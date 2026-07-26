@@ -1,11 +1,3 @@
-<h2 align="center">🎉 全新开源项目，欢迎大家体验</h2>
-
-<p align="center">
-  <a href="https://mediago.torchstellar.com/">
-    <img src="./images/mediago-drama-banner-zh.png" alt="MediaGo Drama — 开源漫剧 Agent，一键产出爆款" width="100%" />
-  </a>
-</p>
-
 <div align="center">
   <h1>MediaGo</h1>
   <a href="https://downloader.caorushizi.cn/guides.html?form=github">快速开始</a>
