@@ -109,7 +109,10 @@ const SourceExtract: FC<SourceExtractProps> = ({ page = false }) => {
 
   return (
     <PageContainer
-      className={cn("flex flex-col p-0", page && "rounded-none border-0")}
+      className={cn(
+        "flex min-h-0 flex-col overflow-hidden p-0",
+        page && "rounded-none border-0",
+      )}
       wrapperClassName={cn(page && "p-0")}
     >
       <ToolBar page={page} />

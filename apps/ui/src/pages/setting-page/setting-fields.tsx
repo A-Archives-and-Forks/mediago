@@ -332,7 +332,7 @@ export function SettingRow({
       orientation="horizontal"
       data-invalid={Boolean(error)}
       className={cn(
-        "grid min-h-14 grid-cols-1 items-start gap-2 py-4 @md/settings:grid-cols-[minmax(140px,0.85fr)_minmax(180px,1.15fr)] @md/settings:items-center @md/settings:gap-6",
+        "grid min-h-14 grid-cols-1 items-start gap-2 py-4 @sm/settings:grid-cols-[minmax(140px,0.85fr)_minmax(180px,1.15fr)] @sm/settings:items-center @sm/settings:gap-6",
         className,
       )}
     >
@@ -350,7 +350,7 @@ export function SettingRow({
       </div>
       <FieldContent
         className={cn(
-          "min-w-0 w-full @md/settings:items-end",
+          "min-w-0 w-full @sm/settings:items-end",
           contentClassName,
         )}
       >

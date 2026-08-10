@@ -244,7 +244,7 @@ const Converter = () => {
           <Button onClick={handleOpenModal}>{t("addFile")}</Button>
         </div>
       }
-      className="flex h-full flex-1 flex-col gap-3 p-3"
+      className="flex h-full min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3"
     >
       <Dialog open={addModalOpen} onOpenChange={setAddModalOpen}>
         <DialogContent>
@@ -329,7 +329,7 @@ const Converter = () => {
         </DialogContent>
       </Dialog>
 
-      <div className="flex flex-1 flex-col overflow-auto">
+      <div className="flex min-h-0 flex-1 flex-col overflow-auto">
         {isLoading ? <Loading /> : null}
         {!isLoading && data?.list?.length === 0 ? (
           <div className="flex h-full flex-1 flex-row items-center justify-center">
@@ -391,6 +391,7 @@ const Converter = () => {
         page={page}
         pageSize={pageSize}
         total={data?.total ?? 0}
+        isLoading={isLoading}
         onPageChange={setPage}
         onPageSizeChange={(size) => {
           setPage(1);

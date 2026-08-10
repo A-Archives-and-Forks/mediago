@@ -75,7 +75,7 @@ func (r *ConversionRepository) FindWithPagination(current, pageSize int) (*Conve
 
 	var items []*db.Conversion
 	offset := (current - 1) * pageSize
-	err := r.db.Order("createdDate ASC").Offset(offset).Limit(pageSize).Find(&items).Error
+	err := r.db.Order("createdDate ASC").Order("id ASC").Offset(offset).Limit(pageSize).Find(&items).Error
 	if err != nil {
 		return nil, err
 	}

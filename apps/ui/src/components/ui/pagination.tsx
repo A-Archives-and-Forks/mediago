@@ -10,42 +10,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn, isWeb } from "@/utils";
+import {
+  getPageItems,
+  getPaginationState,
+  shouldCorrectPage,
+} from "./pagination-logic";
 
 const DEFAULT_PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
-
-type PageItem = number | "ellipsis-start" | "ellipsis-end";
-
-function getPageItems(current: number, totalPages: number): PageItem[] {
-  if (totalPages <= 7) {
-    return Array.from({ length: totalPages }, (_, index) => index + 1);
-  }
-
-  if (current <= 4) {
-    return [1, 2, 3, 4, 5, "ellipsis-end", totalPages];
-  }
-
-  if (current >= totalPages - 3) {
-    return [
-      1,
-      "ellipsis-start",
-      totalPages - 4,
-      totalPages - 3,
-      totalPages - 2,
-      totalPages - 1,
-      totalPages,
-    ];
-  }
-
-  return [
-    1,
-    "ellipsis-start",
-    current - 1,
-    current,
-    current + 1,
-    "ellipsis-end",
-    totalPages,
-  ];
-}
 
 interface PaginationControlProps extends Omit<
   ComponentProps<"nav">,
@@ -58,6 +29,7 @@ interface PaginationControlProps extends Omit<
   onPageSizeChange?: (pageSize: number) => void;
   pageSizeOptions?: number[];
   showSizeChanger?: boolean;
+  isLoading?: boolean;
 }
 
 function PaginationControl({
@@ -69,13 +41,12 @@ function PaginationControl({
   onPageSizeChange,
   pageSizeOptions = DEFAULT_PAGE_SIZE_OPTIONS,
   showSizeChanger,
+  isLoading = false,
   ...props
 }: PaginationControlProps) {
   const { t } = useTranslation();
-  const hasItems = total > 0;
-  const safePageSize = Math.max(1, pageSize);
-  const totalPages = Math.max(1, Math.ceil(total / safePageSize));
-  const safeCurrent = Math.min(Math.max(page, 1), totalPages);
+  const { hasItems, safePageSize, totalPages, safeCurrent } =
+    getPaginationState(page, pageSize, total);
   const pageItems = getPageItems(safeCurrent, totalPages);
   const sizeOptions = pageSizeOptions.includes(safePageSize)
     ? pageSizeOptions
@@ -84,8 +55,10 @@ function PaginationControl({
     Boolean(onPageSizeChange) && (showSizeChanger ?? total > 50);
 
   useEffect(() => {
-    if (page !== safeCurrent) onPageChange(safeCurrent);
-  }, [onPageChange, page, safeCurrent]);
+    if (shouldCorrectPage(page, safeCurrent, isLoading)) {
+      onPageChange(safeCurrent);
+    }
+  }, [isLoading, onPageChange, page, safeCurrent]);
 
   const changePage = (nextPage: number) => {
     if (!hasItems) return;
@@ -102,6 +75,7 @@ function PaginationControl({
   return (
     <nav
       aria-label={t("pagination")}
+      aria-busy={isLoading}
       className={cn("flex items-center gap-1", className)}
       {...props}
     >

@@ -42,7 +42,8 @@ const HomePage: FC<Props> = ({ filter = DownloadFilter.list }) => {
     useShallow(downloadFormSelector),
   );
 
-  const { pagination, total, mutate, setPage, setPageSize } = useTasks(filter);
+  const { data, isLoading, pagination, total, mutate, setPage, setPageSize } =
+    useTasks(filter);
   const { envPath } = useEnvPath();
 
   useUrlInvoke({
@@ -108,9 +109,15 @@ const HomePage: FC<Props> = ({ filter = DownloadFilter.list }) => {
           )}
         </div>
       }
-      className="flex h-full flex-1 flex-col gap-3 p-3"
+      className="flex h-full min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3"
     >
-      <DownloadList filter={filter} />
+      <DownloadList
+        key={filter + ":" + pagination.page + ":" + pagination.pageSize}
+        filter={filter}
+        data={data}
+        isLoading={isLoading}
+        mutate={mutate}
+      />
 
       <PaginationControl
         className="flex justify-end"
@@ -119,6 +126,7 @@ const HomePage: FC<Props> = ({ filter = DownloadFilter.list }) => {
         onPageChange={setPage}
         onPageSizeChange={setPageSize}
         total={total}
+        isLoading={isLoading}
       />
 
       <DownloadForm id={homeId} ref={newFormRef} onConfirm={handleConfirm} />

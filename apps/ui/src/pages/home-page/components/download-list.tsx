@@ -15,24 +15,25 @@ import {
   stopDownload,
   deleteDownloadTask,
 } from "@/api/download-task";
-import { useTasks } from "@/hooks/use-tasks";
+import type { DownloadTaskDetails } from "@/hooks/use-tasks";
 import { cn, tdApp } from "@/utils";
 import { DownloadTaskItem } from "./download-item";
 import { ListHeader } from "./list-header";
 
 interface Props {
   filter: DownloadFilter;
+  data: DownloadTaskDetails[];
+  isLoading: boolean;
+  mutate: () => Promise<unknown>;
 }
 
-export function DownloadTaskList({ filter }: Props) {
+export function DownloadTaskList({ filter, data, isLoading, mutate }: Props) {
   const [selected, setSelected] = useState<number[]>([]);
   const { contextMenu } = usePlatform();
   const { t } = useTranslation();
   const editFormRef = useRef<DownloadFormRef>(null);
   const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const downloadListId = useId();
-  const { mutate, isLoading, data } = useTasks(filter);
-
   useEffect(() => {
     return () => {
       // Clean up any pending refresh timers
@@ -41,7 +42,7 @@ export function DownloadTaskList({ filter }: Props) {
         refreshTimeoutRef.current = null;
       }
     };
-  }, [mutate]);
+  }, []);
 
   const handleItemSelectChange = useMemoizedFn((id: number) => {
     setSelected(
@@ -88,8 +89,12 @@ export function DownloadTaskList({ filter }: Props) {
   const onStopDownload = useMemoizedFn(async (id: number) => {
     await stopDownload(id);
 
-    setTimeout(() => {
+    if (refreshTimeoutRef.current) {
+      clearTimeout(refreshTimeoutRef.current);
+    }
+    refreshTimeoutRef.current = setTimeout(() => {
       mutate();
+      refreshTimeoutRef.current = null;
     }, 500);
   });
 
@@ -151,7 +156,7 @@ export function DownloadTaskList({ filter }: Props) {
   });
 
   return (
-    <div className="flex flex-col flex-1 overflow-auto">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <ListHeader
         selected={selected}
         checked={listChecked}

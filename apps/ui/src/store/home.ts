@@ -1,36 +1,35 @@
+import { DownloadFilter } from "@mediago/shared-common";
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 
 type State = {
-  page: number;
+  pages: Record<DownloadFilter, number>;
   pageSize: number;
 };
 
 type Actions = {
-  setPage: (page: number) => void;
+  setPage: (filter: DownloadFilter, page: number) => void;
   setPageSize: (size: number) => void;
 };
 
 export const useHomeStore = create<State & Actions>()(
   immer((set) => ({
-    page: 0,
+    pages: {
+      [DownloadFilter.list]: 1,
+      [DownloadFilter.done]: 1,
+    },
     pageSize: 20,
-    setPage: (page) => {
+    setPage: (filter, page) => {
       set((state) => {
-        state.page = page;
+        state.pages[filter] = page;
       });
     },
     setPageSize: (pageSize) => {
       set((state) => {
         state.pageSize = pageSize;
+        state.pages[DownloadFilter.list] = 1;
+        state.pages[DownloadFilter.done] = 1;
       });
     },
   })),
 );
-
-export const homeSelector = (s: State & Actions) => ({
-  page: s.page,
-  pageSize: s.pageSize,
-  setPage: s.setPage,
-  setPageSize: s.setPageSize,
-});

@@ -15,7 +15,7 @@ import { useShallow } from "zustand/react/shallow";
 import { downloadStoreSelector, useDownloadStore } from "@/store/download";
 import { getDownloadTasks as fetchDownloadTasks } from "@/api/download-task";
 import { onDownloadEvent } from "@/api/events";
-import { homeSelector, useHomeStore } from "@/store/home";
+import { useHomeStore } from "@/store/home";
 
 /**
  * Extended Download Task with real-time details
@@ -43,8 +43,13 @@ export function useTasks(filter: DownloadFilter = DownloadFilter.list) {
   const { setEvents, eventsMap } = useDownloadStore(
     useShallow(downloadStoreSelector),
   );
-  const { page, pageSize, setPage, setPageSize } = useHomeStore(
-    useShallow(homeSelector),
+  const page = useHomeStore((state) => state.pages[filter]);
+  const pageSize = useHomeStore((state) => state.pageSize);
+  const setStorePage = useHomeStore((state) => state.setPage);
+  const setPageSize = useHomeStore((state) => state.setPageSize);
+  const setPage = useCallback(
+    (nextPage: number) => setStorePage(filter, nextPage),
+    [filter, setStorePage],
   );
 
   const { data, error, isLoading, mutate } = useSWR(
@@ -59,6 +64,7 @@ export function useTasks(filter: DownloadFilter = DownloadFilter.list) {
     ({ args }) => {
       return fetchDownloadTasks(args);
     },
+    { keepPreviousData: true },
   );
 
   const detail: DownloadTaskDetails[] = useMemo(() => {
@@ -161,7 +167,7 @@ export function useTasks(filter: DownloadFilter = DownloadFilter.list) {
 
   return {
     data: detail,
-    total: data?.total || 0,
+    total: data?.total ?? 0,
     isLoading,
     error,
     mutate,

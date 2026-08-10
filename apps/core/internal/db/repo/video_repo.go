@@ -136,7 +136,7 @@ func (r *VideoRepository) FindWithPagination(current, pageSize int, filter strin
 
 	var items []*db.Video
 	offset := (current - 1) * pageSize
-	err := query.Order("createdDate DESC").Offset(offset).Limit(pageSize).Find(&items).Error
+	err := query.Order("createdDate DESC").Order("id DESC").Offset(offset).Limit(pageSize).Find(&items).Error
 	if err != nil {
 		return nil, err
 	}

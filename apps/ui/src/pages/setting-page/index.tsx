@@ -59,7 +59,7 @@ const SettingsCards = memo(function SettingsCards({
   }, []);
 
   return (
-    <div className="mx-auto grid max-w-[1180px] items-start gap-4 xl:grid-cols-2">
+    <div className="mx-auto grid w-full max-w-[1280px] grid-cols-[repeat(auto-fit,minmax(min(100%,430px),1fr))] items-start gap-4">
       <div className="flex min-w-0 flex-col gap-4">
         <StableBasicSettingsCard />
         {!isWeb && visibleStep >= 2 ? <StableBrowserSettingsCard /> : null}
@@ -84,7 +84,7 @@ const SettingsContent = memo(function SettingsContent({
 }) {
   return (
     <SettingsFormProvider>
-      <div className="h-full overflow-x-hidden overflow-y-auto p-4">
+      <div className="h-full min-h-0 overflow-x-hidden overflow-y-auto p-4">
         <SettingsCards onCheckUpdate={onCheckUpdate} />
       </div>
     </SettingsFormProvider>

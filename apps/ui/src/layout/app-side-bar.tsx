@@ -19,11 +19,13 @@ import { useTranslation } from "react-i18next";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { Badge } from "@/components/ui/badge";
+import { HelpButton } from "@/components/help-button";
 import { useAppStore } from "@/store/app";
 import { downloadStoreSelector, useDownloadStore } from "@/store/download";
 import { useSessionStore } from "@/store/session";
 import { cn, isWeb } from "@/utils";
 import { usePlatform } from "@/hooks/use-platform";
+import { AppBrand } from "./app-brand";
 
 function processLocation(pathname: string) {
   const name = pathname === "/" ? "/home" : pathname;
@@ -34,6 +36,9 @@ type MenuItem = {
   label: ReactElement;
   key: string;
 };
+
+const SIDEBAR_HELP_BUTTON_CLASS =
+  "h-10 justify-start gap-1 rounded-md px-3 text-sm font-normal text-muted-foreground hover:bg-surface-hover hover:text-foreground";
 
 interface AppMenuItemProps extends PropsWithChildren {
   onClick?: (event: React.MouseEvent<HTMLAnchorElement>) => void;
@@ -264,12 +269,30 @@ export function AppSideBar({ className }: Props) {
 
   return (
     <aside
-      className={cn("relative select-none border-r bg-surface p-3", className)}
+      className={cn(
+        "relative flex shrink-0 flex-col overflow-hidden border-b bg-surface sm:h-full sm:w-[204px] sm:border-r sm:border-b-0",
+        className,
+      )}
     >
-      <div className="flex flex-row gap-2 sm:w-[180px] sm:flex-col">
-        {visibleItems.map((item) =>
-          cloneElement(item.label, { key: item.key }),
-        )}
+      <AppBrand />
+      <nav className="min-h-0 overflow-x-auto p-3 sm:flex-1 sm:overflow-x-hidden sm:overflow-y-auto">
+        <div className="flex min-w-max flex-row gap-2 sm:min-w-0 sm:flex-col">
+          {visibleItems.map((item) =>
+            cloneElement(item.label, { key: item.key }),
+          )}
+          <div className="sm:hidden">
+            <HelpButton
+              className={SIDEBAR_HELP_BUTTON_CLASS}
+              iconClassName="size-5 stroke-[1.75]"
+            />
+          </div>
+        </div>
+      </nav>
+      <div className="hidden shrink-0 border-t p-3 sm:block">
+        <HelpButton
+          className={cn(SIDEBAR_HELP_BUTTON_CLASS, "w-full")}
+          iconClassName="size-5 stroke-[1.75]"
+        />
       </div>
     </aside>
   );

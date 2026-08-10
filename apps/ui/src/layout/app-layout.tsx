@@ -2,7 +2,6 @@ import { type FC, useEffect } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { CHANGE_PAGE } from "@/const";
 import { tdApp } from "@/utils";
-import { AppHeader } from "./app-header";
 import { AppSideBar } from "./app-side-bar";
 
 function PageAnalytics() {
@@ -17,15 +16,12 @@ function PageAnalytics() {
 
 const App: FC = () => {
   return (
-    <div className="flex h-full w-full flex-col overflow-hidden">
+    <div className="flex h-full w-full flex-col overflow-hidden bg-canvas sm:flex-row">
       <PageAnalytics />
-      <AppHeader className="shrink-0" />
-      <div className="flex flex-1 flex-col overflow-hidden bg-canvas sm:flex-row">
-        <AppSideBar />
-        <div className="flex-1 overflow-auto">
-          <Outlet />
-        </div>
-      </div>
+      <AppSideBar />
+      <main className="min-h-0 min-w-0 flex-1 overflow-hidden">
+        <Outlet />
+      </main>
     </div>
   );
 };

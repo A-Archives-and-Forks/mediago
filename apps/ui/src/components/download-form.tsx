@@ -94,8 +94,11 @@ function FormRow({
   required,
 }: FormRowProps) {
   return (
-    <div className="space-y-2">
-      <label htmlFor={htmlFor} className="block text-sm font-medium">
+    <div className="grid gap-2 sm:grid-cols-[9rem_minmax(0,1fr)] sm:items-start sm:gap-x-4 sm:gap-y-0">
+      <label
+        htmlFor={htmlFor}
+        className="flex min-h-10 items-center text-sm font-medium"
+      >
         {label}
         {required ? (
           <span aria-hidden="true" className="ml-1 text-destructive">
@@ -262,8 +265,8 @@ export default forwardRef<DownloadFormRef, DownloadFormProps>(
 
     return (
       <Dialog open={modalOpen} onOpenChange={setOpen}>
-        <DialogContent className="grid max-h-[calc(100vh-2rem)] max-w-[560px] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0">
-          <DialogHeader className="border-b px-6 py-5 pr-14">
+        <DialogContent className="grid max-h-[calc(100vh-2rem)] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0 sm:max-w-[680px]">
+          <DialogHeader className="border-b px-6 py-4 pr-14 sm:px-7 sm:pr-14">
             <DialogTitle>
               {isEdit ? t("editDownload") : t("newDownload")}
             </DialogTitle>
@@ -273,7 +276,7 @@ export default forwardRef<DownloadFormRef, DownloadFormProps>(
           </DialogHeader>
 
           <form
-            className="space-y-5 overflow-y-auto px-6 py-5"
+            className="space-y-4 overflow-y-auto px-6 py-5 sm:px-7"
             onSubmit={(event) => event.preventDefault()}
           >
             <input
@@ -505,13 +508,13 @@ export default forwardRef<DownloadFormRef, DownloadFormProps>(
             <details
               open={advancedOpen}
               onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}
-              className="group overflow-hidden rounded-md border border-border/70 bg-surface-subtle/40"
+              className="group border-t border-border/70 pt-1"
             >
-              <summary className="flex h-10 cursor-pointer list-none items-center justify-between px-3 text-sm font-medium text-muted-foreground outline-none transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/15 [&::-webkit-details-marker]:hidden">
+              <summary className="flex h-10 cursor-pointer list-none items-center justify-between rounded-md px-1 text-sm font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/15 [&::-webkit-details-marker]:hidden">
                 <span>{t("moreSettings")}</span>
                 <ChevronDown className="size-4 transition-transform group-open:rotate-180" />
               </summary>
-              <div className="space-y-5 border-t bg-surface px-4 py-4">
+              <div className="space-y-4 pt-3">
                 {!isBatch ? (
                   <FormRow htmlFor={`${formId}-folder`} label={t("folder")}>
                     <Input
@@ -555,7 +558,7 @@ export default forwardRef<DownloadFormRef, DownloadFormProps>(
             </details>
           </form>
 
-          <DialogFooter className="border-t bg-surface-subtle/60 px-6 py-4">
+          <DialogFooter className="border-t bg-surface-subtle/60 px-6 py-4 sm:px-7">
             <Button
               type="button"
               variant="ghost"

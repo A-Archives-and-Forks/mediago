@@ -17,6 +17,7 @@ export function useConversions(pagination: ConversionPagination) {
     [getConversionsKey, pagination.current, pagination.pageSize],
     () => getConversions(pagination),
     {
+      keepPreviousData: true,
       refreshInterval: (latestData: unknown) => {
         const d = latestData as ConversionResponse | undefined;
         return d?.list?.some((i) => i.status === "converting") ? 1000 : 0;
