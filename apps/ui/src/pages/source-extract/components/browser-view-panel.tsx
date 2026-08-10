@@ -1,12 +1,8 @@
-import {
-  DeleteOutlined,
-  DockerOutlined,
-  EditOutlined,
-} from "@ant-design/icons";
 import { useMemoizedFn } from "ahooks";
-import { Button as AntdButton, App } from "antd";
+import { Container, Pencil, Trash2 } from "lucide-react";
 import { memo } from "react";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 import { useShallow } from "zustand/react/shallow";
 import { Button } from "@/components/ui/button";
 import { appStoreSelector, useAppStore } from "@/store/app";
@@ -53,32 +49,43 @@ const SourceItem = memo(function SourceItem({
       </span>
       <div className="flex flex-row items-center justify-between gap-3">
         <div className="flex flex-row items-center gap-2">
-          <AntdButton
-            icon={<DeleteOutlined />}
-            type="text"
-            size="small"
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="size-6 p-0 text-destructive hover:text-destructive"
             onClick={() => onDelete(item.url)}
             title={t("delete")}
-            danger
-          />
-          <AntdButton
-            icon={<EditOutlined />}
-            type="text"
-            size="small"
+            aria-label={t("delete")}
+          >
+            <Trash2 className="size-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="size-6 p-0"
             title={t("edit")}
+            aria-label={t("edit")}
             onClick={() => onEdit([item])}
-          />
-          {enableDocker && (
-            <AntdButton
-              icon={<DockerOutlined />}
-              type="text"
-              size="small"
+          >
+            <Pencil className="size-4" />
+          </Button>
+          {enableDocker ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="size-6 p-0"
               title={t("edit")}
+              aria-label={t("edit")}
               onClick={() => onEdit([item])}
-            />
-          )}
+            >
+              <Container className="size-4" />
+            </Button>
+          ) : null}
         </div>
-        <Button size="sm" onClick={() => onDownload(item)}>
+        <Button type="button" size="sm" onClick={() => onDownload(item)}>
           {t("downloadNow")}
         </Button>
       </div>
@@ -94,7 +101,6 @@ export function BrowserViewPanel() {
   );
   const { t } = useTranslation();
   const { browser } = usePlatform();
-  const { message } = App.useApp();
 
   const handleClear = useMemoizedFn(() => {
     clearSources();
@@ -117,16 +123,21 @@ export function BrowserViewPanel() {
       // Badge increments via the "download-create" SSE event (see
       // apps/ui/src/api/events.ts), so no local increase() call needed.
     } catch (e) {
-      message.error((e as Error).message);
+      toast.error(e instanceof Error ? e.message : String(e));
     }
   });
 
   return (
     <div className="flex h-full flex-col gap-3 overflow-y-auto bg-white p-3 dark:bg-[#1F2024]">
       <div>
-        <AntdButton size="small" danger onClick={handleClear}>
+        <Button
+          type="button"
+          size="sm"
+          variant="destructive"
+          onClick={handleClear}
+        >
           {t("clear")}
-        </AntdButton>
+        </Button>
       </div>
       {sources.map((item) => (
         <SourceItem

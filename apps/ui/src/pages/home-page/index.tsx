@@ -1,7 +1,7 @@
-import { QrcodeOutlined } from "@ant-design/icons";
 import { DownloadFilter } from "@mediago/shared-common";
 import { useMemoizedFn } from "ahooks";
-import { Pagination, Popover, QRCode } from "antd";
+import { QrCodeIcon } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { type FC, useId, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
@@ -13,6 +13,12 @@ import DownloadForm, {
 import { HomeDownloadButton } from "@/components/home-download-button";
 import PageContainer from "@/components/page-container";
 import { Button } from "@/components/ui/button";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
+import { PaginationControl } from "@/components/ui/pagination";
 import { CLICK_DOWNLOAD } from "@/const";
 import { usePlatform } from "@/hooks/use-platform";
 import { useEnvPath } from "@/hooks/use-config";
@@ -49,11 +55,6 @@ const HomePage: FC<Props> = ({ filter = DownloadFilter.list }) => {
     },
   });
 
-  const handleChangePage = useMemoizedFn((page: number, pageSize: number) => {
-    setPage(page);
-    setPageSize(pageSize);
-  });
-
   const handleOpenForm = useMemoizedFn(() => {
     tdApp.onEvent(CLICK_DOWNLOAD);
     const item: DownloadFormItem = {
@@ -77,7 +78,10 @@ const HomePage: FC<Props> = ({ filter = DownloadFilter.list }) => {
       rightExtra={
         <div className="flex flex-row gap-2">
           {!isWeb && (
-            <Button onClick={() => shell.open(appStore.local)}>
+            <Button
+              variant="outline"
+              onClick={() => shell.open(appStore.local)}
+            >
               <FolderIcon />
               {t("openFolder")}
             </Button>
@@ -85,20 +89,20 @@ const HomePage: FC<Props> = ({ filter = DownloadFilter.list }) => {
           {filter === DownloadFilter.done &&
             !isWeb &&
             appStore.enableMobilePlayer && (
-              <Popover
-                content={
-                  <div>
-                    <QRCode value={envPath?.playerUrl || ""} />
-                    <div className="text-xs">{t("scanToWatch")}</div>
+              <HoverCard openDelay={100} closeDelay={100}>
+                <HoverCardTrigger asChild>
+                  <Button variant="outline">
+                    <QrCodeIcon />
+                    {t("playOnMobile")}
+                  </Button>
+                </HoverCardTrigger>
+                <HoverCardContent align="end" className="w-auto">
+                  <div className="bg-white p-3">
+                    <QRCodeSVG value={envPath?.playerUrl || ""} size={136} />
                   </div>
-                }
-                placement="bottomRight"
-              >
-                <Button>
-                  <QrcodeOutlined />
-                  {t("playOnMobile")}
-                </Button>
-              </Popover>
+                  <div className="mt-2 text-xs">{t("scanToWatch")}</div>
+                </HoverCardContent>
+              </HoverCard>
             )}
           {filter === DownloadFilter.list && (
             <HomeDownloadButton onClick={handleOpenForm} />
@@ -109,20 +113,16 @@ const HomePage: FC<Props> = ({ filter = DownloadFilter.list }) => {
     >
       <DownloadList filter={filter} />
 
-      <Pagination
+      <PaginationControl
         className="flex justify-end"
-        current={pagination.page}
+        page={pagination.page}
         pageSize={pagination.pageSize}
-        onChange={handleChangePage}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
         total={total}
       />
 
-      <DownloadForm
-        id={homeId}
-        ref={newFormRef}
-        destroyOnClose
-        onConfirm={handleConfirm}
-      />
+      <DownloadForm id={homeId} ref={newFormRef} onConfirm={handleConfirm} />
     </PageContainer>
   );
 };

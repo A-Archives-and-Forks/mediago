@@ -1,4 +1,3 @@
-import { App as AntdApp } from "antd";
 import { CircleHelp } from "lucide-react";
 import {
   createContext,
@@ -18,6 +17,7 @@ import {
   useFormContext,
   type UseFormGetValues,
 } from "react-hook-form";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Field,
@@ -104,7 +104,6 @@ function getInitialSettings(): AppStore {
 }
 
 export function SettingsFormProvider({ children }: { children: ReactNode }) {
-  const { message } = AntdApp.useApp();
   const setAppStore = useAppStore((state) => state.setAppStore);
   const initialSettings = useRef(getInitialSettings());
   const confirmedSettings = useRef({ ...initialSettings.current });
@@ -173,10 +172,10 @@ export function SettingsFormProvider({ children }: { children: ReactNode }) {
           }
         }
 
-        message.error((error as Error).message);
+        toast.error((error as Error).message);
       }
     },
-    [form, message, setAppStore],
+    [form, setAppStore],
   );
 
   const setSettingDrafting = useCallback<SetSettingDrafting>(

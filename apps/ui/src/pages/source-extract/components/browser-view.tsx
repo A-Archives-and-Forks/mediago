@@ -1,9 +1,22 @@
 import { useMemoizedFn } from "ahooks";
-import { Empty, Space, Spin, Splitter } from "antd";
+import { CircleAlert } from "lucide-react";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+} from "@/components/ui/empty";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
+import { Spinner } from "@/components/ui/spinner";
 import WebView from "@/components/web-view";
 import { useBrowserActions } from "@/hooks/use-browser-actions";
 import { usePlatform } from "@/hooks/use-platform";
@@ -38,7 +51,7 @@ export function BrowserView() {
     return () => {
       off("browser:sourceDetected", onSourceDetected);
     };
-  }, []);
+  }, [off, on, onSourceDetected]);
 
   const renderContent = useMemoizedFn(() => {
     // Loading or Loaded: show the WebView so the native WebContentsView is visible
@@ -46,11 +59,11 @@ export function BrowserView() {
       return (
         <div className="relative h-full w-full flex-1">
           <WebView className="h-full w-full flex-1" />
-          {status === BrowserStatus.Loading && (
+          {status === BrowserStatus.Loading ? (
             <div className="absolute inset-0 flex items-center justify-center bg-white/60 dark:bg-black/40">
-              <Spin />
+              <Spinner className="size-5" />
             </div>
-          )}
+          ) : null}
         </div>
       );
     }
@@ -59,11 +72,23 @@ export function BrowserView() {
     if (status === BrowserStatus.Failed) {
       return (
         <div className="flex h-full w-full flex-row items-center justify-center">
-          <Empty description={`${errMsg || t("loadFailed")} (${errCode})`}>
-            <Space>
-              <Button onClick={goHome}>{t("backToHome")}</Button>
-              <Button onClick={() => goto(url)}>{t("refresh")}</Button>
-            </Space>
+          <Empty className="flex-none border-0 p-6 md:p-6">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <CircleAlert />
+              </EmptyMedia>
+              <EmptyDescription>
+                {`${errMsg || t("loadFailed")} (${errCode})`}
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <div className="flex flex-row items-center gap-2">
+                <Button onClick={goHome}>{t("backToHome")}</Button>
+                <Button variant="outline" onClick={() => goto(url)}>
+                  {t("refresh")}
+                </Button>
+              </div>
+            </EmptyContent>
           </Empty>
         </div>
       );
@@ -77,12 +102,13 @@ export function BrowserView() {
       {!sources.length ? (
         renderContent()
       ) : (
-        <Splitter className="flex h-full flex-1 gap-2">
-          <Splitter.Panel>{renderContent()}</Splitter.Panel>
-          <Splitter.Panel min="20%" max="70%" defaultSize={240}>
+        <ResizablePanelGroup orientation="horizontal" className="h-full flex-1">
+          <ResizablePanel className="min-w-0">{renderContent()}</ResizablePanel>
+          <ResizableHandle withHandle className="mx-1" />
+          <ResizablePanel minSize="20%" maxSize="70%" defaultSize={240}>
             <BrowserViewPanel />
-          </Splitter.Panel>
-        </Splitter>
+          </ResizablePanel>
+        </ResizablePanelGroup>
       )}
     </div>
   );

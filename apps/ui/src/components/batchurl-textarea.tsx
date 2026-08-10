@@ -1,31 +1,35 @@
-import { useRef, useEffect } from "react";
-import Input, { TextAreaProps } from "antd/es/input";
-import { cn, isWeb } from "@/utils";
+import { useCallback, useEffect, useRef } from "react";
+import { cn } from "@/utils";
+import { Textarea } from "@/components/ui/textarea";
 
-const { TextArea } = Input;
-
-export interface BatchUrlTextareaProps extends TextAreaProps {}
+export type BatchUrlTextareaProps = React.ComponentProps<typeof Textarea>;
 
 export function BatchUrlTextarea({
   className,
+  ref,
   ...props
 }: BatchUrlTextareaProps) {
-  const textareaRef = useRef<any>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const highlightRef = useRef<HTMLDivElement>(null);
+  const setTextareaRef = useCallback(
+    (element: HTMLTextAreaElement | null) => {
+      textareaRef.current = element;
+      if (typeof ref === "function") ref(element);
+      else if (ref) ref.current = element;
+    },
+    [ref],
+  );
 
   useEffect(() => {
     const handleScroll = () => {
-      if (
-        textareaRef.current?.resizableTextArea?.textArea &&
-        highlightRef.current
-      ) {
-        const textarea = textareaRef.current.resizableTextArea.textArea;
+      if (textareaRef.current && highlightRef.current) {
+        const textarea = textareaRef.current;
         highlightRef.current.scrollTop = textarea.scrollTop;
         highlightRef.current.scrollLeft = textarea.scrollLeft;
       }
     };
 
-    const textarea = textareaRef.current?.resizableTextArea?.textArea;
+    const textarea = textareaRef.current;
     if (textarea) {
       textarea.addEventListener("scroll", handleScroll);
       return () => textarea.removeEventListener("scroll", handleScroll);
@@ -56,16 +60,18 @@ export function BatchUrlTextarea({
       <div
         ref={highlightRef}
         className={cn(
-          "z-1 whitespace-pre wrap-break-word absolute top-0 left-0 right-0 bottom-0 pointer-events-none overflow-hidden border border-transparent text-transparent",
-          [isWeb ? "py-1 px-[11px]" : "py-0 px-[7px]"],
+          "pointer-events-none absolute inset-0 z-1 overflow-hidden wrap-break-word whitespace-pre border border-transparent px-3 py-2 text-base leading-6 text-transparent md:text-sm md:leading-5",
         )}
       >
         {renderHighlightedText()}
       </div>
-      <TextArea
-        ref={textareaRef}
+      <Textarea
+        ref={setTextareaRef}
         {...props}
-        className={cn("z-2 bg-transparent! relative", className)}
+        className={cn(
+          "relative z-2 min-h-0 field-sizing-fixed bg-transparent! leading-6 md:leading-5",
+          className,
+        )}
       />
     </div>
   );

@@ -1,11 +1,13 @@
 import type { DownloadFilter, DownloadTask } from "@mediago/shared-common";
 import { useMemoizedFn } from "ahooks";
-import { App, Empty } from "antd";
 import { produce } from "immer";
+import { InboxIcon } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 import DownloadForm, { type DownloadFormRef } from "@/components/download-form";
 import Loading from "@/components/loading";
+import { Empty, EmptyDescription, EmptyMedia } from "@/components/ui/empty";
 import { EDIT_DOWNLOAD } from "@/const";
 import { usePlatform } from "@/hooks/use-platform";
 import {
@@ -25,10 +27,9 @@ interface Props {
 export function DownloadTaskList({ filter }: Props) {
   const [selected, setSelected] = useState<number[]>([]);
   const { contextMenu } = usePlatform();
-  const { message } = App.useApp();
   const { t } = useTranslation();
   const editFormRef = useRef<DownloadFormRef>(null);
-  const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const downloadListId = useId();
   const { mutate, isLoading, data } = useTasks(filter);
 
@@ -80,7 +81,7 @@ export function DownloadTaskList({ filter }: Props) {
   const onStartDownload = useMemoizedFn(async (id: number) => {
     await startDownload(id);
 
-    message.success(t("addTaskSuccess"));
+    toast.success(t("addTaskSuccess"));
     mutate();
   });
 
@@ -125,7 +126,7 @@ export function DownloadTaskList({ filter }: Props) {
   const onDownloadItems = useMemoizedFn(async (ids: number[]) => {
     await Promise.allSettled(ids.map((id) => startDownload(Number(id))));
 
-    message.success(t("addTaskSuccess"));
+    toast.success(t("addTaskSuccess"));
     mutate();
     setSelected([]);
   });
@@ -168,7 +169,12 @@ export function DownloadTaskList({ filter }: Props) {
         {isLoading && <Loading />}
         {data.length === 0 && !isLoading && (
           <div className="flex h-full flex-1 flex-row items-center justify-center rounded-lg bg-white dark:bg-[#1F2024]">
-            <Empty description={t("noData")} />
+            <Empty>
+              <EmptyMedia variant="icon">
+                <InboxIcon />
+              </EmptyMedia>
+              <EmptyDescription>{t("noData")}</EmptyDescription>
+            </Empty>
           </div>
         )}
         {data.length > 0 &&

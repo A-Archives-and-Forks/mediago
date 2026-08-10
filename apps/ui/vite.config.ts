@@ -31,7 +31,6 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes("antd") || id.includes("@ant-design")) return "antd";
           if (id.includes("zustand") || id.includes("immer")) return "zustand";
           if (
             id.includes("react-dom") ||

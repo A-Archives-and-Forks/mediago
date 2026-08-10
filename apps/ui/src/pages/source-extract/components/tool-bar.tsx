@@ -1,6 +1,5 @@
-import { EyeInvisibleOutlined } from "@ant-design/icons";
 import { useMemoizedFn } from "ahooks";
-import { Input, Tooltip } from "antd";
+import { EyeOff } from "lucide-react";
 import { type KeyboardEvent, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
@@ -17,6 +16,13 @@ import {
   ShareIcon,
 } from "@/assets/svg";
 import { IconButton } from "@/components/icon-button";
+import { Input } from "@/components/ui/input";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   appStoreSelector,
   setAppStoreSelector,
@@ -176,40 +182,48 @@ export function ToolBar({ page }: Props) {
           )
         }
       />
-      <Input
-        key="url-input"
-        value={store.url}
-        onChange={(e) => {
-          const url = e.target.value;
-          setBrowserStore({ url });
-        }}
-        onFocus={(e) => {
-          e.target.select();
-        }}
-        onKeyDown={onInputKeyDown}
-        onContextMenu={onInputContextMenu}
-        placeholder={t("pleaseEnterUrl")}
-        prefix={
-          appStore.privacy ? (
-            <Tooltip placement="top" title={t("privacy")}>
-              <EyeInvisibleOutlined />
+      <div className="relative min-w-0 flex-1">
+        {appStore.privacy ? (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="absolute left-3 top-1/2 z-10 flex -translate-y-1/2 items-center text-muted-foreground">
+                  <EyeOff className="size-4" />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top">{t("privacy")}</TooltipContent>
             </Tooltip>
-          ) : undefined
-        }
-      />
+          </TooltipProvider>
+        ) : null}
+        <Input
+          key="url-input"
+          className={cn("h-8", { "pl-9": appStore.privacy })}
+          value={store.url}
+          onChange={(e) => {
+            const url = e.target.value;
+            setBrowserStore({ url });
+          }}
+          onFocus={(e) => {
+            e.currentTarget.select();
+          }}
+          onKeyDown={onInputKeyDown}
+          onContextMenu={onInputContextMenu}
+          placeholder={t("pleaseEnterUrl")}
+        />
+      </div>
       <IconButton
         title={t("visit")}
         onClick={onClickEnter}
         disabled={!store.url}
         icon={<SendIcon fill={iconColor} />}
       />
-      {page && (
+      {page ? (
         <IconButton
           title={t("mergeToMainWindow")}
           onClick={onCombineToHome}
           icon={<ShareIcon className="rotate-180" fill={iconColor} />}
         />
-      )}
+      ) : null}
     </div>
   );
 }

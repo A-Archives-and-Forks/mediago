@@ -1,16 +1,11 @@
 import {
-  FileTextOutlined,
-  PauseCircleOutlined,
-  PlayCircleOutlined,
-} from "@ant-design/icons";
-import {
   DownloadProgress,
   DownloadStatus,
   type DownloadTask,
   type DownloadTaskWithFile,
 } from "@mediago/shared-common";
 import { useMemoizedFn } from "ahooks";
-import { Progress } from "antd";
+import { FileTextIcon, PauseCircleIcon, PlayCircleIcon } from "lucide-react";
 import { memo, type ReactNode, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
@@ -25,6 +20,7 @@ import {
 import { DownloadTag } from "@/components/download-tag";
 import { IconButton } from "@/components/icon-button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Progress } from "@/components/ui/progress";
 import {
   CONTINUE_DOWNLOAD,
   DOWNLOAD_NOW,
@@ -94,7 +90,11 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
           <IconButton
             key="terminal"
             title={t("terminal")}
-            icon={<FileTextOutlined />}
+            icon={
+              <span>
+                <FileTextIcon className="size-full" />
+              </span>
+            }
           />
         }
         title={task.name}
@@ -130,7 +130,11 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
           <IconButton
             key="stop"
             title={t("pause")}
-            icon={<PauseCircleOutlined />}
+            icon={
+              <span>
+                <PauseCircleIcon className="size-full" />
+              </span>
+            }
             onClick={handleStop}
           />,
         );
@@ -167,7 +171,11 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
         buttons.push(
           <IconButton
             key="play"
-            icon={<PlayCircleOutlined />}
+            icon={
+              <span>
+                <PlayCircleIcon className="size-full" />
+              </span>
+            }
             title={t("playVideo")}
             disabled={!task.exists}
             onClick={handlePlay}
@@ -187,16 +195,16 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
     t,
   ]);
 
-  const renderTitle = useMemoizedFn((task: DownloadTaskWithFile): ReactNode => {
+  const renderTitle = useMemoizedFn((item: DownloadTaskWithFile): ReactNode => {
     return (
       <div
         className={cn("truncate text-sm dark:text-[#B4B4B4]", {
           "text-[#127af3]": selected,
         })}
-        title={task.name}
+        title={item.name}
       >
-        {task.folder ? `${task.folder}/` : task.folder}
-        {task.name}
+        {item.folder ? `${item.folder}/` : item.folder}
+        {item.name}
       </div>
     );
   });
@@ -269,28 +277,28 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
   }, [task, t]);
 
   const renderDescription = useMemoizedFn(
-    (task: DownloadTaskDetails): ReactNode => {
-      if (task.percent && task.status === DownloadStatus.Downloading) {
-        const val = Math.round(Number(task.percent));
+    (item: DownloadTaskDetails): ReactNode => {
+      if (item.percent && item.status === DownloadStatus.Downloading) {
+        const val = Math.round(Number(item.percent));
 
         return (
           <div className="flex flex-row items-center gap-2 text-xs text-[rgba(0,0,0,0.88)] dark:text-[rgba(255,255,255,0.85)]">
-            <Progress percent={val} strokeLinecap="butt" showInfo={false} />
+            <Progress value={val} className="rounded-none" />
             <div className="min-w-5 shrink-0">{val}%</div>
-            <div className="min-w-20 shrink-0">{task.speed}</div>
+            <div className="min-w-20 shrink-0">{item.speed}</div>
           </div>
         );
       }
       return (
         <div
           className="relative flex flex-col gap-1 text-xs text-[#B3B3B3] dark:text-[#515257]"
-          title={task.url}
+          title={item.url}
         >
-          <div className="truncate">{task.url}</div>
+          <div className="truncate">{item.url}</div>
           <div className="truncate">
-            {t("createdAt")} {fromatDateTime(task.createdDate)}
+            {t("createdAt")} {fromatDateTime(item.createdDate)}
           </div>
-          {task.status === DownloadStatus.Failed && (
+          {item.status === DownloadStatus.Failed && (
             <TerminalDialog
               asChild
               trigger={
@@ -298,8 +306,8 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
                   {t("failReason")}: ...
                 </div>
               }
-              title={task.name}
-              id={task.id}
+              title={item.name}
+              id={item.id}
             />
           )}
         </div>

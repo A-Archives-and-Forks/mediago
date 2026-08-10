@@ -1,9 +1,17 @@
-import { Modal, Progress } from "antd";
 import { useMemoizedFn } from "ahooks";
 import { memo, startTransition, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import PageContainer from "@/components/page-container";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Progress } from "@/components/ui/progress";
 import { CHECK_UPDATE } from "@/const";
 import { usePlatform } from "@/hooks/use-platform";
 import { useSessionStore } from "@/store/session";
@@ -127,50 +135,60 @@ const SettingPage = () => {
     };
   }, [off, on]);
 
+  const displayedDownloadProgress = updateDownloaded ? 100 : downloadProgress;
+
   return (
     <PageContainer title={t("setting")} className="-mr-3 overflow-visible">
       <SettingsContent onCheckUpdate={handleCheckUpdate} />
 
-      {openUpdateModal ? (
-        <Modal
-          title={t("updateModal")}
-          open={openUpdateModal}
-          onCancel={handleHiddenUpdateModal}
-          footer={
-            <div className="flex justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleHiddenUpdateModal}
-              >
-                {t("close")}
-              </Button>
-              {updateAvailable ? (
-                updateDownloaded ? (
-                  <Button type="button" onClick={handleInstallUpdate}>
-                    {t("install")}
-                  </Button>
-                ) : (
-                  <Button type="button" onClick={handleUpdate}>
-                    {t("update")}
-                  </Button>
-                )
-              ) : null}
-            </div>
-          }
-        >
-          <div className="flex min-h-28 flex-col justify-center">
-            {updateChecking
-              ? t("checkingForUpdates")
-              : updateAvailable
-                ? t("updateAvailable")
-                : t("updateNotAvailable")}
+      <Dialog open={openUpdateModal} onOpenChange={setOpenUpdateModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("updateModal")}</DialogTitle>
+          </DialogHeader>
+          <div className="flex min-h-28 flex-col justify-center gap-3">
+            <DialogDescription>
+              {updateChecking
+                ? t("checkingForUpdates")
+                : updateAvailable
+                  ? t("updateAvailable")
+                  : t("updateNotAvailable")}
+            </DialogDescription>
             {!updateChecking && updateAvailable ? (
-              <Progress percent={updateDownloaded ? 100 : downloadProgress} />
+              <div className="flex items-center gap-3">
+                <Progress
+                  value={displayedDownloadProgress}
+                  aria-label={t("updateAvailable")}
+                  className="flex-1"
+                />
+                <span className="w-12 text-right text-sm tabular-nums">
+                  {Math.round(displayedDownloadProgress)}%
+                </span>
+              </div>
             ) : null}
           </div>
-        </Modal>
-      ) : null}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleHiddenUpdateModal}
+            >
+              {t("close")}
+            </Button>
+            {updateAvailable ? (
+              updateDownloaded ? (
+                <Button type="button" onClick={handleInstallUpdate}>
+                  {t("install")}
+                </Button>
+              ) : (
+                <Button type="button" onClick={handleUpdate}>
+                  {t("update")}
+                </Button>
+              )
+            ) : null}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageContainer>
   );
 };

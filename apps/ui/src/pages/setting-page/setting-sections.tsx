@@ -1,4 +1,3 @@
-import { App as AntdApp } from "antd";
 import {
   Chrome,
   Copy,
@@ -10,6 +9,7 @@ import {
 import { memo } from "react";
 import { useTranslation } from "react-i18next";
 import { useController, useFormContext } from "react-hook-form";
+import { toast } from "sonner";
 import {
   exportFavorites as exportFavoritesApi,
   importFavorites,
@@ -137,7 +137,6 @@ export const BasicSettingsCard = memo(function BasicSettingsCard() {
 export const BrowserSettingsCard = memo(function BrowserSettingsCard() {
   const { t } = useTranslation();
   const { browser, contextMenu, dialog } = usePlatform();
-  const { message } = AntdApp.useApp();
 
   const showTextMenu = () =>
     contextMenu.show([
@@ -148,9 +147,9 @@ export const BrowserSettingsCard = memo(function BrowserSettingsCard() {
   const clearCache = async () => {
     try {
       await browser.clearCache();
-      message.success(t("clearCacheSuccess"));
+      toast.success(t("clearCacheSuccess"));
     } catch {
-      message.error(t("clearCacheFailed"));
+      toast.error(t("clearCacheFailed"));
     }
   };
 
@@ -165,9 +164,9 @@ export const BrowserSettingsCard = memo(function BrowserSettingsCard() {
         defaultPath: "favorites.json",
         filters: [{ name: "JSON", extensions: ["json"] }],
       });
-      message.success(t("exportFavoriteSuccess"));
+      toast.success(t("exportFavoriteSuccess"));
     } catch {
-      message.error(t("exportFavoriteFailed"));
+      toast.error(t("exportFavoriteFailed"));
     }
   };
 
@@ -181,9 +180,9 @@ export const BrowserSettingsCard = memo(function BrowserSettingsCard() {
       if (!contents?.length) return;
       const favorites = JSON.parse(contents[0]);
       if (Array.isArray(favorites)) await importFavorites(favorites);
-      message.success(t("importFavoriteSuccess"));
+      toast.success(t("importFavoriteSuccess"));
     } catch {
-      message.error(t("importFavoriteFailed"));
+      toast.error(t("importFavoriteFailed"));
     }
   };
 
@@ -310,7 +309,6 @@ export const SkillsSettingsCard = memo(function SkillsSettingsCard() {
   const { t } = useTranslation();
   const { envPath } = useEnvPath();
   const apiKey = useAppStore((state) => state.apiKey);
-  const { message } = AntdApp.useApp();
   const coreUrl = envPath?.playerUrl
     ? envPath.playerUrl.replace(/\/player\/$/, "")
     : "";
@@ -326,9 +324,9 @@ export const SkillsSettingsCard = memo(function SkillsSettingsCard() {
   const copy = async (value: string) => {
     try {
       await navigator.clipboard.writeText(value);
-      message.success(t("skillsCopied"));
+      toast.success(t("skillsCopied"));
     } catch (error: unknown) {
-      message.error(error instanceof Error ? error.message : String(error));
+      toast.error(error instanceof Error ? error.message : String(error));
     }
   };
 

@@ -1,29 +1,37 @@
-import {
-  DeleteOutlined,
-  FolderOpenOutlined,
-  CaretRightOutlined,
-  PauseOutlined,
-} from "@ant-design/icons";
 import { type Conversion } from "@mediago/shared-common";
 import { useMemoizedFn } from "ahooks";
-import {
-  App,
-  Badge,
-  Empty,
-  Form,
-  Input,
-  Modal,
-  Pagination,
-  Progress,
-  Select,
-  Space,
-  Button as AntButton,
-} from "antd";
+import { FileQuestion, FolderOpen, Pause, Play, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 import { IconButton } from "@/components/icon-button";
 import PageContainer from "@/components/page-container";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+} from "@/components/ui/empty";
+import { Input } from "@/components/ui/input";
+import { PaginationControl } from "@/components/ui/pagination";
+import { Progress } from "@/components/ui/progress";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ADD_CONVERT_TASK, DELETE_CONVERT, START_CONVERT } from "@/const";
 import { tdApp } from "@/utils";
 import { useConversions } from "@/hooks/use-conversions";
@@ -56,11 +64,20 @@ const QUALITY_OPTIONS = [
   { label: "Low", value: "low" },
 ];
 
-const STATUS_COLORS: Record<string, string> = {
-  pending: "default",
-  converting: "processing",
-  done: "success",
-  failed: "error",
+const STATUS_STYLES: Record<
+  string,
+  {
+    variant: "default" | "secondary" | "destructive" | "outline";
+    className?: string;
+  }
+> = {
+  pending: { variant: "secondary" },
+  converting: { variant: "default" },
+  done: {
+    variant: "outline",
+    className: "border-emerald-500/40 text-emerald-600 dark:text-emerald-400",
+  },
+  failed: { variant: "destructive" },
 };
 
 const Converter = () => {
@@ -77,7 +94,6 @@ const Converter = () => {
     stopConversion,
   } = useConversions({ current: page, pageSize });
   const { dialog, shell } = usePlatform();
-  const { message } = App.useApp();
   const [outputFormat, setOutputFormat] = useState("mp3");
   const [quality, setQuality] = useState("medium");
   const [filePath, setFilePath] = useState("");
@@ -89,7 +105,7 @@ const Converter = () => {
       const file = paths?.[0];
       if (file) setFilePath(file);
     } catch (e: unknown) {
-      message.error((e as Error).message);
+      toast.error((e as Error).message);
     }
   });
 
@@ -100,7 +116,7 @@ const Converter = () => {
 
   const doAddConversion = useMemoizedFn(async (startImmediately: boolean) => {
     if (!filePath) {
-      message.warning(t("pleaseSelectFile"));
+      toast.warning(t("pleaseSelectFile"));
       return;
     }
     try {
@@ -112,12 +128,12 @@ const Converter = () => {
         quality,
       });
       tdApp.onEvent(ADD_CONVERT_TASK);
-      if (startImmediately && (conv as Record<string, unknown>)?.id) {
-        await startConversion((conv as Record<string, unknown>).id);
+      if (startImmediately && conv.id) {
+        await startConversion(conv.id);
       }
       setAddModalOpen(false);
     } catch (e: unknown) {
-      message.error((e as Error).message);
+      toast.error((e as Error).message);
     }
   });
 
@@ -126,7 +142,7 @@ const Converter = () => {
     try {
       await startConversion(id);
     } catch (e: unknown) {
-      message.error((e as Error).message);
+      toast.error((e as Error).message);
     }
   });
 
@@ -134,7 +150,7 @@ const Converter = () => {
     try {
       await stopConversion(id);
     } catch (e: unknown) {
-      message.error((e as Error).message);
+      toast.error((e as Error).message);
     }
   });
 
@@ -169,7 +185,7 @@ const Converter = () => {
       case "converting":
         return (
           <div title={t("stop")} onClick={() => handleStop(item.id)}>
-            <IconButton icon={<PauseOutlined />} />
+            <IconButton icon={<Pause className="size-4" />} />
           </div>
         );
       case "done":
@@ -180,11 +196,11 @@ const Converter = () => {
                 title={t("openFolder")}
                 onClick={() => handleOpenFolder(item.outputPath)}
               >
-                <IconButton icon={<FolderOpenOutlined />} />
+                <IconButton icon={<FolderOpen className="size-4" />} />
               </div>
             )}
             <div title={t("delete")} onClick={() => handleDelete(item.id)}>
-              <IconButton icon={<DeleteOutlined />} />
+              <IconButton icon={<Trash2 className="size-4" />} />
             </div>
           </>
         );
@@ -192,10 +208,10 @@ const Converter = () => {
         return (
           <>
             <div title={t("start")} onClick={() => handleStart(item.id)}>
-              <IconButton icon={<CaretRightOutlined />} />
+              <IconButton icon={<Play className="size-4" />} />
             </div>
             <div title={t("delete")} onClick={() => handleDelete(item.id)}>
-              <IconButton icon={<DeleteOutlined />} />
+              <IconButton icon={<Trash2 className="size-4" />} />
             </div>
           </>
         );
@@ -212,71 +228,114 @@ const Converter = () => {
     <PageContainer
       title={t("converter")}
       rightExtra={
-        <Space>
-          {hasPending && (
+        <div className="flex items-center gap-2">
+          {hasPending ? (
             <Button variant="outline" onClick={handleConvertAll}>
               {t("convertAll")}
             </Button>
-          )}
+          ) : null}
           <Button onClick={handleOpenModal}>{t("addFile")}</Button>
-        </Space>
+        </div>
       }
       className="rounded-lg bg-white dark:bg-[#1F2024] flex flex-col flex-1 h-full gap-3 p-3"
     >
-      <Modal
-        title={t("addFile")}
-        open={addModalOpen}
-        onCancel={() => setAddModalOpen(false)}
-        footer={
-          <Space>
+      <Dialog open={addModalOpen} onOpenChange={setAddModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("addFile")}</DialogTitle>
+            <DialogDescription className="sr-only">
+              {t("pleaseSelectFile")}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium" htmlFor="conversion-file">
+                {t("filePath")}
+              </label>
+              <div className="flex w-full">
+                <Input
+                  id="conversion-file"
+                  className="rounded-r-none"
+                  value={filePath}
+                  readOnly
+                  placeholder={t("pleaseSelectFile")}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-l-none border-l-0"
+                  onClick={handleBrowseFile}
+                >
+                  {t("browse")}
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium" htmlFor="output-format">
+                {t("outputFormat")}
+              </label>
+              <Select value={outputFormat} onValueChange={setOutputFormat}>
+                <SelectTrigger id="output-format" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {FORMAT_OPTIONS.flatMap((group) => group.options).map(
+                    (option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ),
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium" htmlFor="quality">
+                {t("quality")}
+              </label>
+              <Select value={quality} onValueChange={setQuality}>
+                <SelectTrigger id="quality" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {QUALITY_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
             <Button
-              key="add"
+              type="button"
               variant="outline"
               onClick={() => doAddConversion(false)}
             >
               {t("addToList")}
             </Button>
-            <Button key="convert" onClick={() => doAddConversion(true)}>
+            <Button type="button" onClick={() => doAddConversion(true)}>
               {t("convertNow")}
             </Button>
-          </Space>
-        }
-      >
-        <Form layout="vertical" className="mt-4">
-          <Form.Item label={t("filePath")}>
-            <Space.Compact style={{ width: "100%" }}>
-              <Input
-                value={filePath}
-                readOnly
-                placeholder={t("pleaseSelectFile")}
-              />
-              <AntButton onClick={handleBrowseFile}>{t("browse")}</AntButton>
-            </Space.Compact>
-          </Form.Item>
-          <Form.Item label={t("outputFormat")}>
-            <Select
-              value={outputFormat}
-              onChange={setOutputFormat}
-              options={FORMAT_OPTIONS}
-            />
-          </Form.Item>
-          <Form.Item label={t("quality")}>
-            <Select
-              value={quality}
-              onChange={setQuality}
-              options={QUALITY_OPTIONS}
-            />
-          </Form.Item>
-        </Form>
-      </Modal>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="flex flex-col gap-3 flex-1 overflow-auto">
-        {isLoading && <Loading />}
-        {!isLoading && data?.list?.length === 0 && (
+        {isLoading ? <Loading /> : null}
+        {!isLoading && data?.list?.length === 0 ? (
           <div className="flex h-full flex-1 flex-row items-center justify-center rounded-lg bg-white dark:bg-[#1F2024]">
-            <Empty description={t("noData")} />
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <FileQuestion />
+                </EmptyMedia>
+                <EmptyDescription>{t("noData")}</EmptyDescription>
+              </EmptyHeader>
+            </Empty>
           </div>
-        )}
+        ) : null}
         {!isLoading &&
           Array.isArray(data?.list) &&
           data.list.length > 0 &&
@@ -291,21 +350,13 @@ const Converter = () => {
                     {item.name}
                   </span>
                   <Badge
-                    status={
-                      STATUS_COLORS[item.status] as
-                        | "default"
-                        | "processing"
-                        | "success"
-                        | "error"
-                    }
-                    text={
-                      <span className="text-xs">
-                        {item.status === "converting"
-                          ? `${item.progress}%`
-                          : item.status}
-                      </span>
-                    }
-                  />
+                    variant={STATUS_STYLES[item.status]?.variant ?? "secondary"}
+                    className={STATUS_STYLES[item.status]?.className}
+                  >
+                    {item.status === "converting"
+                      ? `${item.progress}%`
+                      : item.status}
+                  </Badge>
                   {item.outputFormat && (
                     <span className="text-xs text-[#AAB5CB]">
                       → .{item.outputFormat}
@@ -315,11 +366,7 @@ const Converter = () => {
                 <div className="flex flex-row gap-3">{renderActions(item)}</div>
               </div>
               {item.status === "converting" && (
-                <Progress
-                  percent={item.progress}
-                  size="small"
-                  showInfo={false}
-                />
+                <Progress value={item.progress} className="h-1.5" />
               )}
               <div className="text-xs text-[#AAB5CB]">
                 {item.status === "done" && item.outputPath
@@ -333,15 +380,16 @@ const Converter = () => {
           ))}
       </div>
 
-      <Pagination
-        className="flex justify-end"
-        current={page}
+      <PaginationControl
+        className="justify-end"
+        page={page}
         pageSize={pageSize}
-        onChange={(p, ps) => {
-          setPage(p);
-          setPageSize(ps);
-        }}
         total={data?.total ?? 0}
+        onPageChange={setPage}
+        onPageSizeChange={(size) => {
+          setPage(1);
+          setPageSize(size);
+        }}
       />
     </PageContainer>
   );

@@ -1,5 +1,4 @@
 import { useMemoizedFn } from "ahooks";
-import { Badge } from "antd";
 import {
   cloneElement,
   type PropsWithChildren,
@@ -18,6 +17,7 @@ import {
   SettingsIcon,
   ShareIcon,
 } from "@/assets/svg";
+import { Badge } from "@/components/ui/badge";
 import { useAppStore } from "@/store/app";
 import { downloadStoreSelector, useDownloadStore } from "@/store/download";
 import { useSessionStore } from "@/store/session";
@@ -138,7 +138,13 @@ export function AppSideBar({ className }: Props) {
           >
             <span>{t("downloadList")}</span>
             {count > 0 ? (
-              <Badge count={count} offset={[5, 1]} size="small" />
+              <Badge
+                className="relative left-[5px] top-px h-4 min-w-4 border-0 bg-[#ff4d4f] px-1 py-0 text-[10px] leading-4 text-white"
+                title={String(count)}
+                aria-label={`${t("downloadList")}: ${count}`}
+              >
+                {count > 99 ? "99+" : count}
+              </Badge>
             ) : null}
           </AppMenuItem>
         ),
@@ -196,7 +202,11 @@ export function AppSideBar({ className }: Props) {
             icon={<SettingsIcon />}
           >
             <span>{t("setting")}</span>
-            <Badge dot={updateAvailable} offset={[-13, -3]} />
+            {updateAvailable ? (
+              <span className="relative size-0">
+                <Badge className="absolute -left-[13px] -top-[3px] size-1.5 border-0 bg-[#ff4d4f] p-0" />
+              </span>
+            ) : null}
           </AppMenuItem>
         ),
         key: "settings",

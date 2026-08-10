@@ -1,7 +1,7 @@
-import { LinkOutlined } from "@ant-design/icons";
-import { Avatar } from "antd";
+import { Link as LinkIcon } from "lucide-react";
 import { type ReactElement } from "react";
 import { CloseIcon } from "@/assets/svg";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface Props {
   onContextMenu?: () => void;
@@ -26,7 +26,7 @@ export function FavItem({
       onContextMenu={onContextMenu}
       onClick={onClick}
     >
-      {onClose && (
+      {onClose ? (
         <div
           className="absolute right-1 top-1 hidden group-hover:block"
           onClick={(e) => {
@@ -37,15 +37,14 @@ export function FavItem({
         >
           <CloseIcon width={15} height={15} />
         </div>
-      )}
+      ) : null}
       <div className="flex h-14 w-14 flex-row items-center justify-center rounded-lg bg-white dark:bg-[#27292F]">
-        <Avatar
-          size={35}
-          src={src}
-          shape="square"
-          icon={icon || <LinkOutlined size={35} />}
-          className="bg-white text-[#27292F] dark:bg-[#27292F] dark:text-white"
-        />
+        <Avatar className="size-9 rounded-md bg-white text-[#27292F] dark:bg-[#27292F] dark:text-white">
+          <AvatarImage src={src} alt={title || ""} />
+          <AvatarFallback className="rounded-md bg-white text-[#27292F] dark:bg-[#27292F] dark:text-white">
+            {icon ?? <LinkIcon className="size-5" />}
+          </AvatarFallback>
+        </Avatar>
       </div>
       <div
         className="w-full truncate text-center text-sm text-[#636D7E]"

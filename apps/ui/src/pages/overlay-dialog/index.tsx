@@ -43,7 +43,6 @@ export default function OverlayDialog() {
       id={dialogId}
       isEdit
       ref={downloadForm}
-      destroyOnClose
       onFormVisibleChange={handleFormVisibleChange}
     />
   );

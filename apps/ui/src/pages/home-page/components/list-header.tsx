@@ -1,11 +1,17 @@
+import { DownloadFilter } from "@mediago/shared-common";
 import { useMemoizedFn } from "ahooks";
-import { App, Button, Dropdown, type MenuProps } from "antd";
-import { useMemo } from "react";
 import { Trans, useTranslation } from "react-i18next";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { usePlatform } from "@/hooks/use-platform";
 import { isWeb } from "@/utils";
-import { DownloadFilter } from "@mediago/shared-common";
 
 interface Props {
   onSelectAll: (checked: boolean) => void;
@@ -26,34 +32,22 @@ export function ListHeader({
   onCancelItems,
   filter,
 }: Props) {
-  const { message } = App.useApp();
   const { t } = useTranslation();
-  const disabled = useMemo(() => selected.length === 0, [selected.length]);
+  const disabled = selected.length === 0;
   const { dialog } = usePlatform();
-  const items: MenuProps["items"] = useMemo(() => {
-    return [
-      {
-        key: "exportDownloadList",
-        label: t("exportDownloadList"),
-      },
-    ];
-  }, [t]);
 
-  const onMenuClick: MenuProps["onClick"] = useMemoizedFn(async (e) => {
-    const { key } = e;
-    if (key === "exportDownloadList") {
-      try {
-        const { exportDownloadList } = await import("@/api/download-task");
-        const content = await exportDownloadList();
-        await dialog.save({
-          content:
-            typeof content === "string" ? content : JSON.stringify(content),
-          defaultPath: "downloads.txt",
-          filters: [{ name: "Text", extensions: ["txt"] }],
-        });
-      } catch {
-        message.error(t("exportDownloadListFailed"));
-      }
+  const handleExportDownloadList = useMemoizedFn(async () => {
+    try {
+      const { exportDownloadList } = await import("@/api/download-task");
+      const content = await exportDownloadList();
+      await dialog.save({
+        content:
+          typeof content === "string" ? content : JSON.stringify(content),
+        defaultPath: "downloads.txt",
+        filters: [{ name: "Text", extensions: ["txt"] }],
+      });
+    } catch {
+      toast.error(t("exportDownloadListFailed"));
     }
   });
 
@@ -78,31 +72,35 @@ export function ListHeader({
       </div>
       <div className="flex flex-row items-center gap-3">
         <Button
+          variant="outline"
           disabled={disabled}
-          onClick={async () => onDeleteItems(selected)}
+          onClick={() => onDeleteItems(selected)}
         >
           {t("delete")}
         </Button>
-        <Button disabled={disabled} onClick={() => onCancelItems()}>
+        <Button
+          variant="outline"
+          disabled={disabled}
+          onClick={() => onCancelItems()}
+        >
           {t("cancel")}
         </Button>
         {filter === DownloadFilter.list && (
-          <Button
-            disabled={disabled}
-            type="primary"
-            onClick={() => onDownloadItems(selected)}
-          >
+          <Button disabled={disabled} onClick={() => onDownloadItems(selected)}>
             {t("download")}
           </Button>
         )}
         {!isWeb && (
-          <Dropdown
-            menu={{ items, onClick: onMenuClick }}
-            placement="bottomRight"
-            trigger={["click"]}
-          >
-            <Button type="primary">{t("more")}</Button>
-          </Dropdown>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button>{t("more")}</Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={handleExportDownloadList}>
+                {t("exportDownloadList")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
       </div>
     </div>

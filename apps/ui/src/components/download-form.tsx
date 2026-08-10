@@ -1,33 +1,44 @@
-import {
-  CloudDownloadOutlined,
-  DockerOutlined,
-  UnorderedListOutlined,
-} from "@ant-design/icons";
 import { useAsyncEffect, useMemoizedFn } from "ahooks";
+import { Container, Download, ListPlus } from "lucide-react";
 import {
-  App,
-  AutoComplete,
-  Button,
-  Form,
-  Input,
-  Modal,
-  Select,
-  Switch,
-} from "antd";
-import { forwardRef, useImperativeHandle, useState } from "react";
+  forwardRef,
+  type ReactNode,
+  useId,
+  useImperativeHandle,
+  useState,
+} from "react";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 import { useShallow } from "zustand/react/shallow";
-import { ADD_TO_LIST, DOWNLOAD_NOW } from "@/const";
-import { usePlatform } from "@/hooks/use-platform";
 import { createDownloadTasks, getDownloadFolders } from "@/api/download-task";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import { ADD_TO_LIST, DOWNLOAD_NOW } from "@/const";
 import { useDockerApi } from "@/hooks/use-docker-api";
+import { usePlatform } from "@/hooks/use-platform";
 import { appStoreSelector, useAppStore } from "@/store/app";
 import { downloadFormSelector, useConfigStore } from "@/store/config";
-import { tdApp } from "@/utils";
+import { cn, tdApp } from "@/utils";
 import { DownloadTask, DownloadType } from "@mediago/shared-common";
 import { BatchUrlTextarea } from "./batchurl-textarea";
-
-const { TextArea } = Input;
 
 export interface DownloadFormItem {
   batch?: boolean;
@@ -42,7 +53,6 @@ export interface DownloadFormItem {
 
 export interface DownloadFormProps {
   isEdit?: boolean;
-  destroyOnClose?: boolean;
   onFormVisibleChange?: (open: boolean) => void;
   onConfirm?: (values: DownloadFormItem) => void;
   id: string;
@@ -59,160 +69,125 @@ export interface DownloadTaskForm extends DownloadTask {
   batchList?: string;
 }
 
-interface Options {
-  label: string;
-  value: string;
+const DOWNLOAD_TYPE_OPTIONS = [
+  { value: DownloadType.m3u8, labelKey: "streamMedia" },
+  { value: DownloadType.bilibili, labelKey: "bilibiliMedia" },
+  { value: DownloadType.youtube, labelKey: "youtubeMedia" },
+  { value: DownloadType.direct, labelKey: "direct" },
+  { value: DownloadType.mediago, labelKey: "mediagoMedia" },
+] as const;
+
+interface FormRowProps {
+  children: ReactNode;
+  error?: string;
+  errorId?: string;
+  htmlFor: string;
+  label: ReactNode;
+  required?: boolean;
+}
+
+function FormRow({
+  children,
+  error,
+  errorId,
+  htmlFor,
+  label,
+  required,
+}: FormRowProps) {
+  return (
+    <div className="grid gap-2 sm:grid-cols-[7rem_minmax(0,1fr)] sm:items-start">
+      <label htmlFor={htmlFor} className="pt-2 text-sm font-medium">
+        {label}
+        {required ? (
+          <span aria-hidden="true" className="ml-1 text-destructive">
+            *
+          </span>
+        ) : null}
+      </label>
+      <div className="min-w-0 space-y-1.5">
+        {children}
+        {error ? (
+          <p id={errorId} role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 export default forwardRef<DownloadFormRef, DownloadFormProps>(
-  function DownloadForm(
-    { isEdit, destroyOnClose, onFormVisibleChange, id, onConfirm },
-    ref,
-  ) {
+  function DownloadForm({ isEdit, onFormVisibleChange, id, onConfirm }, ref) {
     const { enableDocker } = useAppStore(useShallow(appStoreSelector));
     const [modalOpen, setModalOpen] = useState(false);
-    const [form] = Form.useForm<DownloadFormItem>();
+    const formId = useId();
     const { t } = useTranslation();
-    const { message } = App.useApp();
     const { setLastDownloadTypes, setLastIsBatch } = useConfigStore(
       useShallow(downloadFormSelector),
     );
-    const [folders, setFolders] = useState<Options[]>([]);
     const [videoFolders, setVideoFolders] = useState<string[]>([]);
     const { contextMenu } = usePlatform();
     const { addVideosToDocker } = useDockerApi();
+    const form = useForm<DownloadFormItem>({
+      defaultValues: {
+        batch: false,
+        batchList: "",
+        folder: "",
+        headers: "",
+        name: "",
+        type: DownloadType.m3u8,
+        url: "",
+      },
+    });
+    const isBatch = useWatch({ control: form.control, name: "batch" });
+    const selectedType = useWatch({ control: form.control, name: "type" });
 
     useAsyncEffect(async () => {
-      if (modalOpen) {
-        try {
-          const fetchedFolders = await getDownloadFolders();
-          if (Array.isArray(fetchedFolders)) {
-            setVideoFolders(fetchedFolders);
-            setFolders(() =>
-              fetchedFolders.map((f) => ({
-                value: f,
-                label: f,
-              })),
-            );
-          }
-        } catch {
-          // Go Core may not be ready yet, ignore
-        }
+      if (!modalOpen) return;
+      try {
+        const fetchedFolders = await getDownloadFolders();
+        if (Array.isArray(fetchedFolders)) setVideoFolders(fetchedFolders);
+      } catch {
+        // Go Core may not be ready yet, ignore.
       }
     }, [modalOpen]);
 
-    useImperativeHandle(ref, () => {
-      return {
+    const setOpen = useMemoizedFn((open: boolean) => {
+      setModalOpen(open);
+      onFormVisibleChange?.(open);
+      if (!open) form.reset();
+    });
+
+    useImperativeHandle(
+      ref,
+      () => ({
         openModal: (value) => {
-          setModalOpen(true);
-          // Defer so the Form is mounted before setting values
-          queueMicrotask(() => form.setFieldsValue(value));
+          form.reset(value);
+          setOpen(true);
         },
         setFieldsValue: (value) => {
-          form.setFieldsValue(value);
+          form.reset({ ...form.getValues(), ...value });
         },
-        getFieldsValue: () => {
-          return form.getFieldsValue();
-        },
-      };
-    }, []);
-
-    const handleValuesChange = useMemoizedFn(
-      (values: Record<string, unknown>) => {
-        const { type, batch } = values;
-        if (type) {
-          setLastDownloadTypes(type);
-        }
-        if (batch !== null && batch !== undefined) {
-          setLastIsBatch(batch);
-        }
-      },
+        getFieldsValue: () => form.getValues(),
+      }),
+      [form, setOpen],
     );
 
-    const afterOpenChange = useMemoizedFn((open: boolean) => {
-      onFormVisibleChange?.(open);
-
-      if (!open) {
-        form.resetFields();
-      }
+    const showTextMenu = useMemoizedFn(() => {
+      contextMenu.show([
+        { key: "copy", label: t("copy") },
+        { key: "paste", label: t("paste") },
+      ]);
     });
 
-    const handleSave = useMemoizedFn(async () => {
-      try {
-        await form.validateFields();
-      } catch {
-        return;
-      }
-
-      try {
-        const tasks = await getFormItems();
-        await createDownloadTasks(tasks);
-        // Badge increments via the "download-create" SSE event
-        // (apps/ui/src/api/events.ts); drives both the main window and
-        // the overlay-dialog WebContents from a single source.
-        setModalOpen(false);
-        onConfirm?.(form.getFieldsValue());
-        tdApp.onEvent(ADD_TO_LIST, { id });
-      } catch (e: unknown) {
-        message.error((e as Error)?.message || t("pleaseEnterCorrectFormInfo"));
-      }
-    });
-
-    const handleAddToDocker = useMemoizedFn(async () => {
-      try {
-        await form.validateFields();
-      } catch {
-        return;
-      }
-
-      try {
-        const tasks = await getFormItems();
-        await addVideosToDocker({ items: tasks });
-
-        message.success(t("addToDockerSuccess"));
-      } catch (e: unknown) {
-        message.error((e as Error)?.message || t("pleaseEnterCorrectFormInfo"));
-      }
-    });
-
-    const handleDownloadNow = useMemoizedFn(async () => {
-      try {
-        await form.validateFields();
-      } catch {
-        return;
-      }
-      try {
-        const tasks = await getFormItems();
-        await createDownloadTasks(tasks, true);
-        // Badge increments via the "download-create" SSE event; see
-        // handleSave comment.
-        setModalOpen(false);
-        onConfirm?.(form.getFieldsValue());
-        tdApp.onEvent(DOWNLOAD_NOW, { id });
-      } catch (e: unknown) {
-        message.error((e as Error)?.message || t("pleaseEnterCorrectFormInfo"));
-      }
-    });
-
-    const handleSearchFolder = useMemoizedFn((val: string) => {
-      return setFolders(() => {
-        const videoOptions = videoFolders.map((f) => ({ value: f, label: f }));
-        if (!val) return videoOptions;
-        return [{ value: val, label: val }, ...videoOptions];
-      });
-    });
+    const validateForm = useMemoizedFn(async () => form.trigger());
 
     const getFormItems = useMemoizedFn(async () => {
-      const { batch } = form.getFieldsValue();
-      if (batch) {
-        const {
-          batchList = "",
-          headers,
-          type = DownloadType.m3u8,
-        } = form.getFieldsValue();
-
-        const tasks: Omit<DownloadTask, "id">[] = await Promise.all(
-          batchList.split("\n").map(async (line: string) => {
+      const values = form.getValues();
+      if (values.batch) {
+        const { batchList = "", headers, type = DownloadType.m3u8 } = values;
+        return Promise.all(
+          batchList.split("\n").map(async (line) => {
             const [url, customName, folder] = line.trim().split(" ");
             return {
               url: url.trim(),
@@ -220,292 +195,333 @@ export default forwardRef<DownloadFormRef, DownloadFormProps>(
               headers,
               type,
               folder,
-            };
+            } satisfies Omit<DownloadTask, "id">;
           }),
         );
+      }
 
-        return tasks;
-      } else {
-        const {
-          name = "",
-          url = "",
-          headers,
-          type = DownloadType.m3u8,
-          folder,
-        } = form.getFieldsValue();
+      const {
+        name = "",
+        url = "",
+        headers,
+        type = DownloadType.m3u8,
+        folder,
+      } = values;
+      return [{ name, url, headers, type, folder }];
+    });
 
-        const task: Omit<DownloadTask, "id"> = {
-          name,
-          url,
-          headers,
-          type,
-          folder,
-        };
+    const handleSave = useMemoizedFn(async () => {
+      if (!(await validateForm())) return;
+      try {
+        const tasks = await getFormItems();
+        await createDownloadTasks(tasks);
+        const values = form.getValues();
+        setOpen(false);
+        onConfirm?.(values);
+        tdApp.onEvent(ADD_TO_LIST, { id });
+      } catch (error: unknown) {
+        toast.error(
+          (error as Error)?.message || t("pleaseEnterCorrectFormInfo"),
+        );
+      }
+    });
 
-        return [task];
+    const handleAddToDocker = useMemoizedFn(async () => {
+      if (!(await validateForm())) return;
+      try {
+        await addVideosToDocker({ items: await getFormItems() });
+        toast.success(t("addToDockerSuccess"));
+      } catch (error: unknown) {
+        toast.error(
+          (error as Error)?.message || t("pleaseEnterCorrectFormInfo"),
+        );
+      }
+    });
+
+    const handleDownloadNow = useMemoizedFn(async () => {
+      if (!(await validateForm())) return;
+      try {
+        const tasks = await getFormItems();
+        await createDownloadTasks(tasks, true);
+        const values = form.getValues();
+        setOpen(false);
+        onConfirm?.(values);
+        tdApp.onEvent(DOWNLOAD_NOW, { id });
+      } catch (error: unknown) {
+        toast.error(
+          (error as Error)?.message || t("pleaseEnterCorrectFormInfo"),
+        );
       }
     });
 
     return (
-      <Modal
-        open={modalOpen}
-        key={isEdit ? "edit" : "new"}
-        title={isEdit ? t("editDownload") : t("newDownload")}
-        width={500}
-        onCancel={() => setModalOpen(false)}
-        afterOpenChange={afterOpenChange}
-        destroyOnHidden={destroyOnClose}
-        footer={[
-          <Button key="cancel" onClick={() => setModalOpen(false)}>
-            {t("cancel")}
-          </Button>,
-          enableDocker && (
-            <Button
-              key="docker"
-              onClick={handleAddToDocker}
-              icon={<DockerOutlined />}
-            >
-              {t("addToDocker")}
-            </Button>
-          ),
-          <Button
-            key="submit"
-            onClick={handleSave}
-            icon={<UnorderedListOutlined />}
-          >
-            {t("addToList")}
-          </Button>,
-          <Button
-            key="link"
-            type="primary"
-            onClick={handleDownloadNow}
-            icon={<CloudDownloadOutlined />}
-          >
-            {t("downloadNow")}
-          </Button>,
-        ]}
-      >
-        <Form
-          form={form}
-          autoFocus
-          labelCol={{ span: 5 }}
-          layout="horizontal"
-          colon={false}
-          onValuesChange={handleValuesChange}
-        >
-          <Form.Item name="id" hidden>
-            <Input />
-          </Form.Item>
-          <Form.Item hidden={isEdit} label={t("batchDownload")} name={"batch"}>
-            <Switch />
-          </Form.Item>
-          <Form.Item
-            key="type"
-            name="type"
-            label={t("videoType")}
-            rules={[
-              {
-                required: true,
-                message: t("pleaseEnterVideoName"),
-              },
-            ]}
-          >
-            <Select
-              disabled={isEdit}
-              options={[
-                {
-                  label: t("streamMedia"),
-                  value: "m3u8",
-                },
-                {
-                  label: t("bilibiliMedia"),
-                  value: "bilibili",
-                },
-                {
-                  label: t("youtubeMedia"),
-                  value: "youtube",
-                },
-                {
-                  label: t("direct"),
-                  value: "direct",
-                },
-                {
-                  label: t("mediagoMedia"),
-                  value: "mediago",
-                },
-              ]}
-              placeholder={t("pleaseSelectVideoType")}
-            />
-          </Form.Item>
-          <Form.Item noStyle shouldUpdate>
-            {(formInstance) => {
-              const isBatch = formInstance.getFieldValue("batch");
-              if (isBatch) {
-                return null;
-              }
+      <Dialog open={modalOpen} onOpenChange={setOpen}>
+        <DialogContent className="max-h-[90vh] max-w-[500px] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {isEdit ? t("editDownload") : t("newDownload")}
+            </DialogTitle>
+            <DialogDescription className="sr-only">
+              {t("pleaseEnterCorrectFormInfo")}
+            </DialogDescription>
+          </DialogHeader>
 
-              return (
-                <Form.Item
-                  shouldUpdate
-                  name="name"
-                  label={t("videoName")}
-                  rules={[
-                    {
-                      required:
-                        formInstance.getFieldsValue().type !== "bilibili",
-                      message: t("pleaseEnterCorrectFormInfo"),
-                    },
-                  ]}
-                >
-                  <Input
-                    placeholder={t("pleaseEnterVideoName")}
-                    onContextMenu={() =>
-                      contextMenu.show([
-                        { key: "copy", label: t("copy") },
-                        { key: "paste", label: t("paste") },
-                      ])
-                    }
-                  />
-                </Form.Item>
-              );
-            }}
-          </Form.Item>
-          <Form.Item noStyle shouldUpdate>
-            {(formInstance) => {
-              if (isEdit || !formInstance.getFieldValue("batch")) {
-                return null;
-              }
-              return (
-                <Form.Item
-                  label={t("videoLink")}
-                  name="batchList"
-                  required
-                  rules={[
-                    {
-                      required: true,
-                      message: t("pleaseEnterVideoLink"),
-                    },
-                    {
-                      validator: (_, value) => {
-                        const lines = value.split("\n");
-                        for (const line of lines) {
-                          const params = line.trim().split(" ");
-                          if (params.length > 3) {
-                            return Promise.reject(
-                              new Error(t("pleaseEnterCorrectBatchList")),
-                            );
-                          }
-                          const [url] = params;
-                          if (!/^(https?):\/\/.+/.test(url)) {
-                            return Promise.reject(
-                              new Error(t("pleaseEnterCorrectBatchList")),
-                            );
-                          }
-                        }
-                        return Promise.resolve();
-                      },
-                    },
-                  ]}
-                >
-                  <BatchUrlTextarea
-                    rows={5}
-                    placeholder={t("videoLikeDescription")}
-                    onContextMenu={() =>
-                      contextMenu.show([
-                        { key: "copy", label: t("copy") },
-                        { key: "paste", label: t("paste") },
-                      ])
-                    }
-                  />
-                </Form.Item>
-              );
-            }}
-          </Form.Item>
-          <Form.Item noStyle shouldUpdate>
-            {(formInstance) => {
-              if (formInstance.getFieldValue("batch") && !isEdit) {
-                return null;
-              }
-              return (
-                <Form.Item
-                  name="url"
-                  label={t("videoLink")}
-                  required
-                  rules={[
-                    {
-                      required: true,
-                      message: t("pleaseEnterOnlineVideoUrl"),
-                    },
-                    {
-                      pattern: /^(file|https?):\/\/.+/,
-                      message: t("pleaseEnterCorrectVideoLink"),
-                    },
-                  ]}
-                >
-                  <Input
-                    placeholder={t("pleaseEnterOnlineVideoUrlOrDragM3U8Here")}
-                    onContextMenu={() =>
-                      contextMenu.show([
-                        { key: "copy", label: t("copy") },
-                        { key: "paste", label: t("paste") },
-                      ])
-                    }
-                    onDrop={(e) => {
-                      const file = e.dataTransfer.files[0] as File & {
-                        path: string;
-                      };
-                      formInstance.setFieldValue("url", `file://${file.path}`);
-                      formInstance.validateFields(["url"]);
+          <form
+            className="space-y-4"
+            onSubmit={(event) => event.preventDefault()}
+          >
+            <input
+              type="hidden"
+              {...form.register("id", { valueAsNumber: true })}
+            />
+
+            {!isEdit ? (
+              <FormRow htmlFor={`${formId}-batch`} label={t("batchDownload")}>
+                <Controller
+                  control={form.control}
+                  name="batch"
+                  render={({ field }) => (
+                    <Switch
+                      id={`${formId}-batch`}
+                      checked={Boolean(field.value)}
+                      onCheckedChange={(checked) => {
+                        field.onChange(checked);
+                        setLastIsBatch(checked);
+                      }}
+                    />
+                  )}
+                />
+              </FormRow>
+            ) : null}
+
+            <FormRow
+              errorId={`${formId}-type-error`}
+              htmlFor={`${formId}-type`}
+              label={t("videoType")}
+              required
+              error={form.formState.errors.type?.message}
+            >
+              <Controller
+                control={form.control}
+                name="type"
+                rules={{ required: t("pleaseEnterVideoName") }}
+                render={({ field }) => (
+                  <Select
+                    value={field.value}
+                    disabled={isEdit}
+                    onValueChange={(value) => {
+                      const type = value as DownloadType;
+                      field.onChange(type);
+                      setLastDownloadTypes(type);
                     }}
-                  />
-                </Form.Item>
-              );
-            }}
-          </Form.Item>
-          <Form.Item noStyle shouldUpdate>
-            {(formInstance) => {
-              if (formInstance.getFieldValue("batch")) {
-                return null;
-              }
-              return (
-                <Form.Item name="folder" label={t("folder")}>
-                  <AutoComplete
-                    placeholder={t("pleaseInputVideoFolder")}
-                    optionFilterProp="label"
-                    options={folders}
-                    onSearch={handleSearchFolder}
-                  />
-                </Form.Item>
-              );
-            }}
-          </Form.Item>
-          <Form.Item noStyle shouldUpdate>
-            {(formInstance) => {
-              if (
-                formInstance.getFieldValue("type") !== "m3u8" &&
-                formInstance.getFieldValue("type") !== "mediago" &&
-                !formInstance.getFieldValue("batch")
-              ) {
-                return null;
-              }
-              return (
-                <Form.Item label={t("additionalHeaders")} name="headers">
-                  <TextArea
-                    rows={4}
-                    placeholder={t("additionalHeadersDescription")}
-                    onContextMenu={() =>
-                      contextMenu.show([
-                        { key: "copy", label: t("copy") },
-                        { key: "paste", label: t("paste") },
-                      ])
-                    }
-                  />
-                </Form.Item>
-              );
-            }}
-          </Form.Item>
-        </Form>
-      </Modal>
+                  >
+                    <SelectTrigger
+                      id={`${formId}-type`}
+                      className="w-full"
+                      aria-invalid={Boolean(form.formState.errors.type)}
+                      aria-describedby={
+                        form.formState.errors.type
+                          ? `${formId}-type-error`
+                          : undefined
+                      }
+                    >
+                      <SelectValue placeholder={t("pleaseSelectVideoType")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DOWNLOAD_TYPE_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {t(option.labelKey)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </FormRow>
+
+            {!isBatch ? (
+              <FormRow
+                errorId={`${formId}-name-error`}
+                htmlFor={`${formId}-name`}
+                label={t("videoName")}
+                required={selectedType !== DownloadType.bilibili}
+                error={form.formState.errors.name?.message}
+              >
+                <Input
+                  id={`${formId}-name`}
+                  placeholder={t("pleaseEnterVideoName")}
+                  onContextMenu={showTextMenu}
+                  aria-invalid={Boolean(form.formState.errors.name)}
+                  aria-describedby={
+                    form.formState.errors.name
+                      ? `${formId}-name-error`
+                      : undefined
+                  }
+                  {...form.register("name", {
+                    validate: (value) =>
+                      isBatch ||
+                      selectedType === DownloadType.bilibili ||
+                      value?.trim()
+                        ? true
+                        : t("pleaseEnterCorrectFormInfo"),
+                  })}
+                />
+              </FormRow>
+            ) : null}
+
+            {isBatch && !isEdit ? (
+              <FormRow
+                errorId={`${formId}-batch-list-error`}
+                htmlFor={`${formId}-batch-list`}
+                label={t("videoLink")}
+                required
+                error={form.formState.errors.batchList?.message}
+              >
+                <Controller
+                  control={form.control}
+                  name="batchList"
+                  rules={{
+                    validate: (value) => {
+                      if (!isBatch || isEdit) return true;
+                      if (!value?.trim()) return t("pleaseEnterVideoLink");
+                      for (const line of value.split("\n")) {
+                        const params = line.trim().split(" ");
+                        if (
+                          params.length > 3 ||
+                          !/^(https?):\/\/.+/.test(params[0] ?? "")
+                        ) {
+                          return t("pleaseEnterCorrectBatchList");
+                        }
+                      }
+                      return true;
+                    },
+                  }}
+                  render={({ field }) => (
+                    <BatchUrlTextarea
+                      {...field}
+                      id={`${formId}-batch-list`}
+                      value={field.value ?? ""}
+                      rows={5}
+                      placeholder={t("videoLikeDescription")}
+                      onContextMenu={showTextMenu}
+                      aria-invalid={Boolean(form.formState.errors.batchList)}
+                      aria-describedby={
+                        form.formState.errors.batchList
+                          ? `${formId}-batch-list-error`
+                          : undefined
+                      }
+                    />
+                  )}
+                />
+              </FormRow>
+            ) : null}
+
+            {!isBatch || isEdit ? (
+              <FormRow
+                errorId={`${formId}-url-error`}
+                htmlFor={`${formId}-url`}
+                label={t("videoLink")}
+                required
+                error={form.formState.errors.url?.message}
+              >
+                <Input
+                  id={`${formId}-url`}
+                  placeholder={t("pleaseEnterOnlineVideoUrlOrDragM3U8Here")}
+                  onContextMenu={showTextMenu}
+                  aria-invalid={Boolean(form.formState.errors.url)}
+                  aria-describedby={
+                    form.formState.errors.url
+                      ? `${formId}-url-error`
+                      : undefined
+                  }
+                  {...form.register("url", {
+                    validate: (value) => {
+                      if (isBatch && !isEdit) return true;
+                      if (!value?.trim()) return t("pleaseEnterOnlineVideoUrl");
+                      return /^(file|https?):\/\/.+/.test(value)
+                        ? true
+                        : t("pleaseEnterCorrectVideoLink");
+                    },
+                  })}
+                  onDrop={(event) => {
+                    const file = event.dataTransfer.files[0] as
+                      | (File & { path?: string })
+                      | undefined;
+                    if (!file?.path) return;
+                    form.setValue("url", `file://${file.path}`, {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    });
+                  }}
+                />
+              </FormRow>
+            ) : null}
+
+            {!isBatch ? (
+              <FormRow htmlFor={`${formId}-folder`} label={t("folder")}>
+                <Input
+                  id={`${formId}-folder`}
+                  list={`${formId}-folder-options`}
+                  placeholder={t("pleaseInputVideoFolder")}
+                  {...form.register("folder")}
+                />
+                <datalist id={`${formId}-folder-options`}>
+                  {videoFolders.map((folder) => (
+                    <option key={folder} value={folder} />
+                  ))}
+                </datalist>
+              </FormRow>
+            ) : null}
+
+            {selectedType === DownloadType.m3u8 ||
+            selectedType === DownloadType.mediago ||
+            isBatch ? (
+              <FormRow
+                htmlFor={`${formId}-headers`}
+                label={t("additionalHeaders")}
+              >
+                <Textarea
+                  id={`${formId}-headers`}
+                  rows={4}
+                  placeholder={t("additionalHeadersDescription")}
+                  onContextMenu={showTextMenu}
+                  {...form.register("headers")}
+                />
+              </FormRow>
+            ) : null}
+          </form>
+
+          <DialogFooter className={cn(enableDocker && "sm:justify-between")}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+            >
+              {t("cancel")}
+            </Button>
+            <div className="flex flex-wrap justify-end gap-2">
+              {enableDocker ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleAddToDocker}
+                >
+                  <Container className="size-4" />
+                  {t("addToDocker")}
+                </Button>
+              ) : null}
+              <Button type="button" variant="outline" onClick={handleSave}>
+                <ListPlus className="size-4" />
+                {t("addToList")}
+              </Button>
+              <Button type="button" onClick={handleDownloadNow}>
+                <Download className="size-4" />
+                {t("downloadNow")}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     );
   },
 );

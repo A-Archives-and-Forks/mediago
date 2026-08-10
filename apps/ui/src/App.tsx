@@ -1,26 +1,15 @@
-import { App as AntdApp, ConfigProvider, theme as antdTheme } from "antd";
-import {
-  type FC,
-  lazy,
-  Suspense,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { type FC, lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Route, Routes } from "react-router-dom";
 import "dayjs/locale/zh-cn";
 import "dayjs/locale/it";
 import { useMemoizedFn } from "ahooks";
-import zhCN from "antd/es/locale/zh_CN";
-import enUS from "antd/es/locale/en_US";
-import itIT from "antd/es/locale/it_IT";
 import Loading from "./components/loading";
+import { Toaster } from "./components/ui/sonner";
 import { PAGE_LOAD } from "./const";
 import { useAppStore } from "./store/app";
 import { PageMode, useBrowserStore } from "./store/browser";
 import { useSessionStore } from "./store/session";
-import { isWeb, resolveAppLanguage, tdApp } from "./utils";
+import { isWeb, tdApp } from "./utils";
 import { usePlatform } from "./hooks/use-platform";
 import { setupHttp } from "./utils/http";
 import { getConfig } from "./api/config";
@@ -32,7 +21,6 @@ import {
 } from "./services/config-change-order";
 import { DownloadFilter, type AppStore } from "@mediago/shared-common";
 import { AuthGuard } from "./hooks/use-auth";
-import type { Locale } from "antd/es/locale";
 
 const AppLayout = lazy(() => import("./layout/app-layout"));
 const HomePage = lazy(() => import("./pages/home-page"));
@@ -42,26 +30,6 @@ const SettingPage = lazy(loadSettingPage);
 const ConverterPage = lazy(() => import("./pages/converter-page"));
 const SigninPage = lazy(() => import("./pages/signin-page"));
 const OverlayDialog = lazy(() => import("./pages/overlay-dialog"));
-
-function getAlgorithm(appTheme: "dark" | "light") {
-  return appTheme === "dark"
-    ? antdTheme.darkAlgorithm
-    : antdTheme.defaultAlgorithm;
-}
-
-function getAntdLocale(
-  language: ReturnType<typeof resolveAppLanguage>,
-): Locale {
-  switch (language) {
-    case "zh":
-      return zhCN;
-    case "it":
-      return itIT;
-    case "en":
-    default:
-      return enUS;
-  }
-}
 
 function isAppStoreKey(key: string): key is keyof AppStore {
   return key !== "setAppStore" && key in useAppStore.getState();
@@ -132,7 +100,6 @@ const App: FC = () => {
   );
   const setUploadChecking = useSessionStore((state) => state.setUploadChecking);
   const setAppStore = useAppStore((state) => state.setAppStore);
-  const language = useAppStore((state) => state.language);
   const setBrowserStore = useBrowserStore((state) => state.setBrowserStore);
   const theme = useSessionStore((state) => state.theme);
   const setTheme = useSessionStore((state) => state.setTheme);
@@ -145,15 +112,6 @@ const App: FC = () => {
   const configReconcileRetry = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
-  const appLocale = useMemo(
-    () => getAntdLocale(resolveAppLanguage(language)),
-    [language],
-  );
-  const antdThemeConfig = useMemo(
-    () => ({ algorithm: getAlgorithm(theme) }),
-    [theme],
-  );
-
   const themeChange = useMemoizedFn((event: MediaQueryListEvent) => {
     setTheme(event.matches ? "dark" : "light");
   });
@@ -410,12 +368,8 @@ const App: FC = () => {
   if (!adapterReady) return <Loading />;
 
   return (
-    <ConfigProvider
-      locale={appLocale}
-      componentSize={isWeb ? undefined : "small"}
-      theme={antdThemeConfig}
-    >
-      <AntdApp className="size-full overflow-hidden">
+    <>
+      <div className="size-full overflow-hidden">
         <AuthGuard />
         <Routes>
           <Route
@@ -494,8 +448,9 @@ const App: FC = () => {
             }
           />
         </Routes>
-      </AntdApp>
-    </ConfigProvider>
+      </div>
+      <Toaster theme={theme} richColors position="top-center" duration={2400} />
+    </>
   );
 };
 

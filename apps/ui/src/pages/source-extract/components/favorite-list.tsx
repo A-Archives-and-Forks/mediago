@@ -1,8 +1,19 @@
-import { PlusOutlined } from "@ant-design/icons";
 import { useMemoizedFn } from "ahooks";
-import { App, Form, Input, Modal, Spin } from "antd";
-import { useState } from "react";
+import { Plus } from "lucide-react";
+import { type FormEvent, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
 import { ADD_FAVORITE, OPEN_FAVORITE } from "@/const";
 import { getFavIcon, tdApp } from "@/utils";
 import { FavItem } from "./fav-item";
@@ -22,9 +33,12 @@ export function FavoriteList() {
   const { contextMenu } = usePlatform();
   const { loadUrl } = useBrowserActions();
   const { t } = useTranslation();
-  const { message } = App.useApp();
-  const [favoriteAddForm] = Form.useForm<Favorite>();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [url, setUrl] = useState("");
+  const [title, setTitle] = useState("");
+  const [urlError, setUrlError] = useState<string | null>(null);
+  const urlInputId = useId();
+  const titleInputId = useId();
 
   const onClickLoadItem = useMemoizedFn((item: Favorite) => {
     loadUrl(item.url);
@@ -40,20 +54,35 @@ export function FavoriteList() {
     tdApp.onEvent(ADD_FAVORITE);
   });
 
-  const handleOk = useMemoizedFn(async () => {
+  const handleOk = useMemoizedFn(async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!url) {
+      setUrlError(t("pleaseEnterSiteUrl"));
+      return;
+    }
+    if (!/^https?:\/\/.+/.test(url)) {
+      setUrlError(t("pleaseEnterCorrectUrl"));
+      return;
+    }
+
+    setUrlError(null);
     try {
-      const values = await favoriteAddForm.validateFields();
-      const icon = getFavIcon(values.url);
+      const icon = getFavIcon(url);
       await addFavorite({
-        url: values.url,
-        title: values.title,
+        url,
+        title,
         icon,
       });
-      favoriteAddForm.resetFields();
-
+      setUrl("");
+      setTitle("");
       setIsModalOpen(false);
     } catch (err: unknown) {
-      message.error((err as Error).message || t("addFavoriteFailed"));
+      toast.error(
+        err instanceof Error && err.message
+          ? err.message
+          : t("addFavoriteFailed"),
+      );
     }
   });
 
@@ -61,17 +90,20 @@ export function FavoriteList() {
     setIsModalOpen(false);
   });
 
+  const handleOpenChange = useMemoizedFn((open: boolean) => {
+    setIsModalOpen(open);
+  });
+
   // Auto-fill the title from the page's <title> tag when the user leaves
   // the URL field, unless they already typed a title themselves.
   const handleUrlBlur = useMemoizedFn(async () => {
-    const url: string = favoriteAddForm.getFieldValue("url");
     if (!url || !/^https?:\/\/.+/.test(url)) return;
-    if (favoriteAddForm.getFieldValue("title")) return;
+    if (title) return;
     try {
-      const { data: title } = await getPageTitle(url);
+      const { data: pageTitle } = await getPageTitle(url);
       // Re-check: the user may have typed something while we were fetching.
-      if (!favoriteAddForm.getFieldValue("title") && title) {
-        favoriteAddForm.setFieldValue("title", title);
+      if (pageTitle) {
+        setTitle((currentTitle) => currentTitle || pageTitle);
       }
     } catch {
       // Best-effort: leave title blank if fetch fails; server falls back to URL.
@@ -94,7 +126,7 @@ export function FavoriteList() {
   if (isLoading) {
     return (
       <div className="flex h-full w-full items-center justify-center">
-        <Spin />
+        <Spinner className="size-5" />
       </div>
     );
   }
@@ -123,47 +155,72 @@ export function FavoriteList() {
         <FavItem
           key={"add"}
           onClick={showModal}
-          icon={<PlusOutlined />}
+          icon={<Plus className="size-5" />}
           title={t("addFavorite")}
         />
       </div>
-      <Modal
-        open={isModalOpen}
-        onOk={handleOk}
-        onCancel={handleCancel}
-        title={t("addShortcut")}
-        width={500}
-        destroyOnHidden
-        okText={t("confirm")}
-        cancelText={t("cancel")}
-      >
-        <div className="flex min-h-36 flex-col justify-center">
-          <Form<Favorite> form={favoriteAddForm} autoFocus>
-            <Form.Item
-              name="url"
-              label={t("siteUrl")}
-              rules={[
-                {
-                  required: true,
-                  message: t("pleaseEnterSiteUrl"),
-                },
-                {
-                  pattern: /^https?:\/\/.+/,
-                  message: t("pleaseEnterCorrectUrl"),
-                },
-              ]}
-            >
-              <Input
-                placeholder={t("pleaseEnterSiteUrl")}
-                onBlur={handleUrlBlur}
-              />
-            </Form.Item>
-            <Form.Item name="title" label={t("siteName")}>
-              <Input placeholder={t("pleaseEnterSiteName")} />
-            </Form.Item>
-          </Form>
-        </div>
-      </Modal>
+      <Dialog open={isModalOpen} onOpenChange={handleOpenChange}>
+        <DialogContent className="sm:max-w-[500px]">
+          <form className="flex flex-col gap-4" noValidate onSubmit={handleOk}>
+            <DialogHeader>
+              <DialogTitle>{t("addShortcut")}</DialogTitle>
+              <DialogDescription className="sr-only">
+                {t("pleaseEnterSiteUrl")}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex min-h-36 flex-col justify-center gap-4">
+              <div className="grid gap-2">
+                <label className="text-sm font-medium" htmlFor={urlInputId}>
+                  {t("siteUrl")}
+                </label>
+                <Input
+                  id={urlInputId}
+                  name="url"
+                  value={url}
+                  autoFocus
+                  aria-invalid={Boolean(urlError)}
+                  aria-describedby={
+                    urlError ? `${urlInputId}-error` : undefined
+                  }
+                  onChange={(event) => {
+                    setUrl(event.target.value);
+                    if (urlError) setUrlError(null);
+                  }}
+                  placeholder={t("pleaseEnterSiteUrl")}
+                  onBlur={handleUrlBlur}
+                />
+                {urlError ? (
+                  <p
+                    id={`${urlInputId}-error`}
+                    className="text-sm text-destructive"
+                    role="alert"
+                  >
+                    {urlError}
+                  </p>
+                ) : null}
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium" htmlFor={titleInputId}>
+                  {t("siteName")}
+                </label>
+                <Input
+                  id={titleInputId}
+                  name="title"
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                  placeholder={t("pleaseEnterSiteName")}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={handleCancel}>
+                {t("cancel")}
+              </Button>
+              <Button type="submit">{t("confirm")}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
