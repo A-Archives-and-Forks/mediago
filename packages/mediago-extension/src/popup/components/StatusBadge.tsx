@@ -1,4 +1,10 @@
-import { Loader2 } from "lucide-react";
+import {
+  CircleCheck,
+  CircleX,
+  ExternalLink,
+  Loader2,
+  TriangleAlert,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
@@ -24,8 +30,8 @@ export function StatusBadge({ status, settings }: Props) {
 
   if (status === null || settings === null) {
     return (
-      <Badge variant="outline" className="gap-1.5 normal-case tracking-normal">
-        <Loader2 className="h-3 w-3 animate-spin" />
+      <Badge variant="outline" className="gap-1 normal-case tracking-normal">
+        <Loader2 className="size-3 shrink-0 animate-spin" />
         {t("status.detecting")}
       </Badge>
     );
@@ -33,7 +39,8 @@ export function StatusBadge({ status, settings }: Props) {
 
   if (settings.mode === "desktop-schema") {
     return (
-      <Badge variant="edit" className="normal-case tracking-normal">
+      <Badge variant="edit" className="gap-1 normal-case tracking-normal">
+        <ExternalLink className="size-3 shrink-0" />
         {t("status.schemaMode")}
       </Badge>
     );
@@ -41,7 +48,8 @@ export function StatusBadge({ status, settings }: Props) {
 
   if (settings.mode === "docker-http" && !settings.serverUrl) {
     return (
-      <Badge variant="warning" className="normal-case tracking-normal">
+      <Badge variant="warning" className="gap-1 normal-case tracking-normal">
+        <TriangleAlert className="size-3 shrink-0" />
         {t("status.notConfigured")}
       </Badge>
     );
@@ -55,16 +63,17 @@ export function StatusBadge({ status, settings }: Props) {
     return (
       <Badge
         variant="success"
-        className="font-mono normal-case tracking-normal"
+        className="gap-1 font-mono normal-case tracking-normal"
       >
-        <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-success" />
+        <CircleCheck className="size-3 shrink-0" />
         {host}
       </Badge>
     );
   }
 
   return (
-    <Badge variant="destructive" className="normal-case tracking-normal">
+    <Badge variant="destructive" className="gap-1 normal-case tracking-normal">
+      <CircleX className="size-3 shrink-0" />
       {t("status.connectionFailed")}
     </Badge>
   );

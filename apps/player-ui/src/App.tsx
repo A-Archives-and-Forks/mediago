@@ -1,9 +1,10 @@
 import { useMemoizedFn, useSize } from "ahooks";
-import { List } from "lucide-react";
+import { ListVideo } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
 import videojs from "video.js";
 import "video.js/dist/video-js.css";
 import "@videojs/themes/dist/sea/index.css";
+import "./player-theme.css";
 import useSWR from "swr";
 import type Player from "video.js/dist/types/player";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -191,7 +192,7 @@ export default function PlayerPage() {
             className="absolute right-5 top-5 z-50 hidden cursor-pointer items-center gap-2 rounded-md border border-white/80 bg-black/50 px-3 py-1.5 text-sm text-white backdrop-blur-sm transition-all hover:bg-black/70 md:group-hover:flex"
             onClick={handleOpen}
           >
-            <List className="h-4 w-4" />
+            <ListVideo className="size-4 shrink-0 stroke-[1.75]" />
             <span className="hidden sm:inline">Playlist</span>
           </button>
         </SheetTrigger>

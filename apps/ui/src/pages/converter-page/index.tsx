@@ -1,6 +1,13 @@
 import { type Conversion } from "@mediago/shared-common";
 import { useMemoizedFn } from "ahooks";
-import { FileQuestion, FolderOpen, Pause, Play, Trash2 } from "lucide-react";
+import {
+  ArrowRight,
+  FileQuestion,
+  FolderOpen,
+  Pause,
+  Play,
+  Trash2,
+} from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -358,8 +365,9 @@ const Converter = () => {
                       : item.status}
                   </Badge>
                   {item.outputFormat && (
-                    <span className="text-xs text-[#AAB5CB]">
-                      → .{item.outputFormat}
+                    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                      <ArrowRight className="size-3 shrink-0 stroke-[1.75]" />.
+                      {item.outputFormat}
                     </span>
                   )}
                 </div>

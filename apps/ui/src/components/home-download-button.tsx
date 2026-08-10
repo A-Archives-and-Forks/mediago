@@ -1,5 +1,6 @@
+import { Download } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { DownloadBg1, DownloadBg2, DownloadIcon } from "@/assets/svg";
+import { DownloadBg1, DownloadBg2 } from "@/assets/svg";
 
 interface Props {
   onClick?: () => void;
@@ -21,7 +22,7 @@ export function HomeDownloadButton({ onClick }: Props) {
         className="absolute -left-2 bottom-0 top-0 h-full"
         src={DownloadBg1}
       />
-      <DownloadIcon fill="#fff" className="relative" />
+      <Download className="relative size-4 shrink-0 stroke-[1.75]" />
       {t("newDownload")}
     </div>
   );

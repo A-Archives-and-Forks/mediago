@@ -1,20 +1,19 @@
 import { useMemoizedFn } from "ahooks";
-import { EyeOff } from "lucide-react";
+import {
+  ArrowLeft,
+  Combine,
+  EyeOff,
+  House,
+  Monitor,
+  RefreshCw,
+  Send,
+  Smartphone,
+  Star,
+  X,
+} from "lucide-react";
 import { type KeyboardEvent, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
-import {
-  BackIcon,
-  CloseIcon,
-  FavFillIcon,
-  FavIcon,
-  HomeIcon,
-  PCIcon,
-  PhoneIcon,
-  RefreshIcon,
-  SendIcon,
-  ShareIcon,
-} from "@/assets/svg";
 import { IconButton } from "@/components/icon-button";
 import { Input } from "@/components/ui/input";
 import {
@@ -35,7 +34,6 @@ import {
   setBrowserSelector,
   useBrowserStore,
 } from "@/store/browser";
-import { themeSelector, useSessionStore } from "@/store/session";
 import { cn, getFavIcon } from "@/utils";
 import { useBrowserActions } from "@/hooks/use-browser-actions";
 import { useFavorites } from "@/hooks/use-favorites";
@@ -49,7 +47,6 @@ export function ToolBar({ page }: Props) {
   const { data: favoriteList, addFavorite, removeFavorite } = useFavorites();
   const { browser, app, contextMenu } = usePlatform();
   const { goto, goHome } = useBrowserActions();
-  const { theme } = useSessionStore(useShallow(themeSelector));
   const store = useBrowserStore(useShallow(browserNavSelector));
   const { setBrowserStore } = useBrowserStore(useShallow(setBrowserSelector));
   const appStore = useAppStore(useShallow(appStoreSelector));
@@ -118,8 +115,6 @@ export function ToolBar({ page }: Props) {
     });
   });
 
-  const iconColor = theme === "dark" ? "white" : "black";
-
   return (
     <div
       className={cn(
@@ -132,55 +127,36 @@ export function ToolBar({ page }: Props) {
       <IconButton
         title={t("switchToMobileMode")}
         onClick={onSetDefaultUA}
-        icon={
-          appStore.isMobile ? (
-            <PhoneIcon fill={iconColor} />
-          ) : (
-            <PCIcon fill={iconColor} />
-          )
-        }
+        icon={appStore.isMobile ? <Smartphone /> : <Monitor />}
       />
       <IconButton
         disabled={disabled}
         title={t("home")}
         onClick={goHome}
-        icon={<HomeIcon fill={iconColor} />}
+        icon={<House />}
       />
       <IconButton
         disabled={store.mode === PageMode.Default}
         title={t("back")}
         onClick={onClickGoBack}
-        icon={<BackIcon fill={iconColor} />}
+        icon={<ArrowLeft />}
       />
       {store.mode === PageMode.Browser &&
       store.status === BrowserStatus.Loading ? (
-        <IconButton
-          title={t("cancle")}
-          onClick={goHome}
-          icon={<CloseIcon fill={iconColor} />}
-        />
+        <IconButton title={t("cancle")} onClick={goHome} icon={<X />} />
       ) : (
         <IconButton
           disabled={disabled}
           title={t("refresh")}
           onClick={() => goto(store.url)}
-          icon={<RefreshIcon fill={iconColor} />}
+          icon={<RefreshCw />}
         />
       )}
       <IconButton
         title={curIsFavorite ? t("cancelFavorite") : t("favorite")}
         onClick={onClickAddFavorite}
         disabled={disabled}
-        icon={
-          curIsFavorite ? (
-            <FavFillIcon fill={iconColor} />
-          ) : (
-            <FavIcon
-              fill={iconColor}
-              stroke={theme === "dark" ? "#B4B4B4" : "#020817"}
-            />
-          )
-        }
+        icon={<Star className={cn(curIsFavorite && "fill-current")} />}
       />
       <div className="relative min-w-0 flex-1">
         {appStore.privacy ? (
@@ -215,13 +191,13 @@ export function ToolBar({ page }: Props) {
         title={t("visit")}
         onClick={onClickEnter}
         disabled={!store.url}
-        icon={<SendIcon fill={iconColor} />}
+        icon={<Send />}
       />
       {page ? (
         <IconButton
           title={t("mergeToMainWindow")}
           onClick={onCombineToHome}
-          icon={<ShareIcon className="rotate-180" fill={iconColor} />}
+          icon={<Combine />}
         />
       ) : null}
     </div>

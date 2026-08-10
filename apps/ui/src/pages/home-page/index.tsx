@@ -1,11 +1,10 @@
 import { DownloadFilter } from "@mediago/shared-common";
 import { useMemoizedFn } from "ahooks";
-import { QrCodeIcon } from "lucide-react";
+import { FolderOpen, QrCodeIcon } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { type FC, useId, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
-import { FolderIcon } from "@/assets/svg";
 import DownloadForm, {
   type DownloadFormItem,
   type DownloadFormRef,
@@ -82,7 +81,7 @@ const HomePage: FC<Props> = ({ filter = DownloadFilter.list }) => {
               variant="outline"
               onClick={() => shell.open(appStore.local)}
             >
-              <FolderIcon />
+              <FolderOpen />
               {t("openFolder")}
             </Button>
           )}

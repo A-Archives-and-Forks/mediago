@@ -5,18 +5,20 @@ import {
   type DownloadTaskWithFile,
 } from "@mediago/shared-common";
 import { useMemoizedFn } from "ahooks";
-import { FileTextIcon, PauseCircleIcon, PlayCircleIcon } from "lucide-react";
+import {
+  CircleArrowDown,
+  CirclePause,
+  CirclePlay,
+  CircleX,
+  Download,
+  Pause,
+  Pencil,
+  SquareTerminal,
+} from "lucide-react";
 import { memo, type ReactNode, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import selectedBg from "@/assets/images/select-item-bg.png";
-import {
-  DownloadIcon,
-  DownloadListIcon,
-  EditIcon,
-  FailedIcon,
-  PauseIcon,
-} from "@/assets/svg";
 import { DownloadTag } from "@/components/download-tag";
 import { IconButton } from "@/components/icon-button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -90,11 +92,7 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
           <IconButton
             key="terminal"
             title={t("terminal")}
-            icon={
-              <span>
-                <FileTextIcon className="size-full" />
-              </span>
-            }
+            icon={<SquareTerminal />}
           />
         }
         title={task.name}
@@ -106,7 +104,7 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
       <IconButton
         key="edit"
         title={t("edit")}
-        icon={<EditIcon />}
+        icon={<Pencil />}
         onClick={() => onShowEditForm?.(task)}
       />
     );
@@ -118,7 +116,7 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
         buttons.push(
           <IconButton
             key="download"
-            icon={<DownloadListIcon />}
+            icon={<CircleArrowDown />}
             title={t("download")}
             onClick={() => startWithEvent(DOWNLOAD_NOW)}
           />,
@@ -130,11 +128,7 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
           <IconButton
             key="stop"
             title={t("pause")}
-            icon={
-              <span>
-                <PauseCircleIcon className="size-full" />
-              </span>
-            }
+            icon={<CirclePause />}
             onClick={handleStop}
           />,
         );
@@ -146,7 +140,7 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
           <IconButton
             key="redownload"
             title={t("redownload")}
-            icon={<DownloadListIcon />}
+            icon={<CircleArrowDown />}
             onClick={() => startWithEvent(RESTART_DOWNLOAD)}
           />,
         );
@@ -160,7 +154,7 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
         buttons.push(
           <IconButton
             key="restart"
-            icon={<DownloadListIcon />}
+            icon={<CircleArrowDown />}
             title={t("continueDownload")}
             onClick={() => startWithEvent(CONTINUE_DOWNLOAD)}
           />,
@@ -171,11 +165,7 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
         buttons.push(
           <IconButton
             key="play"
-            icon={
-              <span>
-                <PlayCircleIcon className="size-full" />
-              </span>
-            }
+            icon={<CirclePlay />}
             title={t("playVideo")}
             disabled={!task.exists}
             onClick={handlePlay}
@@ -221,7 +211,7 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
         list.push(
           <DownloadTag
             key="downloading"
-            icon={<DownloadIcon fill="#fff" width={14} height={14} />}
+            icon={<Download />}
             text={t("downloading")}
             color="#127af3"
           />,
@@ -251,7 +241,7 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
             key="failed"
             trigger={
               <DownloadTag
-                icon={<FailedIcon />}
+                icon={<CircleX />}
                 text={t("downloadFailed")}
                 color="#ff7373"
                 className="cursor-pointer"
@@ -266,7 +256,7 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
         list.push(
           <DownloadTag
             key="pause"
-            icon={<PauseIcon />}
+            icon={<Pause />}
             text={t("downloadPause")}
             color="#9abbe2"
           />,

@@ -35,7 +35,7 @@ const buttonVariants = cva(
   // feature set (ss09 on Geist). Safe on system-font fallbacks.
   // Transitions bound to the centralised --transition-color / shadow
   // vars so every interactive surface shares one rhythm.
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium font-feat-display [transition:color_var(--transition-color),background-color_var(--transition-color),box-shadow_var(--transition-shadow)] focus-visible:outline-none focus-visible:shadow-focus disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 cursor-pointer",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium font-feat-display [transition:color_var(--transition-color),background-color_var(--transition-color),box-shadow_var(--transition-shadow)] focus-visible:outline-none focus-visible:shadow-focus disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 [&_svg]:stroke-[1.75] cursor-pointer",
   {
     variants: {
       variant: {

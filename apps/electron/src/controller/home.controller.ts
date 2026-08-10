@@ -60,6 +60,8 @@ export default class HomeController implements Controller {
 
   @handle(IPC.app.showBrowserWindow)
   async showBrowserWindow() {
+    const client = this.downloaderServer.getClient();
+    await client.setConfigKey("openInNewWindow", true);
     this.browserWindow.showWindow();
   }
 

@@ -1,6 +1,5 @@
-import { Link as LinkIcon } from "lucide-react";
+import { Link as LinkIcon, X } from "lucide-react";
 import { type ReactElement } from "react";
-import { CloseIcon } from "@/assets/svg";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface Props {
@@ -28,14 +27,14 @@ export function FavItem({
     >
       {onClose ? (
         <div
-          className="absolute right-1 top-1 hidden group-hover:block"
+          className="absolute right-1 top-1 hidden size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground group-hover:flex"
           onClick={(e) => {
             e.stopPropagation();
             e.preventDefault();
             onClose();
           }}
         >
-          <CloseIcon width={15} height={15} />
+          <X className="size-4 stroke-[1.75]" />
         </div>
       ) : null}
       <div className="flex h-14 w-14 flex-row items-center justify-center rounded-lg bg-white dark:bg-[#27292F]">

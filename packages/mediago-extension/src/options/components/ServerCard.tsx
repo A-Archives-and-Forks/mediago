@@ -183,7 +183,7 @@ export function ServerCard() {
             onClick={() => void test()}
             disabled={testing || !loaded}
           >
-            {testing && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {testing && <Loader2 className="size-3.5 animate-spin" />}
             {t("common.testConnection")}
           </Button>
           <Button
@@ -191,7 +191,7 @@ export function ServerCard() {
             onClick={handleSave}
             disabled={saving || !loaded}
           >
-            {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {saving && <Loader2 className="size-3.5 animate-spin" />}
             {t("common.save")}
           </Button>
           {lastStatus && (
@@ -213,7 +213,7 @@ function StatusInline({ ok, text }: { ok: boolean; text: string }) {
         variant="success"
         className="max-w-[360px] gap-1 normal-case tracking-normal"
       >
-        <CheckCircle2 className="h-3 w-3 shrink-0" />
+        <CheckCircle2 className="size-3 shrink-0" />
         <span className="truncate">{text}</span>
       </Badge>
     );
@@ -223,7 +223,7 @@ function StatusInline({ ok, text }: { ok: boolean; text: string }) {
       variant="destructive"
       className="max-w-[360px] gap-1 normal-case tracking-normal"
     >
-      <XCircle className="h-3 w-3 shrink-0" />
+      <XCircle className="size-3 shrink-0" />
       <span className="truncate">{text}</span>
     </Badge>
   );

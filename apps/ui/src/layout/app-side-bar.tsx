@@ -1,22 +1,24 @@
 import { useMemoizedFn } from "ahooks";
 import {
+  BadgeCheck,
+  CloudDownload,
+  ExternalLink,
+  FileCog,
+  ScanSearch,
+  Settings,
+} from "lucide-react";
+import {
   cloneElement,
   type PropsWithChildren,
   type ReactElement,
+  useEffect,
   useMemo,
+  useRef,
 } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import siderBg from "@/assets/images/sider-bg.png";
-import {
-  ConverterIcon,
-  DoneIcon,
-  ExtractIcon,
-  ListIcon,
-  SettingsIcon,
-  ShareIcon,
-} from "@/assets/svg";
 import { Badge } from "@/components/ui/badge";
 import { useAppStore } from "@/store/app";
 import { downloadStoreSelector, useDownloadStore } from "@/store/download";
@@ -39,7 +41,7 @@ interface AppMenuItemProps extends PropsWithChildren {
   link: string;
   activeKey: string;
   className?: string;
-  icon?: ReactElement;
+  icon?: ReactElement<{ className?: string }>;
 }
 
 function AppMenuItem({
@@ -65,8 +67,11 @@ function AppMenuItem({
         )}
       >
         {icon
-          ? cloneElement(icon as ReactElement<{ fill?: string }>, {
-              fill: isActive ? "#fff" : "#AAB5CB",
+          ? cloneElement(icon, {
+              className: cn(
+                "size-5 shrink-0 stroke-[1.75] text-current",
+                icon.props.className,
+              ),
             })
           : null}
         {children}
@@ -90,11 +95,25 @@ export function AppSideBar({ className }: Props) {
   const openInNewWindow = useAppStore((state) => state.openInNewWindow);
   const setAppStore = useAppStore((state) => state.setAppStore);
   const updateAvailable = useSessionStore((state) => state.updateAvailable);
+  const previousOpenInNewWindow = useRef(openInNewWindow);
 
   const activeKey = useMemo(
     () => processLocation(location.pathname),
     [location.pathname],
   );
+
+  useEffect(() => {
+    const wasOpenInNewWindow = previousOpenInNewWindow.current;
+    previousOpenInNewWindow.current = openInNewWindow;
+
+    if (
+      wasOpenInNewWindow &&
+      !openInNewWindow &&
+      location.pathname !== "/source"
+    ) {
+      navigate("/source", { replace: true });
+    }
+  }, [location.pathname, navigate, openInNewWindow]);
 
   const handleExternalLink = useMemoizedFn(
     async (event: React.MouseEvent<HTMLDivElement>) => {
@@ -103,11 +122,12 @@ export function AppSideBar({ className }: Props) {
 
       if (openInNewWindow) {
         setAppStore({ openInNewWindow: false });
-        navigate("/source");
         await app.combineToHomePage({ url: "", sourceList: [] });
       } else {
         setAppStore({ openInNewWindow: true });
-        if (location.pathname === "/source") navigate("/");
+        if (location.pathname === "/source") {
+          navigate("/", { replace: true });
+        }
         await app.showBrowserWindow();
       }
     },
@@ -134,7 +154,7 @@ export function AppSideBar({ className }: Props) {
             link="/"
             onClick={handleClearCount}
             activeKey={activeKey}
-            icon={<ListIcon />}
+            icon={<CloudDownload />}
           >
             <span>{t("downloadList")}</span>
             {count > 0 ? (
@@ -152,7 +172,7 @@ export function AppSideBar({ className }: Props) {
       },
       {
         label: (
-          <AppMenuItem link="/done" activeKey={activeKey} icon={<DoneIcon />}>
+          <AppMenuItem link="/done" activeKey={activeKey} icon={<BadgeCheck />}>
             <span>{t("downloadComplete")}</span>
           </AppMenuItem>
         ),
@@ -163,7 +183,7 @@ export function AppSideBar({ className }: Props) {
           <AppMenuItem
             link="/converter"
             activeKey={activeKey}
-            icon={<ConverterIcon />}
+            icon={<FileCog />}
           >
             <span>{t("converter")}</span>
           </AppMenuItem>
@@ -176,18 +196,28 @@ export function AppSideBar({ className }: Props) {
             link="/source"
             activeKey={activeKey}
             className="group"
-            icon={<ExtractIcon />}
+            icon={<ScanSearch />}
             onClick={handleExtractPage}
           >
             <span className="flex flex-1">{t("materialExtraction")}</span>
             <div
-              title={t("openInNewWindow")}
-              className="hidden hover:opacity-70 group-hover:block"
+              title={t(
+                openInNewWindow ? "mergeToMainWindow" : "openInNewWindow",
+              )}
+              aria-label={t(
+                openInNewWindow ? "mergeToMainWindow" : "openInNewWindow",
+              )}
+              className={cn(
+                "hover:opacity-70",
+                openInNewWindow ? "block" : "hidden group-hover:block",
+              )}
               onClick={handleExternalLink}
             >
-              <ShareIcon
-                className={cn({ "rotate-180": openInNewWindow })}
-                fill={location.pathname === "/source" ? "#fff" : "#AAB5CB"}
+              <ExternalLink
+                className={cn(
+                  "size-5 shrink-0 stroke-[1.75] transition-transform",
+                  openInNewWindow && "rotate-180",
+                )}
               />
             </div>
           </AppMenuItem>
@@ -199,7 +229,7 @@ export function AppSideBar({ className }: Props) {
           <AppMenuItem
             link="/settings"
             activeKey={activeKey}
-            icon={<SettingsIcon />}
+            icon={<Settings />}
           >
             <span>{t("setting")}</span>
             {updateAvailable ? (

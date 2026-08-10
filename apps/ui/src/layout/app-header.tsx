@@ -1,6 +1,6 @@
 import { useMemoizedFn } from "ahooks";
+import { CircleHelp } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { HelpIcon } from "@/assets/svg";
 import { cn } from "@/utils";
 import LogoImg from "../assets/images/logo.png";
 import { usePlatform } from "@/hooks/use-platform";
@@ -40,13 +40,11 @@ export function AppHeader({ className }: Props) {
       <div className="flex flex-row items-center gap-3 pr-3">
         <button
           type="button"
-          className="flex flex-row items-center gap-2 cursor-pointer"
+          className="text-brand flex cursor-pointer flex-row items-center gap-2 dark:text-white"
           onClick={openHelpUrl}
         >
-          <HelpIcon height={18} width={18} />
-          <span className="text-sm text-[#137BF4] dark:text-white">
-            {t("help")}
-          </span>
+          <CircleHelp className="size-4 shrink-0 stroke-[1.75]" />
+          <span className="text-sm">{t("help")}</span>
         </button>
       </div>
     </div>

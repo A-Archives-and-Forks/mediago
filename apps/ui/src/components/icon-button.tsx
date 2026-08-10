@@ -1,12 +1,5 @@
 import { useMemoizedFn } from "ahooks";
-import {
-  cloneElement,
-  memo,
-  type PropsWithChildren,
-  type ReactElement,
-} from "react";
-import { useShallow } from "zustand/react/shallow";
-import { themeSelector, useSessionStore } from "@/store/session";
+import { memo, type PropsWithChildren, type ReactElement } from "react";
 import { cn } from "@/utils";
 
 interface Props extends PropsWithChildren {
@@ -23,7 +16,6 @@ export const IconButton = memo(function IconButton({
   onClick,
   icon,
 }: Props) {
-  const { theme } = useSessionStore(useShallow(themeSelector));
   const handleClick = useMemoizedFn(() => {
     if (disabled) {
       return;
@@ -34,7 +26,7 @@ export const IconButton = memo(function IconButton({
   return (
     <div
       className={cn(
-        "flex h-4 w-4 shrink-0 cursor-pointer flex-row items-center justify-center rounded-sm hover:opacity-70",
+        "flex size-6 shrink-0 cursor-pointer flex-row items-center justify-center rounded-sm text-foreground/70 transition-colors hover:bg-accent hover:text-foreground [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:stroke-[1.75]",
         {
           "cursor-not-allowed": disabled,
           "opacity-50": disabled,
@@ -43,14 +35,7 @@ export const IconButton = memo(function IconButton({
       title={title}
       onClick={handleClick}
     >
-      {icon &&
-        cloneElement(icon, {
-          className: cn(
-            "w-full h-full text-[#020817] dark:text-[#B4B4B4]",
-            icon.props.className,
-          ),
-          fill: theme === "dark" ? "#B4B4B4" : "#020817",
-        })}
+      {icon}
       {children}
     </div>
   );

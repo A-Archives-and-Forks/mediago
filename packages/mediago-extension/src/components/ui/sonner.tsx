@@ -1,5 +1,22 @@
+import {
+  CircleCheck,
+  CircleX,
+  Info,
+  Loader2,
+  TriangleAlert,
+  X,
+} from "lucide-react";
 import * as React from "react";
 import { Toaster as Sonner, type ToasterProps } from "sonner";
+
+const toastIcons: NonNullable<ToasterProps["icons"]> = {
+  success: <CircleCheck className="size-4 text-current" />,
+  info: <Info className="size-4 text-current" />,
+  warning: <TriangleAlert className="size-4 text-current" />,
+  error: <CircleX className="size-4 text-current" />,
+  loading: <Loader2 className="size-4 animate-spin text-current" />,
+  close: <X className="size-4 text-current" />,
+};
 
 /**
  * Theme-aware sonner wrapper. The extension doesn't expose a theme
@@ -27,6 +44,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       theme={theme}
       className="toaster group"
+      icons={toastIcons}
       toastOptions={{
         classNames: {
           // 10px radius — Cursor's "featured container" bucket. Puts

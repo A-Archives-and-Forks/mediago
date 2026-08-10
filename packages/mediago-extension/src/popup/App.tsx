@@ -87,7 +87,7 @@ export function App() {
           onClick={data.clear}
           title={t("popup.clear")}
         >
-          <Trash2 className="h-3.5 w-3.5" />
+          <Trash2 className="size-3.5" />
           <span className="sr-only">{t("popup.clear")}</span>
         </Button>
         <Button
@@ -97,7 +97,7 @@ export function App() {
           disabled={!hasSources || importing}
           onClick={data.importAll}
         >
-          <DownloadCloud className="h-3.5 w-3.5" />
+          <DownloadCloud className="size-3.5" />
           {hasSources
             ? t("popup.importAllWithCount", { count: sources.length })
             : t("popup.importAll")}
@@ -108,7 +108,7 @@ export function App() {
           title={t("popup.settings")}
           onClick={() => chrome.runtime.openOptionsPage()}
         >
-          <Settings className="h-4 w-4" />
+          <Settings className="size-4" />
         </Button>
       </footer>
     </div>

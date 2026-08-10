@@ -37,7 +37,7 @@ export function SourceItem({ source, onImport, disabled }: Props) {
         disabled={disabled}
         onClick={() => onImport(source)}
       >
-        <ArrowUpRight className="h-3.5 w-3.5" />
+        <ArrowUpRight className="size-3.5" />
         {t("source.import")}
       </Button>
     </li>
