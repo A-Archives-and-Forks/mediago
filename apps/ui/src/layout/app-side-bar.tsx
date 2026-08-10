@@ -18,21 +18,14 @@ import {
   SettingsIcon,
   ShareIcon,
 } from "@/assets/svg";
-import {
-  appStoreSelector,
-  setAppStoreSelector,
-  useAppStore,
-} from "@/store/app";
+import { useAppStore } from "@/store/app";
 import { downloadStoreSelector, useDownloadStore } from "@/store/download";
-import { updateSelector, useSessionStore } from "@/store/session";
+import { useSessionStore } from "@/store/session";
 import { cn, isWeb } from "@/utils";
 import { usePlatform } from "@/hooks/use-platform";
 
 function processLocation(pathname: string) {
-  let name = pathname;
-  if (pathname === "/") {
-    name = "/home";
-  }
+  const name = pathname === "/" ? "/home" : pathname;
   return name.substring(1);
 }
 
@@ -42,7 +35,7 @@ type MenuItem = {
 };
 
 interface AppMenuItemProps extends PropsWithChildren {
-  onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
+  onClick?: (event: React.MouseEvent<HTMLAnchorElement>) => void;
   link: string;
   activeKey: string;
   className?: string;
@@ -57,9 +50,7 @@ function AppMenuItem({
   className,
   icon,
 }: AppMenuItemProps) {
-  const isActive = useMemo(() => {
-    return activeKey === processLocation(link);
-  }, [activeKey, link]);
+  const isActive = activeKey === processLocation(link);
 
   return (
     <Link discover="render" to={link} onClick={onClick}>
@@ -73,10 +64,11 @@ function AppMenuItem({
           className,
         )}
       >
-        {icon &&
-          cloneElement(icon as React.ReactElement, {
-            fill: isActive ? "#fff" : "#AAB5CB",
-          })}
+        {icon
+          ? cloneElement(icon as ReactElement<{ fill?: string }>, {
+              fill: isActive ? "#fff" : "#AAB5CB",
+            })
+          : null}
         {children}
       </div>
     </Link>
@@ -95,9 +87,9 @@ export function AppSideBar({ className }: Props) {
   const { count, clearCount } = useDownloadStore(
     useShallow(downloadStoreSelector),
   );
-  const appStore = useAppStore(useShallow(appStoreSelector));
-  const { setAppStore } = useAppStore(useShallow(setAppStoreSelector));
-  const { updateAvailable } = useSessionStore(useShallow(updateSelector));
+  const openInNewWindow = useAppStore((state) => state.openInNewWindow);
+  const setAppStore = useAppStore((state) => state.setAppStore);
+  const updateAvailable = useSessionStore((state) => state.updateAvailable);
 
   const activeKey = useMemo(
     () => processLocation(location.pathname),
@@ -105,22 +97,17 @@ export function AppSideBar({ className }: Props) {
   );
 
   const handleExternalLink = useMemoizedFn(
-    async (e: React.MouseEvent<HTMLDivElement>) => {
-      e.stopPropagation();
-      e.preventDefault();
+    async (event: React.MouseEvent<HTMLDivElement>) => {
+      event.stopPropagation();
+      event.preventDefault();
 
-      if (appStore.openInNewWindow) {
+      if (openInNewWindow) {
         setAppStore({ openInNewWindow: false });
         navigate("/source");
-        await app.combineToHomePage({
-          url: "",
-          sourceList: [],
-        });
+        await app.combineToHomePage({ url: "", sourceList: [] });
       } else {
         setAppStore({ openInNewWindow: true });
-        if (location.pathname === "/source") {
-          navigate("/");
-        }
+        if (location.pathname === "/source") navigate("/");
         await app.showBrowserWindow();
       }
     },
@@ -131,17 +118,16 @@ export function AppSideBar({ className }: Props) {
   });
 
   const handleExtractPage = useMemoizedFn(
-    (e: React.MouseEvent<HTMLAnchorElement>) => {
-      if (appStore.openInNewWindow) {
-        e.preventDefault();
-        e.stopPropagation();
-        app.showBrowserWindow();
-      }
+    (event: React.MouseEvent<HTMLAnchorElement>) => {
+      if (!openInNewWindow) return;
+      event.preventDefault();
+      event.stopPropagation();
+      app.showBrowserWindow();
     },
   );
 
-  const items1: MenuItem[] = useMemo(() => {
-    return [
+  const items = useMemo<MenuItem[]>(
+    () => [
       {
         label: (
           <AppMenuItem
@@ -151,9 +137,9 @@ export function AppSideBar({ className }: Props) {
             icon={<ListIcon />}
           >
             <span>{t("downloadList")}</span>
-            {count > 0 && (
-              <Badge count={count} offset={[5, 1]} size="small"></Badge>
-            )}
+            {count > 0 ? (
+              <Badge count={count} offset={[5, 1]} size="small" />
+            ) : null}
           </AppMenuItem>
         ),
         key: "home",
@@ -194,8 +180,8 @@ export function AppSideBar({ className }: Props) {
               onClick={handleExternalLink}
             >
               <ShareIcon
-                className={cn({ "rotate-180": appStore.openInNewWindow })}
-                fill={"/source" === location.pathname ? "#fff" : "#AAB5CB"}
+                className={cn({ "rotate-180": openInNewWindow })}
+                fill={location.pathname === "/source" ? "#fff" : "#AAB5CB"}
               />
             </div>
           </AppMenuItem>
@@ -215,22 +201,27 @@ export function AppSideBar({ className }: Props) {
         ),
         key: "settings",
       },
-    ];
-  }, [
-    activeKey,
-    count,
-    handleExternalLink,
-    location.pathname,
-    t,
-    updateAvailable,
-    handleClearCount,
-  ]);
+    ],
+    [
+      activeKey,
+      count,
+      handleClearCount,
+      handleExternalLink,
+      handleExtractPage,
+      location.pathname,
+      openInNewWindow,
+      t,
+      updateAvailable,
+    ],
+  );
 
-  const finalItems = useMemo(() => {
-    return items1.filter((i) =>
-      isWeb ? i.key !== "source" && i.key !== "converter" : true,
-    );
-  }, [items1]);
+  const visibleItems = useMemo(
+    () =>
+      items.filter((item) =>
+        isWeb ? item.key !== "source" && item.key !== "converter" : true,
+      ),
+    [items],
+  );
 
   return (
     <div
@@ -240,7 +231,9 @@ export function AppSideBar({ className }: Props) {
       )}
     >
       <div className="relative z-10 flex flex-row gap-3 sm:w-[180px] sm:flex-col">
-        {finalItems.map((item) => cloneElement(item.label, { key: item.key }))}
+        {visibleItems.map((item) =>
+          cloneElement(item.label, { key: item.key }),
+        )}
       </div>
 
       <img

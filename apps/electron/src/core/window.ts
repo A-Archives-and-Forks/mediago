@@ -29,7 +29,7 @@ export default class Window {
 
     this.window.show();
 
-    if (isDev) {
+    if (isDev && process.env.OPEN_DEVTOOLS === "true") {
       this.window.webContents.openDevTools();
     }
   };

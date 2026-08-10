@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -315,5 +316,67 @@ func TestAtomicWrite(t *testing.T) {
 	tmpPath := c.Path() + ".tmp"
 	if _, err := os.Stat(tmpPath); err == nil {
 		t.Error("temp file still exists after write")
+	}
+}
+
+func TestWriteFailureDoesNotMutateStore(t *testing.T) {
+	dir := tempDir(t)
+	defaults := testConfig{Name: "original", Count: 1, Debug: false}
+	c, err := New(Options[testConfig]{
+		CWD:      dir,
+		Defaults: defaults,
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	if err := os.Mkdir(c.Path()+".tmp", 0o755); err != nil {
+		t.Fatalf("block temp writes: %v", err)
+	}
+
+	listenerCalls := 0
+	c.OnDidChange("name", func(newVal, oldVal any) {
+		listenerCalls++
+	})
+
+	tests := []struct {
+		name string
+		run  func() error
+	}{
+		{
+			name: "Set",
+			run:  func() error { return c.Set("name", "changed") },
+		},
+		{
+			name: "Delete",
+			run:  func() error { return c.Delete("name") },
+		},
+		{
+			name: "SetStore",
+			run: func() error {
+				return c.SetStore(testConfig{Name: "changed", Count: 2, Debug: true})
+			},
+		},
+		{
+			name: "Update",
+			run: func() error {
+				return c.Update(map[string]any{"name": "changed", "debug": true})
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if err := test.run(); err == nil {
+				t.Fatal("write unexpectedly succeeded")
+			}
+			if store := c.Store(); !reflect.DeepEqual(store, defaults) {
+				t.Fatalf("Store() = %+v, want %+v", store, defaults)
+			}
+		})
+	}
+
+	if listenerCalls != 0 {
+		t.Fatalf("listeners called after failed writes: %d", listenerCalls)
 	}
 }

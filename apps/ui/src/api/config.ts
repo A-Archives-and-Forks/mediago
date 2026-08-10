@@ -9,10 +9,22 @@ export interface GoEnvPath {
 }
 
 export const getConfigKey = "/api/config";
-export const getConfig = (): Promise<AppStore> => http.get(getConfigKey);
+export const getConfig = (options?: {
+  suppressAuthRedirect?: boolean;
+  timeoutMs?: number;
+}): Promise<AppStore> =>
+  http.get(getConfigKey, {
+    suppressAuthRedirect: options?.suppressAuthRedirect,
+    timeout: options?.timeoutMs,
+  });
 
-export const setConfigValue = (key: string, value: unknown): Promise<void> =>
-  http.put(`/api/config/${key}`, { value });
+export const setConfigValue = <K extends keyof AppStore>(
+  key: K,
+  value: AppStore[K],
+): Promise<void> => http.put(`/api/config/${String(key)}`, { value });
+
+export const setConfigValues = (values: Partial<AppStore>): Promise<void> =>
+  http.post(getConfigKey, values);
 
 export const getEnvPathKey = "/api/env";
 export const getEnvPath = (): Promise<GoEnvPath> => http.get(getEnvPathKey);

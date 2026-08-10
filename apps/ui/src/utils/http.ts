@@ -1,8 +1,12 @@
 import { useAppStore } from "@/store/app";
-import axios from "axios";
+import axios, { type InternalAxiosRequestConfig } from "axios";
 
 // Go Core axios instance
 const http = axios.create({});
+
+function shouldSkipAuthRedirect(config?: InternalAxiosRequestConfig) {
+  return config?.suppressAuthRedirect === true;
+}
 
 /**
  * Initialize http instance with Go Core base URL.
@@ -29,7 +33,7 @@ http.interceptors.response.use(
       if (res.success) {
         return res.data;
       }
-      if (res.code === 401) {
+      if (res.code === 401 && !shouldSkipAuthRedirect(response.config)) {
         window.location.pathname = "/signin";
       }
       return Promise.reject(new Error(res.message || "Request failed"));
@@ -42,6 +46,7 @@ http.interceptors.response.use(
     if (
       resp &&
       resp.status === 401 &&
+      !shouldSkipAuthRedirect(error.config) &&
       !window.location.pathname.startsWith("/signin")
     ) {
       useAppStore.getState().setAppStore({ apiKey: "" });

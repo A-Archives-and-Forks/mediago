@@ -1,26 +1,46 @@
 // DOWNLOAD_EVENT_NAME is used as the channel name for dispatching download events
 import { http } from "@/utils";
 import { useDownloadStore } from "@/store/download";
+import { useAppStore } from "@/store/app";
 
 type Callback = (...args: unknown[]) => void;
 
 let es: EventSource | null = null;
+let currentCoreUrl: string | null = null;
+let connectedApiKey = "";
+let stopWatchingApiKey: (() => void) | null = null;
 
 const downloadListeners = new Set<Callback>();
 const configListeners = new Set<Callback>();
 
-let pollingTimer: ReturnType<typeof setInterval> | null = null;
+let pollingTimer: ReturnType<typeof setTimeout> | null = null;
+let pollingGeneration = 0;
+let pollingEnabled = false;
+let pollingRequestInFlight = false;
 
 /**
  * Initialize Go Core SSE event stream.
  * Called once from App.tsx after discovering the core URL.
  */
 export function initGoEvents(coreUrl: string) {
+  currentCoreUrl = coreUrl;
   if (es) {
     es.close();
   }
 
-  es = new EventSource(`${coreUrl}/api/events`);
+  const apiKey = useAppStore.getState().apiKey;
+  connectedApiKey = apiKey;
+  const eventsUrl = new URL("/api/events", coreUrl);
+  if (apiKey) eventsUrl.searchParams.set("token", apiKey);
+  es = new EventSource(eventsUrl);
+
+  if (!stopWatchingApiKey) {
+    stopWatchingApiKey = useAppStore.subscribe((state, previousState) => {
+      if (state.apiKey === previousState.apiKey) return;
+      if (!currentCoreUrl || state.apiKey === connectedApiKey) return;
+      initGoEvents(currentCoreUrl);
+    });
+  }
 
   // Task creation is broadcast from Go Core's download.Create handler.
   // Driving the sidebar badge from SSE (instead of the local `increase()`
@@ -120,56 +140,92 @@ function dispatchConfig(data: unknown) {
   configListeners.forEach((cb) => cb(null, data));
 }
 
+interface TaskListResponse {
+  tasks: Array<{
+    id: string;
+    type: string;
+    percent: number;
+    speed: string;
+    isLive: boolean;
+    status: string;
+  }>;
+  total: number;
+}
+
 // --- Progress polling (only while downloads are active) ---
 
-function startProgressPolling() {
-  if (pollingTimer) return;
-  pollingTimer = setInterval(async () => {
-    try {
-      // Use /api/tasks which returns TaskInfo with percent/speed/isLive
-      const data = await http.get("/api/tasks");
-      const result = data as {
-        tasks: Array<{
-          id: string;
-          type: string;
-          percent: number;
-          speed: string;
-          isLive: boolean;
-          status: string;
-        }>;
-        total: number;
-      };
-      const activeTasks = result.tasks.filter(
-        (t) => t.percent > 0 && t.percent < 100 && t.status === "downloading",
-      );
-      if (activeTasks.length > 0) {
-        const progress = activeTasks.map((t) => ({
-          id: Number(t.id),
-          type: t.type,
-          percent: String(t.percent || 0),
-          speed: t.speed || "",
-          isLive: t.isLive || false,
-          status: t.status,
-        }));
-        dispatchDownload({ type: "progress", data: progress });
-      }
-    } catch {
-      // Go Core may not be ready yet
+function scheduleProgressPoll(delayMs: number) {
+  if (!pollingEnabled || pollingTimer || pollingRequestInFlight) return;
+  pollingTimer = setTimeout(() => {
+    pollingTimer = null;
+    void pollProgress();
+  }, delayMs);
+}
+
+async function pollProgress() {
+  if (!pollingEnabled || pollingRequestInFlight) return;
+  pollingRequestInFlight = true;
+  const requestGeneration = pollingGeneration;
+
+  try {
+    // Use /api/tasks which returns TaskInfo with percent/speed/isLive.
+    const result = await http.get<unknown, TaskListResponse>("/api/tasks", {
+      timeout: 5000,
+    });
+    if (requestGeneration !== pollingGeneration || !pollingEnabled) return;
+
+    const activeTasks = result.tasks.filter(
+      (t) => t.percent > 0 && t.percent < 100 && t.status === "downloading",
+    );
+    if (activeTasks.length > 0) {
+      const progress = activeTasks.map((t) => ({
+        id: Number(t.id),
+        type: t.type,
+        percent: String(t.percent || 0),
+        speed: t.speed || "",
+        isLive: t.isLive || false,
+        status: t.status,
+      }));
+      dispatchDownload({ type: "progress", data: progress });
     }
-  }, 1000);
+
+    if (!result.tasks.some((task) => task.status === "downloading")) {
+      stopPolling();
+    }
+  } catch {
+    // Go Core may not be ready yet.
+  } finally {
+    pollingRequestInFlight = false;
+    if (pollingEnabled) {
+      scheduleProgressPoll(requestGeneration === pollingGeneration ? 1000 : 0);
+    }
+  }
+}
+
+function startProgressPolling() {
+  pollingGeneration += 1;
+  pollingEnabled = true;
+  scheduleProgressPoll(1000);
 }
 
 function stopPolling() {
+  pollingEnabled = false;
+  pollingGeneration += 1;
   if (pollingTimer) {
-    clearInterval(pollingTimer);
+    clearTimeout(pollingTimer);
     pollingTimer = null;
   }
 }
 
 async function stopProgressPollingIfIdle() {
+  const requestGeneration = pollingGeneration;
   try {
-    const data = await http.get("/api/tasks");
-    const result = data as { tasks: Array<{ status: string }>; total: number };
+    const result = await http.get<
+      unknown,
+      Pick<TaskListResponse, "tasks" | "total">
+    >("/api/tasks", { timeout: 5000 });
+    if (requestGeneration !== pollingGeneration) return;
+
     const hasActive = result.tasks.some((t) => t.status === "downloading");
     if (!hasActive) {
       stopPolling();

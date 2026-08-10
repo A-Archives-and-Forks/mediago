@@ -1,37 +1,29 @@
-import { appStoreSelector, useAppStore } from "@/store/app";
-import { isWeb } from "@/utils";
-import { useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import { useShallow } from "zustand/react/shallow";
 import { getAuthStatus } from "@/api/auth";
+import { useAppStore } from "@/store/app";
+import { isWeb } from "@/utils";
+import { createElement, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 
-export function useAuth() {
+function WebAuthGuard() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { apiKey } = useAppStore(useShallow(appStoreSelector));
+  const apiKey = useAppStore((state) => state.apiKey);
 
   useEffect(() => {
-    if (!isWeb) return;
-    if (location.pathname === "/signin") return;
+    if (!isWeb || location.pathname === "/signin" || apiKey) return;
 
-    // If we already have an apiKey stored, no need to check
-    if (apiKey) return;
-
-    // No apiKey — check if Go Core has auth configured
     getAuthStatus()
-      .then((data) => {
-        const status = data as Record<string, unknown>;
-        if (status?.setuped) {
-          // Password already set, user must sign in
-          navigate("/signin");
-        } else {
-          // First time — go to signin page to set up password
-          navigate("/signin");
-        }
+      .then(() => {
+        navigate("/signin");
       })
       .catch(() => {
-        // If auth check itself returns 401, the http interceptor will redirect
-        // If Go Core is not ready yet, ignore
+        // The HTTP interceptor handles 401. Ignore startup connection errors.
       });
-  }, [apiKey, location.pathname]);
+  }, [apiKey, location.pathname, navigate]);
+
+  return null;
+}
+
+export function AuthGuard() {
+  return isWeb ? createElement(WebAuthGuard) : null;
 }

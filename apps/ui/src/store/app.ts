@@ -1,9 +1,9 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
+import { persist } from "zustand/middleware";
 import i18n from "../i18n";
 import { resolveAppLanguage } from "../utils";
-import { AppLanguage, AppStore, AppTheme } from "@mediago/shared-common";
-import { persist } from "zustand/middleware";
+import { AppLanguage, type AppStore, AppTheme } from "@mediago/shared-common";
 
 const initialState: AppStore = {
   local: "",
@@ -39,19 +39,28 @@ type Actions = {
 export const useAppStore = create<AppStore & Actions>()(
   immer(
     persist(
-      (set) => ({
+      (set, get) => ({
         ...initialState,
-        setAppStore: (values) =>
-          set((state) => {
-            const { language } = values;
-            if (language) {
-              i18n.changeLanguage(resolveAppLanguage(language));
-            }
+        setAppStore: (values) => {
+          const current = get();
+          const changedEntries = Object.entries(values).filter(
+            ([key, value]) => !Object.is(current[key as keyof AppStore], value),
+          );
+          if (changedEntries.length === 0) return;
 
-            Object.entries(values).forEach(([key, val]) => {
-              (state as any)[key] = val;
+          const language = changedEntries.find(
+            ([key]) => key === "language",
+          )?.[1] as AppLanguage | undefined;
+          if (language !== undefined) {
+            void i18n.changeLanguage(resolveAppLanguage(language));
+          }
+
+          set((state) => {
+            changedEntries.forEach(([key, value]) => {
+              (state as Record<string, unknown>)[key] = value;
             });
-          }),
+          });
+        },
       }),
       {
         name: "appstore-storage",
@@ -61,8 +70,7 @@ export const useAppStore = create<AppStore & Actions>()(
 );
 
 export const appStoreSelector = (state: AppStore & Actions) => {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { setAppStore, ...appStore } = state;
+  const { setAppStore: _setAppStore, ...appStore } = state;
   return appStore;
 };
 

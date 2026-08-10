@@ -90,6 +90,7 @@ export const it = {
   clearCacheFailed: "Impossibile azzerare la cache",
   binPath: "Percorso esecuzione",
   localDir: "Cartella download",
+  browserExtension: "Estensione browser",
   extensionDir: "Cartella estensione browser",
   extensionGuide: "Guida installazione estensione",
   currentVersion: "Versione",

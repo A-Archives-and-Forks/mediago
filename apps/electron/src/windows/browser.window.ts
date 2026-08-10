@@ -61,7 +61,9 @@ export default class BrowserWindow extends Window {
     }
 
     this.window.show();
-    if (isDev) this.window.webContents.openDevTools();
+    if (isDev && process.env.OPEN_DEVTOOLS === "true") {
+      this.window.webContents.openDevTools();
+    }
 
     const browserBounds = this.store.get("browserBounds");
     if (browserBounds) {

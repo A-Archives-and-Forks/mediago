@@ -6,7 +6,8 @@
     "dev": {
       "cache": false,
       "persistent": true,
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build"],
+      "passThroughEnv": ["OPEN_DEVTOOLS"]
     },
     "build": {
       "cache": true,

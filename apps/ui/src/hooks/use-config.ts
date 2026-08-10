@@ -1,10 +1,10 @@
 import useSWR from "swr";
 import {
-  getConfigKey,
   getConfig,
-  setConfigValue,
-  getEnvPathKey,
+  getConfigKey,
   getEnvPath,
+  getEnvPathKey,
+  setConfigValue,
   type GoEnvPath,
 } from "@/api/config";
 import type { AppStore } from "@mediago/shared-common";
@@ -12,9 +12,12 @@ import type { AppStore } from "@mediago/shared-common";
 export function useConfig() {
   const { data, isLoading, error, mutate } = useSWR(getConfigKey, getConfig);
 
-  const setConfigKey = async (key: string, value: unknown) => {
+  const setConfigKey = async <K extends keyof AppStore>(
+    key: K,
+    value: AppStore[K],
+  ) => {
     await setConfigValue(key, value);
-    mutate();
+    await mutate();
   };
 
   return {

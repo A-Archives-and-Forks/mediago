@@ -50,7 +50,7 @@ export default class OverlayDialogService {
       }
     });
 
-    if (isDev) {
+    if (isDev && process.env.OPEN_DEVTOOLS === "true") {
       this.view.webContents.openDevTools({ mode: "detach" });
     }
 

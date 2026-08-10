@@ -88,10 +88,18 @@ func (c *Conf[T]) Get(key string) any {
 func (c *Conf[T]) Set(key string, value any) error {
 	c.mu.Lock()
 
-	oldVal := dotGet(c.data, key)
-	dotSet(c.data, key, value)
+	oldData := c.data
+	newData, err := structToMap(oldData)
+	if err != nil {
+		c.mu.Unlock()
+		return fmt.Errorf("conf: clone data: %w", err)
+	}
+	oldVal := dotGet(oldData, key)
+	dotSet(newData, key, value)
+	c.data = newData
 
 	if err := c.write(); err != nil {
+		c.data = oldData
 		c.mu.Unlock()
 		return err
 	}
@@ -111,10 +119,24 @@ func (c *Conf[T]) Set(key string, value any) error {
 // Delete removes a key using dot-notation and persists to disk.
 func (c *Conf[T]) Delete(key string) error {
 	c.mu.Lock()
-	defer c.mu.Unlock()
 
-	dotDelete(c.data, key)
-	return c.write()
+	oldData := c.data
+	newData, err := structToMap(oldData)
+	if err != nil {
+		c.mu.Unlock()
+		return fmt.Errorf("conf: clone data: %w", err)
+	}
+	dotDelete(newData, key)
+	c.data = newData
+
+	if err := c.write(); err != nil {
+		c.data = oldData
+		c.mu.Unlock()
+		return err
+	}
+
+	c.mu.Unlock()
+	return nil
 }
 
 // Store returns the entire configuration as the typed struct T.
@@ -140,6 +162,7 @@ func (c *Conf[T]) SetStore(store T) error {
 	c.data = newMap
 
 	if err := c.write(); err != nil {
+		c.data = oldData
 		c.mu.Unlock()
 		return err
 	}
@@ -170,6 +193,13 @@ func (c *Conf[T]) SetStore(store T) error {
 func (c *Conf[T]) Update(partial map[string]any) error {
 	c.mu.Lock()
 
+	oldData := c.data
+	newData, err := structToMap(oldData)
+	if err != nil {
+		c.mu.Unlock()
+		return fmt.Errorf("conf: clone data: %w", err)
+	}
+
 	// Track old values for listeners
 	type lc struct {
 		fn     func(newVal, oldVal any)
@@ -179,8 +209,8 @@ func (c *Conf[T]) Update(partial map[string]any) error {
 	var calls []lc
 
 	for key, value := range partial {
-		oldVal := dotGet(c.data, key)
-		dotSet(c.data, key, value)
+		oldVal := dotGet(oldData, key)
+		dotSet(newData, key, value)
 
 		for _, l := range c.listeners {
 			if l.key == key {
@@ -189,7 +219,10 @@ func (c *Conf[T]) Update(partial map[string]any) error {
 		}
 	}
 
+	c.data = newData
+
 	if err := c.write(); err != nil {
+		c.data = oldData
 		c.mu.Unlock()
 		return err
 	}
