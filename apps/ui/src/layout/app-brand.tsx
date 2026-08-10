@@ -13,10 +13,8 @@ export function AppBrand({ className }: AppBrandProps) {
         className,
       )}
     >
-      <img className="mr-2 size-7" src={LogoImg} alt="Media Go" />
-      <span className="text-base font-semibold whitespace-nowrap">
-        Media Go
-      </span>
+      <img className="mr-2 size-7" src={LogoImg} alt="MediaGo" />
+      <span className="text-base font-semibold whitespace-nowrap">MediaGo</span>
       <span className="ml-2 text-xs text-muted-foreground">
         v{import.meta.env.APP_VERSION}
       </span>
