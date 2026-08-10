@@ -97,7 +97,7 @@ function FormRow({
     <div className="grid gap-2 sm:grid-cols-[9rem_minmax(0,1fr)] sm:items-start sm:gap-x-4 sm:gap-y-0">
       <label
         htmlFor={htmlFor}
-        className="flex min-h-10 items-center text-sm font-medium"
+        className="flex min-h-8 items-center text-sm font-medium"
       >
         {label}
         {required ? (
@@ -311,7 +311,7 @@ export default forwardRef<DownloadFormRef, DownloadFormProps>(
                           aria-pressed={!batchMode}
                           onClick={() => selectMode(false)}
                           className={cn(
-                            "h-8 rounded-sm px-3 text-sm font-medium text-muted-foreground outline-none transition-[background-color,color,box-shadow] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/15",
+                            "h-[30px] rounded-sm px-2.5 text-sm font-medium text-muted-foreground outline-none transition-[background-color,color,box-shadow] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/15",
                             !batchMode &&
                               "bg-surface text-foreground shadow-sm",
                           )}
@@ -323,7 +323,7 @@ export default forwardRef<DownloadFormRef, DownloadFormProps>(
                           aria-pressed={batchMode}
                           onClick={() => selectMode(true)}
                           className={cn(
-                            "h-8 rounded-sm px-3 text-sm font-medium text-muted-foreground outline-none transition-[background-color,color,box-shadow] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/15",
+                            "h-[30px] rounded-sm px-2.5 text-sm font-medium text-muted-foreground outline-none transition-[background-color,color,box-shadow] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/15",
                             batchMode && "bg-surface text-foreground shadow-sm",
                           )}
                         >
@@ -510,7 +510,7 @@ export default forwardRef<DownloadFormRef, DownloadFormProps>(
               onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}
               className="group border-t border-border/70 pt-1"
             >
-              <summary className="flex h-10 cursor-pointer list-none items-center justify-between rounded-md px-1 text-sm font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/15 [&::-webkit-details-marker]:hidden">
+              <summary className="flex h-8 cursor-pointer list-none items-center justify-between rounded-md px-1 text-sm font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/15 [&::-webkit-details-marker]:hidden">
                 <span>{t("moreSettings")}</span>
                 <ChevronDown className="size-4 transition-transform group-open:rotate-180" />
               </summary>

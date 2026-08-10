@@ -22,10 +22,10 @@ const buttonVariants = cva(
         link: "border-transparent bg-transparent text-brand shadow-none underline-offset-4 hover:underline",
       },
       size: {
-        default: "h-8 px-3",
-        sm: "h-7 px-2.5 text-xs",
-        lg: "h-9 px-4",
-        icon: "size-8 p-0",
+        default: "h-[30px] px-2.5",
+        sm: "h-6 px-2 text-xs",
+        lg: "h-8 px-3.5",
+        icon: "size-7 p-0",
       },
     },
     defaultVariants: {

@@ -60,7 +60,7 @@ export function BatchUrlTextarea({
       <div
         ref={highlightRef}
         className={cn(
-          "pointer-events-none absolute inset-0 z-1 overflow-hidden wrap-break-word whitespace-pre border border-transparent px-3 py-2.5 text-base leading-6 text-transparent md:text-sm md:leading-5",
+          "pointer-events-none absolute inset-0 z-1 overflow-hidden wrap-break-word whitespace-pre border border-transparent px-3 py-2 text-base leading-6 text-transparent md:text-sm md:leading-5",
         )}
       >
         {renderHighlightedText()}

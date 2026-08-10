@@ -26,7 +26,7 @@ export const IconButton = memo(function IconButton({
   return (
     <div
       className={cn(
-        "flex size-8 shrink-0 cursor-pointer flex-row items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:stroke-[1.75]",
+        "flex size-7 shrink-0 cursor-pointer flex-row items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:stroke-[1.75]",
         {
           "cursor-not-allowed": disabled,
           "opacity-50": disabled,

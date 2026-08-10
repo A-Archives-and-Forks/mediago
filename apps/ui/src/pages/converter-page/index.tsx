@@ -270,7 +270,7 @@ const Converter = () => {
                 <Button
                   type="button"
                   variant="outline"
-                  className="rounded-l-none border-l-0"
+                  className="h-8 rounded-l-none border-l-0"
                   onClick={handleBrowseFile}
                 >
                   {t("browse")}

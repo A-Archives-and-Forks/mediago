@@ -36,7 +36,7 @@ import { AppLanguage, type AppStore, AppTheme } from "@mediago/shared-common";
 const version = import.meta.env.APP_VERSION;
 const EXTENSION_GUIDE_URL = "https://downloader.caorushizi.cn/extension.html";
 
-const actionButtonClass = "h-9 shrink-0";
+const actionButtonClass = "h-8 shrink-0";
 
 export const BasicSettingsCard = memo(function BasicSettingsCard() {
   const { t } = useTranslation();
@@ -63,7 +63,7 @@ export const BasicSettingsCard = memo(function BasicSettingsCard() {
             readOnly
             aria-readonly="true"
             placeholder={t("pleaseSelectDownloadDir")}
-            className="h-9"
+            className="h-8"
           />
           {!isWeb ? (
             <Button
@@ -344,7 +344,7 @@ export const SkillsSettingsCard = memo(function SkillsSettingsCard() {
             id="skills-install-command"
             value={installCommand}
             readOnly
-            className="h-9 pr-10 font-mono text-xs"
+            className="h-8 pr-10 font-mono text-xs"
           />
           <Button
             type="button"
@@ -369,7 +369,7 @@ export const SkillsSettingsCard = memo(function SkillsSettingsCard() {
             id="skills-setup-command"
             value={setupCommand}
             readOnly
-            className="h-9 pr-10 font-mono text-xs"
+            className="h-8 pr-10 font-mono text-xs"
           />
           <Button
             type="button"
@@ -441,7 +441,7 @@ export const MoreSettingsCard = memo(function MoreSettingsCard({
             id="setting-web-api-key"
             value={apiKey}
             readOnly
-            className="h-9"
+            className="h-8"
           />
         </SettingRow>
       ) : (

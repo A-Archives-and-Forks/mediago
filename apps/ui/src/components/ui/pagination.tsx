@@ -82,7 +82,7 @@ function PaginationControl({
       <Button
         type="button"
         variant="outline"
-        className={cn(isWeb ? "size-8" : "size-6", "rounded-md p-0")}
+        className={cn(isWeb ? "size-7" : "size-6", "rounded-md p-0")}
         aria-label={t("previousPage")}
         disabled={!hasItems || safeCurrent === 1}
         onClick={() => changePage(safeCurrent - 1)}
@@ -103,7 +103,7 @@ function PaginationControl({
               type="button"
               variant="ghost"
               className={cn(
-                isWeb ? "size-8" : "size-6",
+                isWeb ? "size-7" : "size-6",
                 "rounded-md p-0 text-muted-foreground",
               )}
               aria-label={label}
@@ -120,7 +120,7 @@ function PaginationControl({
             key={item}
             type="button"
             variant={item === safeCurrent ? "default" : "ghost"}
-            className={cn(isWeb ? "size-8" : "size-6", "rounded-md p-0")}
+            className={cn(isWeb ? "size-7" : "size-6", "rounded-md p-0")}
             aria-current={item === safeCurrent ? "page" : undefined}
             aria-label={t("pageNumber", { page: item })}
             disabled={!hasItems}
@@ -134,7 +134,7 @@ function PaginationControl({
       <Button
         type="button"
         variant="outline"
-        className={cn(isWeb ? "size-8" : "size-6", "rounded-md p-0")}
+        className={cn(isWeb ? "size-7" : "size-6", "rounded-md p-0")}
         aria-label={t("nextPage")}
         disabled={!hasItems || safeCurrent === totalPages}
         onClick={() => changePage(safeCurrent + 1)}

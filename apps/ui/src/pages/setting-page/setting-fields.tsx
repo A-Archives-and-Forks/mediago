@@ -487,7 +487,7 @@ export function SettingTextField({
         }}
         onContextMenu={onContextMenu}
         aria-invalid={fieldState.invalid}
-        className={cn("h-9", className)}
+        className={cn("h-8", className)}
       />
     </SettingRow>
   );
@@ -527,7 +527,6 @@ export function SettingSelectField({
       >
         <SelectTrigger
           id={id}
-          size="sm"
           className="w-full"
           aria-invalid={fieldState.invalid}
         >
@@ -684,7 +683,7 @@ export function SettingNumberField({
           if (event.key === "Enter") event.currentTarget.blur();
         }}
         aria-invalid={fieldState.invalid}
-        className="h-9 max-w-40"
+        className="h-8 max-w-40"
       />
     </SettingRow>
   );

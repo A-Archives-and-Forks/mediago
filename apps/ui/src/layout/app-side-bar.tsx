@@ -38,7 +38,7 @@ type MenuItem = {
 };
 
 const SIDEBAR_HELP_BUTTON_CLASS =
-  "h-10 justify-start gap-1 rounded-md px-3 text-sm font-normal text-muted-foreground hover:bg-surface-hover hover:text-foreground";
+  "h-9 justify-start gap-1 rounded-md px-3 text-sm font-normal text-muted-foreground hover:bg-surface-hover hover:text-foreground";
 
 interface AppMenuItemProps extends PropsWithChildren {
   onClick?: (event: React.MouseEvent<HTMLAnchorElement>) => void;
@@ -62,7 +62,7 @@ function AppMenuItem({
     <Link discover="render" to={link} onClick={onClick}>
       <div
         className={cn(
-          "flex h-10 flex-row items-center gap-1 rounded-md px-3 text-sm text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground",
+          "flex h-9 flex-row items-center gap-1 rounded-md px-3 text-sm text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground",
           {
             "bg-primary text-primary-foreground hover:bg-brand-hover hover:text-primary-foreground":
               isActive,
