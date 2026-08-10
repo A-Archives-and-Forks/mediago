@@ -5,26 +5,27 @@ import * as React from "react";
 import { cn } from "@/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap rounded-full text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 gap-2 cursor-pointer [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 [&_svg]:stroke-[1.75]",
+  "inline-flex cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-transparent text-sm font-medium shadow-xs transition-[background-color,border-color,color,box-shadow] focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/25 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 [&_svg]:stroke-[1.75]",
   {
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground hover:bg-primary/90 bg-linear-to-r from-[#127AF3] to-[#06D5FB]",
+          "bg-primary text-primary-foreground hover:bg-brand-hover active:bg-brand-active",
         destructive:
-          "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+          "bg-destructive text-destructive-foreground hover:bg-destructive/90 active:bg-destructive/80",
         outline:
-          "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+          "border-border bg-surface text-foreground hover:bg-surface-hover active:bg-secondary",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
+          "bg-secondary text-secondary-foreground hover:bg-surface-hover active:bg-accent",
+        ghost:
+          "border-transparent bg-transparent shadow-none hover:bg-surface-hover active:bg-secondary",
+        link: "border-transparent bg-transparent text-brand shadow-none underline-offset-4 hover:underline",
       },
       size: {
-        default: "h-[30px] px-3 py-1",
-        sm: "h-[20px] rounded-md px-1.5 text-xs",
-        lg: "h-11 rounded-md px-8",
-        icon: "h-10 w-10",
+        default: "h-8 px-3",
+        sm: "h-7 px-2.5 text-xs",
+        lg: "h-9 px-4",
+        icon: "size-8 p-0",
       },
     },
     defaultVariants: {

@@ -20,20 +20,26 @@ const PageContainer: FC<PageContainerProps> = ({
   wrapperClassName,
 }) => {
   return (
-    <div className={cn("flex h-full flex-col gap-3 p-3", wrapperClassName)}>
-      {title && (
-        <div className="flex flex-row items-center justify-between rounded-lg bg-white p-3 dark:bg-[#1F2024]">
+    <div className={cn("flex h-full flex-col p-3", wrapperClassName)}>
+      {title ? (
+        <div className="flex flex-row items-center justify-between rounded-t-lg border bg-surface px-4 py-3">
           <div className="flex flex-row gap-3">
-            <div className="text-sm text-[#343434] dark:text-white">
-              {title}
-            </div>
-            {titleExtra && <div>{titleExtra}</div>}
+            <div className="text-sm font-medium text-foreground">{title}</div>
+            {titleExtra ? <div>{titleExtra}</div> : null}
           </div>
-          {rightExtra && <div>{rightExtra}</div>}
+          {rightExtra ? <div>{rightExtra}</div> : null}
         </div>
-      )}
+      ) : null}
 
-      <div className={cn("flex-1 overflow-auto", className)}>{children}</div>
+      <div
+        className={cn(
+          "min-h-0 flex-1 overflow-auto bg-surface",
+          title ? "rounded-b-lg border border-t-0" : "rounded-lg border",
+          className,
+        )}
+      >
+        {children}
+      </div>
     </div>
   );
 };

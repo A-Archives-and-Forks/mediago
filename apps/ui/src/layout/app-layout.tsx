@@ -20,7 +20,7 @@ const App: FC = () => {
     <div className="flex h-full w-full flex-col overflow-hidden">
       <PageAnalytics />
       <AppHeader className="shrink-0" />
-      <div className="flex flex-1 flex-col overflow-hidden bg-[#F4F7FA] sm:flex-row dark:bg-[#141415]">
+      <div className="flex flex-1 flex-col overflow-hidden bg-canvas sm:flex-row">
         <AppSideBar />
         <div className="flex-1 overflow-auto">
           <Outlet />

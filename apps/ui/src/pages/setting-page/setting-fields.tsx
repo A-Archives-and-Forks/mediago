@@ -271,16 +271,16 @@ export const SettingCard = memo(function SettingCard({
     <Card
       aria-labelledby={titleId}
       className={cn(
-        "gap-0 overflow-hidden rounded-lg border-0 bg-white py-0 shadow-none dark:bg-[#1F2024]",
+        "gap-0 overflow-hidden rounded-lg border bg-transparent py-0 shadow-none",
         className,
       )}
     >
-      <CardHeader className="border-b px-5 py-4">
-        <CardTitle id={titleId} className="text-base">
+      <CardHeader className="border-b px-5 py-3.5">
+        <CardTitle id={titleId} className="text-sm font-semibold">
           {title}
         </CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-col gap-5 px-5 py-5">
+      <CardContent className="@container/settings flex flex-col divide-y px-5 py-0">
         {children}
       </CardContent>
     </Card>
@@ -332,7 +332,7 @@ export function SettingRow({
       orientation="horizontal"
       data-invalid={Boolean(error)}
       className={cn(
-        "grid min-h-9 grid-cols-[140px_minmax(0,1fr)] items-center gap-4",
+        "grid min-h-14 grid-cols-1 items-start gap-2 py-4 @md/settings:grid-cols-[minmax(140px,0.85fr)_minmax(180px,1.15fr)] @md/settings:items-center @md/settings:gap-6",
         className,
       )}
     >
@@ -348,7 +348,12 @@ export function SettingRow({
         )}
         {tooltip ? <LabelHelp content={tooltip} /> : null}
       </div>
-      <FieldContent className={cn("min-w-0", contentClassName)}>
+      <FieldContent
+        className={cn(
+          "min-w-0 w-full @md/settings:items-end",
+          contentClassName,
+        )}
+      >
         {children}
         {error ? <FieldError>{error}</FieldError> : null}
       </FieldContent>
@@ -482,7 +487,7 @@ export function SettingTextField({
         }}
         onContextMenu={onContextMenu}
         aria-invalid={fieldState.invalid}
-        className={className}
+        className={cn("h-9", className)}
       />
     </SettingRow>
   );
@@ -522,6 +527,7 @@ export function SettingSelectField({
       >
         <SelectTrigger
           id={id}
+          size="sm"
           className="w-full"
           aria-invalid={fieldState.invalid}
         >
@@ -567,7 +573,7 @@ export function SettingBooleanRadioField({
           field.onChange(nextValue);
           void persistSetting(name, nextValue);
         }}
-        className="flex flex-wrap gap-5"
+        className="flex flex-wrap justify-end gap-5"
         aria-invalid={fieldState.invalid}
       >
         {options.map((option) => {
@@ -678,7 +684,7 @@ export function SettingNumberField({
           if (event.key === "Enter") event.currentTarget.blur();
         }}
         aria-invalid={fieldState.invalid}
-        className="max-w-40"
+        className="h-9 max-w-40"
       />
     </SettingRow>
   );

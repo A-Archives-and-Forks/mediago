@@ -7,6 +7,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useAuthApi } from "@/hooks/use-auth-api";
 import { useMemoizedFn } from "ahooks";
 import { useNavigate } from "react-router-dom";
@@ -73,20 +75,19 @@ export default function SigninPage() {
                 <div>
                   <label
                     htmlFor="password"
-                    className="block text-sm/6 font-medium text-gray-900 dark:text-gray-100"
+                    className="block text-sm/6 font-medium text-foreground"
                   >
                     {isSetuped
                       ? t("adminPassword")
                       : t("settingUpAdminPassword")}
                   </label>
                   <div className="mt-2">
-                    <input
+                    <Input
                       id="password"
                       name="password"
                       type="password"
                       minLength={6}
                       required
-                      className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-600 sm:text-sm/6 dark:bg-white/5 dark:text-white dark:outline-white/10 dark:placeholder:text-gray-500 dark:focus:outline-blue-500"
                     />
                   </div>
                 </div>
@@ -95,18 +96,17 @@ export default function SigninPage() {
                   <div>
                     <label
                       htmlFor="repeat-password"
-                      className="block text-sm/6 font-medium text-gray-900 dark:text-gray-100"
+                      className="block text-sm/6 font-medium text-foreground"
                     >
                       {t("repeatPassword")}
                     </label>
                     <div className="mt-2">
-                      <input
+                      <Input
                         id="repeat-password"
                         name="repeat-password"
                         type="password"
                         minLength={6}
                         required
-                        className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-600 sm:text-sm/6 dark:bg-white/5 dark:text-white dark:outline-white/10 dark:placeholder:text-gray-500 dark:focus:outline-blue-500"
                       />
                     </div>
                   </div>
@@ -133,12 +133,9 @@ export default function SigninPage() {
                 )}
 
                 <div>
-                  <button
-                    type="submit"
-                    className="flex w-full justify-center rounded-md bg-blue-600 px-3 py-1.5 text-sm/6 font-semibold text-white shadow-xs hover:bg-blue-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:bg-blue-500 dark:shadow-none dark:hover:bg-blue-400 dark:focus-visible:outline-blue-500"
-                  >
+                  <Button type="submit" className="w-full">
                     {isSetuped ? t("signin") : t("setup")}
-                  </button>
+                  </Button>
                 </div>
               </form>
             </div>

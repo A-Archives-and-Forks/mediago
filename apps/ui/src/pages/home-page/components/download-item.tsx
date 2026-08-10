@@ -18,7 +18,6 @@ import {
 import { memo, type ReactNode, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
-import selectedBg from "@/assets/images/select-item-bg.png";
 import { DownloadTag } from "@/components/download-tag";
 import { IconButton } from "@/components/icon-button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -188,8 +187,8 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
   const renderTitle = useMemoizedFn((item: DownloadTaskWithFile): ReactNode => {
     return (
       <div
-        className={cn("truncate text-sm dark:text-[#B4B4B4]", {
-          "text-[#127af3]": selected,
+        className={cn("truncate text-sm text-foreground", {
+          "text-brand": selected,
         })}
         title={item.name}
       >
@@ -203,7 +202,7 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
     const list: ReactNode[] = [];
     if (task.isLive)
       list.push(
-        <DownloadTag key="live" text={t("liveResource")} color="#9abbe2" />,
+        <DownloadTag key="live" text={t("liveResource")} variant="info" />,
       );
 
     switch (task.status) {
@@ -213,7 +212,7 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
             key="downloading"
             icon={<Download />}
             text={t("downloading")}
-            color="#127af3"
+            variant="brand"
           />,
         );
         break;
@@ -222,7 +221,7 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
           <DownloadTag
             key="success"
             text={t("downloadSuccess")}
-            color="#09ce87"
+            variant="success"
           />,
         );
         if (!task.exists) {
@@ -230,7 +229,7 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
             <DownloadTag
               key="notExists"
               text={t("fileNotExist")}
-              color="#9abbe2"
+              variant="muted"
             />,
           );
         }
@@ -243,7 +242,7 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
               <DownloadTag
                 icon={<CircleX />}
                 text={t("downloadFailed")}
-                color="#ff7373"
+                variant="destructive"
                 className="cursor-pointer"
               />
             }
@@ -258,7 +257,7 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
             key="pause"
             icon={<Pause />}
             text={t("downloadPause")}
-            color="#9abbe2"
+            variant="muted"
           />,
         );
         break;
@@ -272,7 +271,7 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
         const val = Math.round(Number(item.percent));
 
         return (
-          <div className="flex flex-row items-center gap-2 text-xs text-[rgba(0,0,0,0.88)] dark:text-[rgba(255,255,255,0.85)]">
+          <div className="flex flex-row items-center gap-2 text-xs text-foreground/80">
             <Progress value={val} className="rounded-none" />
             <div className="min-w-5 shrink-0">{val}%</div>
             <div className="min-w-20 shrink-0">{item.speed}</div>
@@ -281,7 +280,7 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
       }
       return (
         <div
-          className="relative flex flex-col gap-1 text-xs text-[#B3B3B3] dark:text-[#515257]"
+          className="relative flex flex-col gap-1 text-xs text-muted-foreground"
           title={item.url}
         >
           <div className="truncate">{item.url}</div>
@@ -292,7 +291,7 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
             <TerminalDialog
               asChild
               trigger={
-                <div className="cursor-pointer truncate text-[#ff7373] dark:text-[rgba(255,115,115,0.6)]">
+                <div className="cursor-pointer truncate text-destructive">
                   {t("failReason")}: ...
                 </div>
               }
@@ -308,10 +307,9 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
   return (
     <div
       className={cn(
-        "relative flex flex-row gap-3 rounded-lg bg-[#FAFCFF] px-3 pb-3.5 pt-2 dark:bg-[#27292F]",
+        "relative flex flex-row gap-3 border-b px-3 py-3 transition-colors last:border-b-0 hover:bg-surface-hover",
         {
-          "bg-linear-to-r from-[#D0E8FF] to-[#F2F7FF] dark:from-[#27292F] dark:to-[#00244E]":
-            selected,
+          "bg-surface-selected hover:bg-surface-selected": selected,
           "opacity-70": task.status === DownloadStatus.Success && !task.exists,
         },
       )}
@@ -323,17 +321,10 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
         onCheckedChange={() => onSelectChange(task.id)}
       />
       <div className={cn("flex flex-1 flex-col gap-1 overflow-hidden")}>
-        {selected && (
-          <img
-            alt=""
-            src={selectedBg}
-            className="absolute bottom-0 right-[126px] top-0 block h-full select-none"
-          />
-        )}
         <div className="relative flex flex-row items-center gap-2">
           {renderTitle(task)}
           <div className="flex shrink-0 grow flex-row gap-2">{tags}</div>
-          <div className="flex flex-row items-center gap-3 rounded-md bg-[#eff4fa] px-1.5 py-1.5 dark:bg-[#3B3F48]">
+          <div className="flex flex-row items-center gap-1">
             {actionButtons}
           </div>
         </div>

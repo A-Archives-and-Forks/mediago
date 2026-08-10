@@ -244,7 +244,7 @@ const Converter = () => {
           <Button onClick={handleOpenModal}>{t("addFile")}</Button>
         </div>
       }
-      className="rounded-lg bg-white dark:bg-[#1F2024] flex flex-col flex-1 h-full gap-3 p-3"
+      className="flex h-full flex-1 flex-col gap-3 p-3"
     >
       <Dialog open={addModalOpen} onOpenChange={setAddModalOpen}>
         <DialogContent>
@@ -329,10 +329,10 @@ const Converter = () => {
         </DialogContent>
       </Dialog>
 
-      <div className="flex flex-col gap-3 flex-1 overflow-auto">
+      <div className="flex flex-1 flex-col overflow-auto">
         {isLoading ? <Loading /> : null}
         {!isLoading && data?.list?.length === 0 ? (
-          <div className="flex h-full flex-1 flex-row items-center justify-center rounded-lg bg-white dark:bg-[#1F2024]">
+          <div className="flex h-full flex-1 flex-row items-center justify-center">
             <Empty>
               <EmptyHeader>
                 <EmptyMedia variant="icon">
@@ -349,13 +349,11 @@ const Converter = () => {
           data.list.map((item: Conversion) => (
             <div
               key={item.id}
-              className="flex flex-col gap-2 rounded-lg bg-[#FAFCFF] p-3 dark:bg-[#27292F]"
+              className="flex flex-col gap-2 border-b px-1 py-3 last:border-b-0"
             >
               <div className="flex flex-row items-center justify-between">
                 <div className="flex flex-row items-center gap-2">
-                  <span className="text-sm text-[#343434] dark:text-[#B4B4B4]">
-                    {item.name}
-                  </span>
+                  <span className="text-sm text-foreground">{item.name}</span>
                   <Badge
                     variant={STATUS_STYLES[item.status]?.variant ?? "secondary"}
                     className={STATUS_STYLES[item.status]?.className}
@@ -376,7 +374,7 @@ const Converter = () => {
               {item.status === "converting" && (
                 <Progress value={item.progress} className="h-1.5" />
               )}
-              <div className="text-xs text-[#AAB5CB]">
+              <div className="text-xs text-muted-foreground">
                 {item.status === "done" && item.outputPath
                   ? item.outputPath
                   : item.path}

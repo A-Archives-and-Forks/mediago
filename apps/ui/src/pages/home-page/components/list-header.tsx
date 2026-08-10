@@ -52,17 +52,17 @@ export function ListHeader({
   });
 
   return (
-    <div className="flex flex-row items-center justify-between pb-2 pl-3">
+    <div className="flex flex-row items-center justify-between border-b px-3 py-2">
       <div className="flex flex-row items-center gap-3">
         <Checkbox checked={checked} onCheckedChange={onSelectAll} />
         <span
-          className="cursor-pointer text-sm text-[#343434] dark:text-white"
+          className="cursor-pointer text-sm text-foreground"
           onClick={() => onSelectAll(true)}
         >
           {t("selectAll")}
         </span>
         {!!selected.length && (
-          <span className="text-xs text-[#A4A4A4]">
+          <span className="text-xs text-muted-foreground">
             <Trans
               i18nKey="selectedItems"
               values={{ count: selected.length }}
@@ -70,7 +70,7 @@ export function ListHeader({
           </span>
         )}
       </div>
-      <div className="flex flex-row items-center gap-3">
+      <div className="flex flex-row items-center gap-2">
         <Button
           variant="outline"
           disabled={disabled}

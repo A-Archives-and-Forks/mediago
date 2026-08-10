@@ -102,6 +102,11 @@ export const zh = {
   collapse: "收起",
   editDownload: "编辑下载",
   batchDownload: "批量下载",
+  downloadMode: "下载模式",
+  singleDownload: "单个下载",
+  batchListHelp: "每行一个链接，可在链接后填写视频名称和文件夹名称。",
+  additionalHeadersHelp:
+    "每行填写一个 Header，例如 Origin: https://example.com",
   videoLink: "视频链接",
   pleaseEnterVideoLink: "请输入站点视频链接",
   videoName: "视频名称",

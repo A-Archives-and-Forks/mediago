@@ -34,15 +34,15 @@ const SourceItem = memo(function SourceItem({
   const { t } = useTranslation();
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg bg-[#FAFCFF] p-2 dark:bg-[#27292F]">
+    <div className="flex flex-col gap-2 border-b px-1 py-3 last:border-b-0">
       <span
-        className="line-clamp-2 cursor-default break-words text-sm text-[#343434] dark:text-[#B4B4B4]"
+        className="line-clamp-2 cursor-default break-words text-sm text-foreground"
         title={item.name}
       >
         {item.name}
       </span>
       <span
-        className="line-clamp-2 cursor-default break-words text-xs dark:text-[#515257]"
+        className="line-clamp-2 cursor-default break-words text-xs text-muted-foreground"
         title={item.url}
       >
         {item.url}
@@ -128,8 +128,8 @@ export function BrowserViewPanel() {
   });
 
   return (
-    <div className="flex h-full flex-col gap-3 overflow-y-auto bg-white p-3 dark:bg-[#1F2024]">
-      <div>
+    <div className="flex h-full flex-col overflow-y-auto p-3">
+      <div className="border-b pb-2">
         <Button
           type="button"
           size="sm"

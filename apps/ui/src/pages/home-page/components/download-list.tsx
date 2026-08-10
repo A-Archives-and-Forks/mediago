@@ -161,14 +161,10 @@ export function DownloadTaskList({ filter }: Props) {
         onCancelItems={onCancelItems}
         filter={filter}
       />
-      <div
-        className={cn(
-          "flex w-full flex-1 shrink-0 flex-col gap-3 overflow-auto",
-        )}
-      >
+      <div className={cn("flex w-full flex-1 shrink-0 flex-col overflow-auto")}>
         {isLoading && <Loading />}
         {data.length === 0 && !isLoading && (
-          <div className="flex h-full flex-1 flex-row items-center justify-center rounded-lg bg-white dark:bg-[#1F2024]">
+          <div className="flex h-full flex-1 flex-row items-center justify-center">
             <Empty>
               <EmptyMedia variant="icon">
                 <InboxIcon />

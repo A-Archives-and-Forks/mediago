@@ -110,6 +110,12 @@ export const en = {
   collapse: "Collapse",
   editDownload: "Edit download",
   batchDownload: "Batch download",
+  downloadMode: "Download mode",
+  singleDownload: "Single download",
+  batchListHelp:
+    "Enter one link per line. Add a video name and folder after the link if needed.",
+  additionalHeadersHelp:
+    "Enter one header per line, for example Origin: https://example.com",
   videoLink: "Video link",
   pleaseEnterVideoLink: "Enter a video link",
   videoName: "Video name",

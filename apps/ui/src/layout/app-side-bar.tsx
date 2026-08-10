@@ -18,7 +18,6 @@ import {
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
-import siderBg from "@/assets/images/sider-bg.png";
 import { Badge } from "@/components/ui/badge";
 import { useAppStore } from "@/store/app";
 import { downloadStoreSelector, useDownloadStore } from "@/store/download";
@@ -58,9 +57,9 @@ function AppMenuItem({
     <Link discover="render" to={link} onClick={onClick}>
       <div
         className={cn(
-          "flex h-10 flex-row items-center gap-1 rounded-lg bg-[#FAFCFF] px-3 text-sm text-[#636D7E] hover:bg-[#E1F0FF] hover:text-[#636D7E] dark:bg-[#2C2E33] dark:text-[rgba(255,255,255,0.85)] dark:hover:bg-[#3B3C41] dark:hover:text-[rgba(255,255,255,0.85)]",
+          "flex h-10 flex-row items-center gap-1 rounded-md px-3 text-sm text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground",
           {
-            "bg-linear-to-r from-[#127AF3] to-[#06D5FB] text-white hover:text-white dark:text-white":
+            "bg-primary text-primary-foreground hover:bg-brand-hover hover:text-primary-foreground":
               isActive,
           },
           className,
@@ -159,7 +158,7 @@ export function AppSideBar({ className }: Props) {
             <span>{t("downloadList")}</span>
             {count > 0 ? (
               <Badge
-                className="relative left-[5px] top-px h-4 min-w-4 border-0 bg-[#ff4d4f] px-1 py-0 text-[10px] leading-4 text-white"
+                className="relative left-[5px] top-px h-4 min-w-4 border-0 bg-destructive px-1 py-0 text-[10px] leading-4 text-destructive-foreground"
                 title={String(count)}
                 aria-label={`${t("downloadList")}: ${count}`}
               >
@@ -234,7 +233,7 @@ export function AppSideBar({ className }: Props) {
             <span>{t("setting")}</span>
             {updateAvailable ? (
               <span className="relative size-0">
-                <Badge className="absolute -left-[13px] -top-[3px] size-1.5 border-0 bg-[#ff4d4f] p-0" />
+                <Badge className="absolute -left-[13px] -top-[3px] size-1.5 border-0 bg-destructive p-0" />
               </span>
             ) : null}
           </AppMenuItem>
@@ -264,23 +263,14 @@ export function AppSideBar({ className }: Props) {
   );
 
   return (
-    <div
-      className={cn(
-        "relative select-none bg-white p-3 dark:bg-[#1F2024]",
-        className,
-      )}
+    <aside
+      className={cn("relative select-none border-r bg-surface p-3", className)}
     >
-      <div className="relative z-10 flex flex-row gap-3 sm:w-[180px] sm:flex-col">
+      <div className="flex flex-row gap-2 sm:w-[180px] sm:flex-col">
         {visibleItems.map((item) =>
           cloneElement(item.label, { key: item.key }),
         )}
       </div>
-
-      <img
-        src={siderBg}
-        alt=""
-        className="pointer-events-none absolute bottom-0 left-0 right-0 w-full select-none"
-      />
-    </div>
+    </aside>
   );
 }

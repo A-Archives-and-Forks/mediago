@@ -1,6 +1,7 @@
 import { useMemoizedFn } from "ahooks";
 import { CircleHelp } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/utils";
 import LogoImg from "../assets/images/logo.png";
 import { usePlatform } from "@/hooks/use-platform";
@@ -19,34 +20,30 @@ export function AppHeader({ className }: Props) {
   });
 
   return (
-    <div
+    <header
       className={cn(
-        "flex h-16 w-full select-none flex-row justify-between bg-[#F9FBFC] dark:bg-[#1F2024]",
+        "flex h-16 w-full select-none flex-row justify-between border-b bg-surface",
         className,
       )}
     >
-      <div className="h-full rounded-br-full bg-[#EBF3FB] pr-2 dark:bg-[#3B3C41]">
-        <div className="relative flex h-full min-w-[299px] flex-row items-center rounded-br-full bg-white pl-3 pr-2 dark:bg-[#2C2E33]">
-          <img className="m-3 h-8 w-8" src={LogoImg} alt="" />
-          <span className="text-lg dark:text-white">Media Go</span>
-          <span className="ml-[30px] block text-sm text-[#666] dark:text-white">
-            v{import.meta.env.APP_VERSION}
-          </span>
-          <div className="absolute bottom-0 h-px w-[136px] bg-[#EFF7FF] dark:bg-[#606167]" />
-          <div className="absolute bottom-0 h-[2px] w-[45px] bg-[#127AF3]" />
-        </div>
+      <div className="flex h-full min-w-[299px] flex-row items-center px-4">
+        <img className="mr-3 size-8" src={LogoImg} alt="Media Go" />
+        <span className="text-lg font-semibold">Media Go</span>
+        <span className="ml-4 text-sm text-muted-foreground">
+          v{import.meta.env.APP_VERSION}
+        </span>
       </div>
-      {/* help */}
-      <div className="flex flex-row items-center gap-3 pr-3">
-        <button
+      <div className="flex items-center pr-3">
+        <Button
           type="button"
-          className="text-brand flex cursor-pointer flex-row items-center gap-2 dark:text-white"
+          variant="ghost"
+          className="text-brand hover:text-brand"
           onClick={openHelpUrl}
         >
-          <CircleHelp className="size-4 shrink-0 stroke-[1.75]" />
-          <span className="text-sm">{t("help")}</span>
-        </button>
+          <CircleHelp />
+          {t("help")}
+        </Button>
       </div>
-    </div>
+    </header>
   );
 }

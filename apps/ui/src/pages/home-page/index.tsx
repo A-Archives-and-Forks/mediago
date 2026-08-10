@@ -108,7 +108,7 @@ const HomePage: FC<Props> = ({ filter = DownloadFilter.list }) => {
           )}
         </div>
       }
-      className="bg-white p-3 dark:bg-[#1F2024] flex flex-col flex-1 h-full rounded-lg gap-3"
+      className="flex h-full flex-1 flex-col gap-3 p-3"
     >
       <DownloadList filter={filter} />
 

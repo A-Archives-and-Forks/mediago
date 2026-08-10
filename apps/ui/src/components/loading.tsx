@@ -3,7 +3,7 @@ import { Spinner } from "@/components/ui/spinner";
 
 const Loading: FC = () => {
   return (
-    <div className="flex h-full w-full items-center justify-center bg-white dark:bg-[#1F2024]">
+    <div className="flex h-full w-full items-center justify-center">
       <Spinner />
     </div>
   );

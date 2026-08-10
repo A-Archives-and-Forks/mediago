@@ -110,6 +110,12 @@ export const it = {
   collapse: "Riduci",
   editDownload: "Modifica download",
   batchDownload: "Download batch",
+  downloadMode: "Modalità di download",
+  singleDownload: "Download singolo",
+  batchListHelp:
+    "Inserisci un link per riga. Se necessario, aggiungi il nome del video e la cartella dopo il link.",
+  additionalHeadersHelp:
+    "Inserisci un'intestazione per riga, ad esempio Origin: https://example.com",
   videoLink: "Collegamento video",
   pleaseEnterVideoLink: "Inserisci un collegamento video",
   videoName: "Nome video",

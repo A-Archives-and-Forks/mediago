@@ -1,5 +1,5 @@
 import { useAsyncEffect, useMemoizedFn } from "ahooks";
-import { Container, Download, ListPlus } from "lucide-react";
+import { ChevronDown, Container, Download, ListPlus } from "lucide-react";
 import {
   forwardRef,
   type ReactNode,
@@ -29,7 +29,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { ADD_TO_LIST, DOWNLOAD_NOW } from "@/const";
 import { useDockerApi } from "@/hooks/use-docker-api";
@@ -95,8 +94,8 @@ function FormRow({
   required,
 }: FormRowProps) {
   return (
-    <div className="grid gap-2 sm:grid-cols-[7rem_minmax(0,1fr)] sm:items-start">
-      <label htmlFor={htmlFor} className="pt-2 text-sm font-medium">
+    <div className="space-y-2">
+      <label htmlFor={htmlFor} className="block text-sm font-medium">
         {label}
         {required ? (
           <span aria-hidden="true" className="ml-1 text-destructive">
@@ -104,10 +103,10 @@ function FormRow({
           </span>
         ) : null}
       </label>
-      <div className="min-w-0 space-y-1.5">
+      <div className="min-w-0 space-y-2">
         {children}
         {error ? (
-          <p id={errorId} role="alert" className="text-sm text-destructive">
+          <p id={errorId} role="alert" className="text-xs text-destructive">
             {error}
           </p>
         ) : null}
@@ -120,6 +119,7 @@ export default forwardRef<DownloadFormRef, DownloadFormProps>(
   function DownloadForm({ isEdit, onFormVisibleChange, id, onConfirm }, ref) {
     const { enableDocker } = useAppStore(useShallow(appStoreSelector));
     const [modalOpen, setModalOpen] = useState(false);
+    const [advancedOpen, setAdvancedOpen] = useState(false);
     const formId = useId();
     const { t } = useTranslation();
     const { setLastDownloadTypes, setLastIsBatch } = useConfigStore(
@@ -155,7 +155,10 @@ export default forwardRef<DownloadFormRef, DownloadFormProps>(
     const setOpen = useMemoizedFn((open: boolean) => {
       setModalOpen(open);
       onFormVisibleChange?.(open);
-      if (!open) form.reset();
+      if (!open) {
+        form.reset();
+        setAdvancedOpen(false);
+      }
     });
 
     useImperativeHandle(
@@ -163,6 +166,9 @@ export default forwardRef<DownloadFormRef, DownloadFormProps>(
       () => ({
         openModal: (value) => {
           form.reset(value);
+          setAdvancedOpen(
+            Boolean(value.folder?.trim() || value.headers?.trim()),
+          );
           setOpen(true);
         },
         setFieldsValue: (value) => {
@@ -256,8 +262,8 @@ export default forwardRef<DownloadFormRef, DownloadFormProps>(
 
     return (
       <Dialog open={modalOpen} onOpenChange={setOpen}>
-        <DialogContent className="max-h-[90vh] max-w-[500px] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="grid max-h-[calc(100vh-2rem)] max-w-[560px] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0">
+          <DialogHeader className="border-b px-6 py-5 pr-14">
             <DialogTitle>
               {isEdit ? t("editDownload") : t("newDownload")}
             </DialogTitle>
@@ -267,7 +273,7 @@ export default forwardRef<DownloadFormRef, DownloadFormProps>(
           </DialogHeader>
 
           <form
-            className="space-y-4"
+            className="space-y-5 overflow-y-auto px-6 py-5"
             onSubmit={(event) => event.preventDefault()}
           >
             <input
@@ -276,20 +282,53 @@ export default forwardRef<DownloadFormRef, DownloadFormProps>(
             />
 
             {!isEdit ? (
-              <FormRow htmlFor={`${formId}-batch`} label={t("batchDownload")}>
+              <FormRow
+                htmlFor={`${formId}-single-mode`}
+                label={t("downloadMode")}
+              >
                 <Controller
                   control={form.control}
                   name="batch"
-                  render={({ field }) => (
-                    <Switch
-                      id={`${formId}-batch`}
-                      checked={Boolean(field.value)}
-                      onCheckedChange={(checked) => {
-                        field.onChange(checked);
-                        setLastIsBatch(checked);
-                      }}
-                    />
-                  )}
+                  render={({ field }) => {
+                    const batchMode = Boolean(field.value);
+                    const selectMode = (nextBatchMode: boolean) => {
+                      field.onChange(nextBatchMode);
+                      setLastIsBatch(nextBatchMode);
+                    };
+
+                    return (
+                      <div
+                        role="group"
+                        aria-label={t("downloadMode")}
+                        className="grid grid-cols-2 rounded-md bg-surface-subtle p-1"
+                      >
+                        <button
+                          id={`${formId}-single-mode`}
+                          type="button"
+                          aria-pressed={!batchMode}
+                          onClick={() => selectMode(false)}
+                          className={cn(
+                            "h-8 rounded-sm px-3 text-sm font-medium text-muted-foreground outline-none transition-[background-color,color,box-shadow] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/15",
+                            !batchMode &&
+                              "bg-surface text-foreground shadow-sm",
+                          )}
+                        >
+                          {t("singleDownload")}
+                        </button>
+                        <button
+                          type="button"
+                          aria-pressed={batchMode}
+                          onClick={() => selectMode(true)}
+                          className={cn(
+                            "h-8 rounded-sm px-3 text-sm font-medium text-muted-foreground outline-none transition-[background-color,color,box-shadow] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/15",
+                            batchMode && "bg-surface text-foreground shadow-sm",
+                          )}
+                        >
+                          {t("batchDownload")}
+                        </button>
+                      </div>
+                    );
+                  }}
                 />
               </FormRow>
             ) : null}
@@ -402,17 +441,23 @@ export default forwardRef<DownloadFormRef, DownloadFormProps>(
                       id={`${formId}-batch-list`}
                       value={field.value ?? ""}
                       rows={5}
-                      placeholder={t("videoLikeDescription")}
+                      placeholder={t("pleaseEnterVideoLink")}
                       onContextMenu={showTextMenu}
                       aria-invalid={Boolean(form.formState.errors.batchList)}
                       aria-describedby={
                         form.formState.errors.batchList
-                          ? `${formId}-batch-list-error`
-                          : undefined
+                          ? `${formId}-batch-list-error ${formId}-batch-list-help`
+                          : `${formId}-batch-list-help`
                       }
                     />
                   )}
                 />
+                <p
+                  id={`${formId}-batch-list-help`}
+                  className="text-xs leading-relaxed text-muted-foreground"
+                >
+                  {t("batchListHelp")}
+                </p>
               </FormRow>
             ) : null}
 
@@ -457,44 +502,63 @@ export default forwardRef<DownloadFormRef, DownloadFormProps>(
               </FormRow>
             ) : null}
 
-            {!isBatch ? (
-              <FormRow htmlFor={`${formId}-folder`} label={t("folder")}>
-                <Input
-                  id={`${formId}-folder`}
-                  list={`${formId}-folder-options`}
-                  placeholder={t("pleaseInputVideoFolder")}
-                  {...form.register("folder")}
-                />
-                <datalist id={`${formId}-folder-options`}>
-                  {videoFolders.map((folder) => (
-                    <option key={folder} value={folder} />
-                  ))}
-                </datalist>
-              </FormRow>
-            ) : null}
+            <details
+              open={advancedOpen}
+              onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}
+              className="group overflow-hidden rounded-md border border-border/70 bg-surface-subtle/40"
+            >
+              <summary className="flex h-10 cursor-pointer list-none items-center justify-between px-3 text-sm font-medium text-muted-foreground outline-none transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/15 [&::-webkit-details-marker]:hidden">
+                <span>{t("moreSettings")}</span>
+                <ChevronDown className="size-4 transition-transform group-open:rotate-180" />
+              </summary>
+              <div className="space-y-5 border-t bg-surface px-4 py-4">
+                {!isBatch ? (
+                  <FormRow htmlFor={`${formId}-folder`} label={t("folder")}>
+                    <Input
+                      id={`${formId}-folder`}
+                      list={`${formId}-folder-options`}
+                      placeholder={t("pleaseInputVideoFolder")}
+                      {...form.register("folder")}
+                    />
+                    <datalist id={`${formId}-folder-options`}>
+                      {videoFolders.map((folder) => (
+                        <option key={folder} value={folder} />
+                      ))}
+                    </datalist>
+                  </FormRow>
+                ) : null}
 
-            {selectedType === DownloadType.m3u8 ||
-            selectedType === DownloadType.mediago ||
-            isBatch ? (
-              <FormRow
-                htmlFor={`${formId}-headers`}
-                label={t("additionalHeaders")}
-              >
-                <Textarea
-                  id={`${formId}-headers`}
-                  rows={4}
-                  placeholder={t("additionalHeadersDescription")}
-                  onContextMenu={showTextMenu}
-                  {...form.register("headers")}
-                />
-              </FormRow>
-            ) : null}
+                {selectedType === DownloadType.m3u8 ||
+                selectedType === DownloadType.mediago ||
+                isBatch ? (
+                  <FormRow
+                    htmlFor={`${formId}-headers`}
+                    label={t("additionalHeaders")}
+                  >
+                    <Textarea
+                      id={`${formId}-headers`}
+                      rows={4}
+                      placeholder="Origin: https://example.com"
+                      onContextMenu={showTextMenu}
+                      aria-describedby={`${formId}-headers-help`}
+                      {...form.register("headers")}
+                    />
+                    <p
+                      id={`${formId}-headers-help`}
+                      className="text-xs leading-relaxed text-muted-foreground"
+                    >
+                      {t("additionalHeadersHelp")}
+                    </p>
+                  </FormRow>
+                ) : null}
+              </div>
+            </details>
           </form>
 
-          <DialogFooter className={cn(enableDocker && "sm:justify-between")}>
+          <DialogFooter className="border-t bg-surface-subtle/60 px-6 py-4">
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
               onClick={() => setOpen(false)}
             >
               {t("cancel")}

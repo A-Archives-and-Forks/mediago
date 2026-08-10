@@ -59,7 +59,7 @@ const SettingsCards = memo(function SettingsCards({
   }, []);
 
   return (
-    <div className="grid items-start gap-4 md:grid-cols-2">
+    <div className="mx-auto grid max-w-[1180px] items-start gap-4 xl:grid-cols-2">
       <div className="flex min-w-0 flex-col gap-4">
         <StableBasicSettingsCard />
         {!isWeb && visibleStep >= 2 ? <StableBrowserSettingsCard /> : null}
@@ -84,7 +84,7 @@ const SettingsContent = memo(function SettingsContent({
 }) {
   return (
     <SettingsFormProvider>
-      <div className="h-full overflow-x-hidden overflow-y-auto py-2 pr-3">
+      <div className="h-full overflow-x-hidden overflow-y-auto p-4">
         <SettingsCards onCheckUpdate={onCheckUpdate} />
       </div>
     </SettingsFormProvider>
@@ -138,7 +138,7 @@ const SettingPage = () => {
   const displayedDownloadProgress = updateDownloaded ? 100 : downloadProgress;
 
   return (
-    <PageContainer title={t("setting")} className="-mr-3 overflow-visible">
+    <PageContainer title={t("setting")} className="overflow-hidden p-0">
       <SettingsContent onCheckUpdate={handleCheckUpdate} />
 
       <Dialog open={openUpdateModal} onOpenChange={setOpenUpdateModal}>

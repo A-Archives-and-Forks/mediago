@@ -36,7 +36,7 @@ import { AppLanguage, type AppStore, AppTheme } from "@mediago/shared-common";
 const version = import.meta.env.APP_VERSION;
 const EXTENSION_GUIDE_URL = "https://downloader.caorushizi.cn/extension.html";
 
-const actionButtonClass = "shrink-0";
+const actionButtonClass = "h-9 shrink-0";
 
 export const BasicSettingsCard = memo(function BasicSettingsCard() {
   const { t } = useTranslation();
@@ -56,12 +56,14 @@ export const BasicSettingsCard = memo(function BasicSettingsCard() {
   return (
     <SettingCard title={t("basicSetting")}>
       <SettingRow label={t("localDir")} htmlFor="setting-local">
-        <div className="flex min-w-0 gap-2">
+        <div className="flex w-full min-w-0 gap-2">
           <Input
             id="setting-local"
             value={String(localField.value ?? "")}
-            disabled
+            readOnly
+            aria-readonly="true"
             placeholder={t("pleaseSelectDownloadDir")}
+            className="h-9"
           />
           {!isWeb ? (
             <Button
@@ -337,21 +339,23 @@ export const SkillsSettingsCard = memo(function SkillsSettingsCard() {
         tooltip={t("skillsInstallTooltip")}
         htmlFor="skills-install-command"
       >
-        <div className="flex min-w-0">
+        <div className="relative w-full min-w-0">
           <Input
             id="skills-install-command"
             value={installCommand}
             readOnly
-            className="rounded-r-none font-mono"
+            className="h-9 pr-10 font-mono text-xs"
           />
           <Button
             type="button"
-            variant="outline"
+            variant="ghost"
+            size="icon"
+            aria-label={t("skillsCopy")}
             onClick={() => copy(installCommand)}
-            className="rounded-l-none border-l-0"
+            className="absolute right-1 top-1/2 size-7 -translate-y-1/2"
           >
             <Copy className="size-4" />
-            {t("skillsCopy")}
+            <span className="sr-only">{t("skillsCopy")}</span>
           </Button>
         </div>
       </SettingRow>
@@ -360,21 +364,23 @@ export const SkillsSettingsCard = memo(function SkillsSettingsCard() {
         tooltip={t("skillsInitTooltip")}
         htmlFor="skills-setup-command"
       >
-        <div className="flex min-w-0">
+        <div className="relative w-full min-w-0">
           <Input
             id="skills-setup-command"
             value={setupCommand}
             readOnly
-            className="rounded-r-none font-mono"
+            className="h-9 pr-10 font-mono text-xs"
           />
           <Button
             type="button"
-            variant="outline"
+            variant="ghost"
+            size="icon"
+            aria-label={t("skillsCopy")}
             onClick={() => copy(setupCommand)}
-            className="rounded-l-none border-l-0"
+            className="absolute right-1 top-1/2 size-7 -translate-y-1/2"
           >
             <Copy className="size-4" />
-            {t("skillsCopy")}
+            <span className="sr-only">{t("skillsCopy")}</span>
           </Button>
         </div>
       </SettingRow>
@@ -431,7 +437,12 @@ export const MoreSettingsCard = memo(function MoreSettingsCard({
     <SettingCard title={t("moreSettings")}>
       {isWeb ? (
         <SettingRow label={t("apiKey")} htmlFor="setting-web-api-key">
-          <Input id="setting-web-api-key" value={apiKey} disabled />
+          <Input
+            id="setting-web-api-key"
+            value={apiKey}
+            readOnly
+            className="h-9"
+          />
         </SettingRow>
       ) : (
         <SettingRow label={t("moreAction")}>
@@ -474,7 +485,7 @@ export const MoreSettingsCard = memo(function MoreSettingsCard({
                 {t("checkUpdate")}
               </Button>
               {updateAvailable ? (
-                <span className="absolute right-0 top-0 size-2 rounded-full bg-red-500" />
+                <span className="absolute right-0 top-0 size-2 rounded-full bg-destructive" />
               ) : null}
             </span>
           ) : null}
