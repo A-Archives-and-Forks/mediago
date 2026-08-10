@@ -7,11 +7,13 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"caorushizi.cn/mediago/internal/api"
 	"caorushizi.cn/mediago/internal/api/handler"
 	"caorushizi.cn/mediago/internal/app"
 	"caorushizi.cn/mediago/internal/logger"
+	"caorushizi.cn/mediago/internal/mcpserver"
 	"github.com/gin-gonic/gin"
 )
 
@@ -107,6 +109,42 @@ func runServer(rt *app.Runtime) error {
 			Platform:  runtime.GOOS,
 		},
 	})
+	store := rt.AppStore.Store()
+	if strings.TrimSpace(store.MCPToken) == "" {
+		token, err := mcpserver.GenerateToken()
+		if err != nil {
+			return fmt.Errorf("generate MCP token: %w", err)
+		}
+		if err := rt.AppStore.Set("mcpToken", token); err != nil {
+			return fmt.Errorf("persist MCP token: %w", err)
+		}
+	}
+
+	mcpManager := mcpserver.NewManager(server.DownloadService(), cfg)
+	applyMCPSettings := func() {
+		current := rt.AppStore.Store()
+		if err := mcpManager.Apply(mcpserver.Settings{
+			Enabled: current.EnableMCP,
+			Port:    current.MCPPort,
+			Token:   current.MCPToken,
+		}); err != nil {
+			logger.Errorf("Failed to apply MCP settings: %v", err)
+		}
+	}
+	unsubscribers := []func(){
+		rt.AppStore.OnDidChange("enableMcp", func(_, _ any) { applyMCPSettings() }),
+		rt.AppStore.OnDidChange("mcpPort", func(_, _ any) { applyMCPSettings() }),
+		rt.AppStore.OnDidChange("mcpToken", func(_, _ any) { applyMCPSettings() }),
+	}
+	defer func() {
+		for _, unsubscribe := range unsubscribers {
+			unsubscribe()
+		}
+		_ = mcpManager.Close()
+	}()
+	server.RegisterMCPStatusRoute(func() any { return mcpManager.Status() })
+	applyMCPSettings()
+
 	addr := cfg.Host + ":" + cfg.Port
 	gin.SetMode(cfg.GinMode)
 	logger.Infof("Starting HTTP server on %s", addr)

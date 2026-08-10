@@ -28,6 +28,9 @@ type AppStore struct {
 	DockerUrl           string `json:"dockerUrl"`
 	EnableMobilePlayer  bool   `json:"enableMobilePlayer"`
 	ApiKey              string `json:"apiKey"`
+	EnableMCP           bool   `json:"enableMcp"`
+	MCPPort             int    `json:"mcpPort"`
+	MCPToken            string `json:"mcpToken"`
 	PasswordHash        string `json:"passwordHash"`
 }
 
@@ -58,6 +61,9 @@ func DefaultAppStore() AppStore {
 		DockerUrl:           "",
 		EnableMobilePlayer:  false,
 		ApiKey:              "",
+		EnableMCP:           false,
+		MCPPort:             39720,
+		MCPToken:            "",
 		PasswordHash:        "",
 	}
 }

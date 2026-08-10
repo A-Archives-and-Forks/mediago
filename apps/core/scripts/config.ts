@@ -8,6 +8,8 @@ import { win32 } from "node:path/win32";
 export const config = {
   APP_NAME: "mediago-core",
   CMD_PATH: "./cmd/server",
+  CLI_APP_NAME: "mediago",
+  CLI_CMD_PATH: "./cmd/cli",
   BIN_DIR: "./bin",
   RELEASE_DIR: "./release",
   DEPS_DIR: join("..", "..", ".deps"),

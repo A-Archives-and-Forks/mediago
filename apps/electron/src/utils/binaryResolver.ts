@@ -48,6 +48,24 @@ export function resolveCoreBinaries(): {
 }
 
 /**
+ * Resolves the bundled user-facing MediaGo CLI.
+ *
+ * Development: apps/core/bin/mediago
+ * Production: extraResources/bin/mediago
+ */
+export function resolveCLIBinary(): string {
+  if (process.env.MEDIAGO_CLI_BIN) {
+    return process.env.MEDIAGO_CLI_BIN;
+  }
+
+  if (isDev) {
+    return path.join(getMonorepoRoot(), "apps", "core", "bin", `mediago${ext}`);
+  }
+
+  return path.join(process.resourcesPath, "bin", `mediago${ext}`);
+}
+
+/**
  * Resolves the deps directory containing helper binaries (ffmpeg, N_m3u8DL-RE, BBDown, etc.).
  *
  * Development: .deps/{platform}/{arch}/ (downloaded by `pnpm deps:download`)

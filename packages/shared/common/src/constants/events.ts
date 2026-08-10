@@ -35,6 +35,10 @@ export const IPC = {
   contextMenu: {
     show: "contextMenu.show",
   },
+  cli: {
+    getStatus: "cli.getStatus",
+    install: "cli.install",
+  },
   update: {
     check: "update.check",
     startDownload: "update.startDownload",

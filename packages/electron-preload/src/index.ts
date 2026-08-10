@@ -7,6 +7,7 @@ import {
   type DialogOpenOptions,
   type DialogSaveOptions,
   type ContextMenuItem,
+  type CLIInstallOptions,
 } from "@mediago/shared-common";
 import { contextBridge, ipcRenderer } from "electron";
 
@@ -94,6 +95,14 @@ const electronApi: PlatformApi = {
   contextMenu: {
     show(items: ContextMenuItem[]): Promise<string | null> {
       return ipcRenderer.invoke(IPC.contextMenu.show, items);
+    },
+  },
+  cli: {
+    getStatus() {
+      return ipcRenderer.invoke(IPC.cli.getStatus);
+    },
+    install(options: CLIInstallOptions) {
+      return ipcRenderer.invoke(IPC.cli.install, options);
     },
   },
   update: {

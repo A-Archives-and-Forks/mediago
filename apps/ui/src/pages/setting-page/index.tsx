@@ -20,8 +20,10 @@ import {
   BasicSettingsCard,
   BrowserExtensionCard,
   BrowserSettingsCard,
+  CLISettingsCard,
   DockerSettingsCard,
   DownloadSettingsCard,
+  MCPSettingsCard,
   MoreSettingsCard,
   SkillsSettingsCard,
 } from "./setting-sections";
@@ -30,10 +32,12 @@ const StableBasicSettingsCard = memo(BasicSettingsCard);
 const StableBrowserSettingsCard = memo(BrowserSettingsCard);
 const StableDownloadSettingsCard = memo(DownloadSettingsCard);
 const StableDockerSettingsCard = memo(DockerSettingsCard);
+const StableCLISettingsCard = memo(CLISettingsCard);
+const StableMCPSettingsCard = memo(MCPSettingsCard);
 const StableSkillsSettingsCard = memo(SkillsSettingsCard);
 const StableBrowserExtensionCard = memo(BrowserExtensionCard);
 const StableMoreSettingsCard = memo(MoreSettingsCard);
-const SETTINGS_REVEAL_STEPS = isWeb ? 2 : 4;
+const SETTINGS_REVEAL_STEPS = isWeb ? 2 : 5;
 
 const SettingsCards = memo(function SettingsCards({
   onCheckUpdate,
@@ -67,8 +71,10 @@ const SettingsCards = memo(function SettingsCards({
       <div className="flex min-w-0 flex-col gap-4">
         {!isWeb ? <StableDockerSettingsCard /> : <StableSkillsSettingsCard />}
         {!isWeb && visibleStep >= 2 ? <StableSkillsSettingsCard /> : null}
-        {!isWeb && visibleStep >= 3 ? <StableBrowserExtensionCard /> : null}
-        {visibleStep >= (isWeb ? 2 : 4) ? (
+        {!isWeb && visibleStep >= 3 ? <StableCLISettingsCard /> : null}
+        {!isWeb && visibleStep >= 3 ? <StableMCPSettingsCard /> : null}
+        {!isWeb && visibleStep >= 4 ? <StableBrowserExtensionCard /> : null}
+        {visibleStep >= (isWeb ? 2 : 5) ? (
           <StableMoreSettingsCard onCheckUpdate={onCheckUpdate} />
         ) : null}
       </div>

@@ -30,6 +30,9 @@ const initialState: AppStore = {
   dockerUrl: "",
   closeMainWindow: false,
   apiKey: "",
+  enableMcp: false,
+  mcpPort: 39720,
+  mcpToken: "",
 };
 
 type Actions = {

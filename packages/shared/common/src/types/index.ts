@@ -187,6 +187,26 @@ export interface EnvPath {
   coreUrl: string;
 }
 
+export interface CLIInstallOptions {
+  baseUrl: string;
+  apiKey?: string;
+}
+
+export interface CLIInstallStatus {
+  installed: boolean;
+  updateAvailable: boolean;
+  inPath: boolean;
+  binaryPath: string;
+  configPath: string;
+}
+
+export interface MCPServerStatus {
+  enabled: boolean;
+  running: boolean;
+  endpoint: string;
+  error?: string;
+}
+
 export interface Rectangle {
   height: number;
   width: number;
@@ -244,6 +264,10 @@ export interface AppStore {
   enableMobilePlayer: boolean;
   // server apikey
   apiKey: string;
+  // Built-in local MCP server
+  enableMcp: boolean;
+  mcpPort: number;
+  mcpToken: string;
 }
 
 export interface WebSource {
@@ -380,6 +404,10 @@ export interface PlatformApi {
   };
   contextMenu: {
     show(items: ContextMenuItem[]): Promise<string | null>;
+  };
+  cli: {
+    getStatus(): Promise<CLIInstallStatus>;
+    install(options: CLIInstallOptions): Promise<CLIInstallStatus>;
   };
   update: {
     check(): Promise<void>;

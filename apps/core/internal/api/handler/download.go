@@ -106,7 +106,8 @@ func (h *DownloadHandler) Get(c *gin.Context) {
 		return
 	}
 
-	video, err := h.svc.FindByIDOrFail(id)
+	localPath, _ := h.conf.Get("local").(string)
+	video, err := h.svc.GetDownloadTask(id, localPath)
 	if err != nil {
 		c.JSON(http.StatusNotFound, dto.ErrorResponse{Success: false, Code: http.StatusNotFound, Message: err.Error()})
 		return

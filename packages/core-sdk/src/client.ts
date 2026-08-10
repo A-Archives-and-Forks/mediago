@@ -18,6 +18,7 @@ import type {
   EnvPaths,
   FavoriteItem,
   HealthResponse,
+  MCPServerStatus,
   PaginatedResponse,
   StartDownloadParams,
   Task,
@@ -404,6 +405,13 @@ export class MediaGoClient {
    */
   async getConfig(): Promise<ApiResponse<AppStore>> {
     return this.api.get("/api/config");
+  }
+
+  /**
+   * Gets the built-in MCP listener's actual runtime status.
+   */
+  async getMCPStatus(): Promise<ApiResponse<MCPServerStatus>> {
+    return this.api.get("/api/mcp/status");
   }
 
   /**

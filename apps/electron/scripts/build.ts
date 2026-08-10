@@ -330,11 +330,17 @@ const depsDir = path.resolve(appRoot, "app/build/deps");
 await fs.mkdir(binDir, { recursive: true });
 await fs.mkdir(depsDir, { recursive: true });
 
-// Copy mediago-core binary + config
-await fs.copyFile(
-  path.resolve(projectRoot, `apps/core/bin/mediago-core${ext}`),
-  path.join(binDir, `mediago-core${ext}`),
-);
+// Copy the core service and user-facing CLI into resources/bin.
+await Promise.all([
+  fs.copyFile(
+    path.resolve(projectRoot, `apps/core/bin/mediago-core${ext}`),
+    path.join(binDir, `mediago-core${ext}`),
+  ),
+  fs.copyFile(
+    path.resolve(projectRoot, `apps/core/bin/mediago${ext}`),
+    path.join(binDir, `mediago${ext}`),
+  ),
+]);
 
 // Copy dependency binaries (ffmpeg, N_m3u8DL-RE, BBDown, aria2c, yt-dlp)
 const platformKey = `${os.platform()}-${os.arch()}`;

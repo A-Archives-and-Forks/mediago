@@ -1,7 +1,13 @@
-import { chmodSync, existsSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { config, devConfig } from "./config";
-import { getExeExt, mkdir, runCommand, copyFile, rmrf } from "./utils";
+import { copyFile, getExeExt, mkdir, rmrf, runCommand } from "./utils";
+
+const appVersion = (
+  JSON.parse(
+    readFileSync(join("..", "electron", "app", "package.json"), "utf8"),
+  ) as { version: string }
+).version;
 
 /**
  * Start the development server
@@ -35,7 +41,6 @@ export async function buildPlayerUI() {
   console.log("🎬 Building Player UI...");
   const playerUiDist = join(config.PLAYER_UI_DIR, "dist");
 
-  // Build player-ui
   await runCommand("pnpm", ["build"], { cwd: config.PLAYER_UI_DIR });
 
   if (!existsSync(playerUiDist)) {
@@ -44,24 +49,18 @@ export async function buildPlayerUI() {
     );
   }
 
-  // Copy dist to core assets/player/ for go:embed
   rmrf(config.PLAYER_ASSETS_DIR);
   copyFile(playerUiDist, config.PLAYER_ASSETS_DIR);
 
   console.log(`✅ Player UI copied to ${config.PLAYER_ASSETS_DIR}`);
 }
 
-/**
- * Compile the development build for the current platform
- */
-export async function devBuild() {
-  console.log("🔨 Compiling development build...");
-
-  // Build and embed player-ui first
-  await buildPlayerUI();
-
-  mkdir(config.BIN_DIR);
-  const output = join(config.BIN_DIR, config.APP_NAME + getExeExt());
+async function buildCurrentPlatformBinary(
+  name: string,
+  commandPath: string,
+  ldflags: string,
+) {
+  const output = join(config.BIN_DIR, name + getExeExt());
   await runCommand(
     "go",
     [
@@ -70,15 +69,41 @@ export async function devBuild() {
       "dev",
       "-trimpath",
       "-ldflags",
-      config.GO_LDFLAGS,
+      ldflags,
       "-o",
       output,
-      config.CMD_PATH,
+      commandPath,
     ],
-    { description: "Compile binary for current platform" },
+    { description: `Compile ${name} for current platform` },
   );
   if (process.platform !== "win32") {
     chmodSync(output, 0o755);
   }
-  console.log(`✅ Development build compiled -> ${output}`);
+  return output;
+}
+
+/**
+ * Compile the core service and CLI for the current platform.
+ */
+export async function devBuild() {
+  console.log("🔨 Compiling development build...");
+
+  await buildPlayerUI();
+  mkdir(config.BIN_DIR);
+
+  const [serverOutput, cliOutput] = await Promise.all([
+    buildCurrentPlatformBinary(
+      config.APP_NAME,
+      config.CMD_PATH,
+      config.GO_LDFLAGS,
+    ),
+    buildCurrentPlatformBinary(
+      config.CLI_APP_NAME,
+      config.CLI_CMD_PATH,
+      `${config.GO_LDFLAGS} -X main.version=${appVersion}`,
+    ),
+  ]);
+
+  console.log(`✅ Core service compiled -> ${serverOutput}`);
+  console.log(`✅ CLI compiled -> ${cliOutput}`);
 }

@@ -59,6 +59,22 @@ export const webPlatformStubs: PlatformApi = {
   contextMenu: {
     show: async () => null,
   },
+  cli: {
+    getStatus: async () => ({
+      installed: false,
+      updateAvailable: false,
+      inPath: false,
+      binaryPath: "",
+      configPath: "",
+    }),
+    install: async () => ({
+      installed: false,
+      updateAvailable: false,
+      inPath: false,
+      binaryPath: "",
+      configPath: "",
+    }),
+  },
   update: {
     check: noop,
     startDownload: noop,

@@ -1,5 +1,5 @@
 import { http } from "@/utils";
-import type { AppStore } from "@mediago/shared-common";
+import type { AppStore, MCPServerStatus } from "@mediago/shared-common";
 
 export interface GoEnvPath {
   configDir: string;
@@ -28,3 +28,7 @@ export const setConfigValues = (values: Partial<AppStore>): Promise<void> =>
 
 export const getEnvPathKey = "/api/env";
 export const getEnvPath = (): Promise<GoEnvPath> => http.get(getEnvPathKey);
+
+export const getMCPStatusKey = "/api/mcp/status";
+export const getMCPStatus = (): Promise<MCPServerStatus> =>
+  http.get(getMCPStatusKey);

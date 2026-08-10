@@ -90,6 +90,9 @@ const EDITABLE_SETTING_KEYS = [
   "apiKey",
   "dockerUrl",
   "enableDocker",
+  "enableMcp",
+  "mcpPort",
+  "mcpToken",
 ] as const satisfies readonly SettingName[];
 
 type PersistSetting = (name: SettingName, value: SettingValue) => Promise<void>;

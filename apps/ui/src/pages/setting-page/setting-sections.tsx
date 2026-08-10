@@ -4,18 +4,24 @@ import {
   Download,
   Eraser,
   FolderOpen,
+  RefreshCw,
+  Server,
+  Terminal,
   Upload,
 } from "lucide-react";
-import { memo } from "react";
+import { memo, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useController, useFormContext } from "react-hook-form";
 import { toast } from "sonner";
+import useSWR from "swr";
 import {
   exportFavorites as exportFavoritesApi,
   importFavorites,
 } from "@/api/favorite";
+import { getMCPStatus, getMCPStatusKey } from "@/api/config";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { useEnvPath } from "@/hooks/use-config";
 import { usePlatform } from "@/hooks/use-platform";
 import { useAppStore } from "@/store/app";
@@ -31,7 +37,12 @@ import {
   SettingTextField,
   usePersistSetting,
 } from "./setting-fields";
-import { AppLanguage, type AppStore, AppTheme } from "@mediago/shared-common";
+import {
+  AppLanguage,
+  type AppStore,
+  AppTheme,
+  type CLIInstallStatus,
+} from "@mediago/shared-common";
 
 const version = import.meta.env.APP_VERSION;
 const EXTENSION_GUIDE_URL = "https://downloader.caorushizi.cn/extension.html";
@@ -382,6 +393,236 @@ export const SkillsSettingsCard = memo(function SkillsSettingsCard() {
             <Copy className="size-4" />
             <span className="sr-only">{t("skillsCopy")}</span>
           </Button>
+        </div>
+      </SettingRow>
+    </SettingCard>
+  );
+});
+
+export const CLISettingsCard = memo(function CLISettingsCard() {
+  const { t } = useTranslation();
+  const { cli, shell } = usePlatform();
+  const { envPath } = useEnvPath();
+  const apiKey = useAppStore((state) => state.apiKey);
+  const [status, setStatus] = useState<CLIInstallStatus | null>(null);
+  const [installing, setInstalling] = useState(false);
+  const coreUrl = envPath?.playerUrl
+    ? envPath.playerUrl.replace(/\/player\/$/, "")
+    : "http://127.0.0.1:39719";
+
+  useEffect(() => {
+    void cli
+      .getStatus()
+      .then(setStatus)
+      .catch((error: unknown) =>
+        toast.error(error instanceof Error ? error.message : String(error)),
+      );
+  }, [cli]);
+
+  const install = async () => {
+    setInstalling(true);
+    try {
+      const nextStatus = await cli.install({ baseUrl: coreUrl, apiKey });
+      setStatus(nextStatus);
+      toast.success(t("cliInstallSuccess"));
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : String(error));
+    } finally {
+      setInstalling(false);
+    }
+  };
+
+  const openInstallDir = () => {
+    if (!status?.binaryPath) return;
+    const directory = status.binaryPath.replace(/[\\/][^\\/]+$/, "");
+    void shell.open(directory);
+  };
+
+  const buttonLabel = status?.updateAvailable
+    ? t("cliUpdate")
+    : status?.installed
+      ? t("cliReinstall")
+      : t("cliInstall");
+
+  return (
+    <SettingCard title={t("cliSetting")}>
+      <SettingRow label={t("cliStatus")}>
+        <span className="text-sm text-muted-foreground">
+          {status?.installed ? t("cliInstalled") : t("cliNotInstalled")}
+          {status?.inPath ? ` · ${t("cliPathReady")}` : ""}
+        </span>
+      </SettingRow>
+      <SettingRow label={t("cliInstallPath")}>
+        <Input
+          value={status?.binaryPath ?? "~/.mediago-community/bin/mediago"}
+          readOnly
+          className="h-8 font-mono text-xs"
+        />
+      </SettingRow>
+      <SettingRow label={t("cliUsage")} htmlFor="cli-usage-command">
+        <div className="relative w-full min-w-0">
+          <Input
+            id="cli-usage-command"
+            value="mediago download <url>"
+            readOnly
+            className="h-8 pr-10 font-mono text-xs"
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label={t("copy")}
+            onClick={() => {
+              void navigator.clipboard
+                .writeText("mediago download <url>")
+                .then(() => toast.success(t("cliCommandCopied")))
+                .catch((error: unknown) =>
+                  toast.error(
+                    error instanceof Error ? error.message : String(error),
+                  ),
+                );
+            }}
+            className="absolute right-1 top-1/2 size-7 -translate-y-1/2"
+          >
+            <Copy className="size-4" />
+          </Button>
+        </div>
+      </SettingRow>
+      <SettingRow label={t("moreAction")}>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={install}
+            disabled={installing}
+          >
+            <Terminal className="size-4" />
+            {buttonLabel}
+          </Button>
+          {status?.installed ? (
+            <Button type="button" variant="outline" onClick={openInstallDir}>
+              <FolderOpen className="size-4" />
+              {t("openFolder")}
+            </Button>
+          ) : null}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {t("cliRestartTerminalHint")}
+        </p>
+      </SettingRow>
+    </SettingCard>
+  );
+});
+
+export const MCPSettingsCard = memo(function MCPSettingsCard() {
+  const { t } = useTranslation();
+  const persistSetting = usePersistSetting();
+  const enabled = useAppStore((state) => state.enableMcp);
+  const port = useAppStore((state) => state.mcpPort);
+  const token = useAppStore((state) => state.mcpToken);
+  const { data: status, mutate } = useSWR(getMCPStatusKey, getMCPStatus, {
+    dedupingInterval: 250,
+    refreshInterval: 1500,
+  });
+  const isStatusPending = status === undefined || status.enabled !== enabled;
+  const endpoint = `http://127.0.0.1:${port || 39720}/mcp`;
+  const agentConfig = JSON.stringify(
+    {
+      mcpServers: {
+        mediago: {
+          type: "http",
+          url: endpoint,
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      },
+    },
+    null,
+    2,
+  );
+
+  useEffect(() => {
+    void mutate();
+
+    const timer = window.setTimeout(() => {
+      void mutate();
+    }, 500);
+
+    return () => window.clearTimeout(timer);
+  }, [enabled, mutate, port, token]);
+
+  const copyConfig = async () => {
+    try {
+      await navigator.clipboard.writeText(agentConfig);
+      toast.success(t("mcpConfigCopied"));
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  const regenerateToken = async () => {
+    const bytes = crypto.getRandomValues(new Uint8Array(32));
+    const nextToken = Array.from(bytes, (value) =>
+      value.toString(16).padStart(2, "0"),
+    ).join("");
+    await persistSetting("mcpToken", nextToken);
+    toast.success(t("mcpTokenRegenerated"));
+  };
+
+  return (
+    <SettingCard title={t("mcpSetting")}>
+      <SettingSwitchField
+        name="enableMcp"
+        label={t("mcpEnable")}
+        tooltip={t("mcpEnableTooltip")}
+      />
+      <SettingNumberField
+        name="mcpPort"
+        label={t("mcpPort")}
+        min={1024}
+        max={65535}
+      />
+      <SettingRow label={t("mcpStatus")}>
+        <div className="flex items-center justify-end gap-2 text-sm">
+          <Server className="size-4" />
+          <span
+            className={
+              isStatusPending
+                ? "text-amber-600"
+                : status?.running
+                  ? "text-emerald-600"
+                  : "text-muted-foreground"
+            }
+          >
+            {isStatusPending
+              ? t("mcpApplying")
+              : status?.running
+                ? t("mcpRunning")
+                : t("mcpStopped")}
+          </span>
+          {status?.error ? (
+            <span className="text-destructive">{status.error}</span>
+          ) : null}
+        </div>
+      </SettingRow>
+      <SettingRow label={t("mcpAgentConfig")}>
+        <div className="w-full space-y-2">
+          <Textarea
+            value={agentConfig}
+            readOnly
+            rows={10}
+            className="min-h-52 font-mono text-xs"
+          />
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button type="button" variant="outline" onClick={regenerateToken}>
+              <RefreshCw className="size-4" />
+              {t("mcpRegenerateToken")}
+            </Button>
+            <Button type="button" variant="outline" onClick={copyConfig}>
+              <Copy className="size-4" />
+              {t("copy")}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">{t("mcpRunningHint")}</p>
         </div>
       </SettingRow>
     </SettingCard>

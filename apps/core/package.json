@@ -5,7 +5,9 @@
   "description": "MediaGo Core - Go download backend build scripts",
   "scripts": {
     "dev": "gulp dev",
-    "build": "gulp devBuild"
+    "build": "gulp devBuild",
+    "release:build": "gulp releaseBuild",
+    "release": "gulp releasePackageFull"
   },
   "keywords": [
     "video",

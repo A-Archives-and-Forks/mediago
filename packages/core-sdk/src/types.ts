@@ -273,6 +273,16 @@ export interface AppStore {
   dockerUrl: string;
   enableMobilePlayer: boolean;
   apiKey: string;
+  enableMcp: boolean;
+  mcpPort: number;
+  mcpToken: string;
+}
+
+export interface MCPServerStatus {
+  enabled: boolean;
+  running: boolean;
+  endpoint: string;
+  error?: string;
 }
 
 // #endregion

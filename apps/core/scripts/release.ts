@@ -1,5 +1,5 @@
 import { series } from "gulp";
-import { existsSync, chmodSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   config,
@@ -18,6 +18,12 @@ import {
 } from "./utils";
 import { buildPlayerUI } from "./dev";
 
+const appVersion = (
+  JSON.parse(
+    readFileSync(join("..", "electron", "app", "package.json"), "utf8"),
+  ) as { version: string }
+).version;
+
 // ============================================================
 // Release Tasks
 // ============================================================
@@ -31,25 +37,25 @@ function getTargetExt(goos: string): string {
 }
 
 /**
- * Build the binary for a single platform
+ * Build one Go command for a single platform.
  */
-async function buildBinary(cfg: BuildConfig) {
+async function buildBinary(
+  cfg: BuildConfig,
+  name: string,
+  commandPath: string,
+  ldflags: string,
+) {
   const ext = getTargetExt(cfg.goos);
-  const output = join(config.BIN_DIR, `${getPackageName(cfg)}${ext}`);
+  const output = join(
+    config.BIN_DIR,
+    `${name}-${cfg.goos}-${cfg.goarch}${ext}`,
+  );
 
   await runCommand(
     "go",
-    [
-      "build",
-      "-trimpath",
-      "-ldflags",
-      config.GO_LDFLAGS,
-      "-o",
-      output,
-      config.CMD_PATH,
-    ],
+    ["build", "-trimpath", "-ldflags", ldflags, "-o", output, commandPath],
     {
-      description: `✓ ${cfg.goos}/${cfg.goarch}`,
+      description: `✓ ${name} ${cfg.goos}/${cfg.goarch}`,
       env: {
         GOOS: cfg.goos,
         GOARCH: cfg.goarch,
@@ -69,7 +75,22 @@ export async function releaseBuild() {
   console.log("🔨 Building binaries for all platforms...");
   mkdir(config.BIN_DIR);
 
-  await Promise.all(BUILD_PLATFORMS.map(buildBinary));
+  await Promise.all(
+    BUILD_PLATFORMS.flatMap((platform) => [
+      buildBinary(
+        platform,
+        config.APP_NAME,
+        config.CMD_PATH,
+        config.GO_LDFLAGS,
+      ),
+      buildBinary(
+        platform,
+        config.CLI_APP_NAME,
+        config.CLI_CMD_PATH,
+        `${config.GO_LDFLAGS} -X main.version=${appVersion}`,
+      ),
+    ]),
+  );
   console.log("✅ All-platform binaries compiled");
 }
 
@@ -93,6 +114,13 @@ async function packagePlatform(cfg: BuildConfig) {
     join(config.BIN_DIR, `${pkgName}${ext}`),
     join(pkgDir, `${config.APP_NAME}${ext}`),
   );
+  copyFile(
+    join(
+      config.BIN_DIR,
+      `${config.CLI_APP_NAME}-${cfg.goos}-${cfg.goarch}${ext}`,
+    ),
+    join(pkgDir, `${config.CLI_APP_NAME}${ext}`),
+  );
 
   // Copy downloader tools
   if (existsSync(toolsSrc)) {
@@ -111,6 +139,7 @@ async function packagePlatform(cfg: BuildConfig) {
   if (cfg.goos !== "windows" && process.platform !== "win32") {
     try {
       chmodSync(join(pkgDir, config.APP_NAME), 0o755);
+      chmodSync(join(pkgDir, config.CLI_APP_NAME), 0o755);
       const binDir = join(pkgDir, releaseConfig.packageBinDir);
       chmodExecutable(binDir);
     } catch {

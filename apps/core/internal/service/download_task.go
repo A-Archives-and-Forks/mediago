@@ -155,6 +155,24 @@ func (s *DownloadTaskService) GetDownloadTasks(current, pageSize int, filter, lo
 	return &PaginatedResult{Total: result.Total, List: list}, nil
 }
 
+// GetDownloadTask retrieves one download task with file existence information.
+func (s *DownloadTaskService) GetDownloadTask(id int64, localPath string) (*DownloadTaskWithFile, error) {
+	item, err := s.repo.FindByIDOrFail(id)
+	if err != nil {
+		return nil, err
+	}
+
+	result := &DownloadTaskWithFile{Video: item}
+	if item.Status == "success" && localPath != "" {
+		searchDir := localPath
+		if item.Folder != nil && *item.Folder != "" {
+			searchDir = filepath.Join(localPath, *item.Folder)
+		}
+		result.Exists, result.File = CheckFileExists(item.Name, searchDir)
+	}
+	return result, nil
+}
+
 // StartDownload starts a download task.
 func (s *DownloadTaskService) StartDownload(taskID int64, localPath string, deleteSegments bool) error {
 	video, err := s.repo.FindByIDOrFail(taskID)
