@@ -10,7 +10,7 @@ import {
 } from "@mediago/shared-common";
 import { i18n } from "../core/i18n";
 import { DownloaderServer } from "../services/downloader.server";
-import { app, Menu, Notification } from "electron";
+import { app, Notification } from "electron";
 import isDev from "electron-is-dev";
 import { inject, injectable } from "inversify";
 import _ from "lodash";
@@ -78,8 +78,6 @@ export default class MainWindow extends Window {
       this.window.show();
       return;
     }
-
-    Menu.setApplicationMenu(null);
 
     this.window = this.create();
 

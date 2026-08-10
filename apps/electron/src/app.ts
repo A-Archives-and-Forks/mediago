@@ -27,6 +27,7 @@ import MainWindow from "./windows/main.window";
 import "./controller";
 import ElectronLogger from "./vendor/ElectronLogger";
 import { AppTheme, resolveAppLanguage } from "@mediago/shared-common";
+import { installApplicationMenu } from "./core/application-menu";
 
 @injectable()
 @provide()
@@ -71,6 +72,7 @@ export default class ElectronApp {
   async init(): Promise<void> {
     this.protocol.create();
     this.router.init();
+    installApplicationMenu();
 
     // 1. Show the window immediately — must happen regardless of backend status
     await this.vendorInit();
