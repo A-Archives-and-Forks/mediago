@@ -271,7 +271,7 @@ export const SettingCard = memo(function SettingCard({
     <Card
       aria-labelledby={titleId}
       className={cn(
-        "gap-0 overflow-hidden rounded-lg border bg-transparent py-0 shadow-none",
+        "gap-0 overflow-hidden rounded-lg border bg-surface py-0 shadow-none",
         className,
       )}
     >
@@ -280,7 +280,7 @@ export const SettingCard = memo(function SettingCard({
           {title}
         </CardTitle>
       </CardHeader>
-      <CardContent className="@container/settings flex flex-col divide-y px-5 py-0">
+      <CardContent className="@container/settings flex flex-col px-5 py-0">
         {children}
       </CardContent>
     </Card>

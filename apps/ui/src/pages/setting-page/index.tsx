@@ -1,7 +1,6 @@
 import { useMemoizedFn } from "ahooks";
 import { memo, startTransition, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import PageContainer from "@/components/page-container";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -138,7 +137,7 @@ const SettingPage = () => {
   const displayedDownloadProgress = updateDownloaded ? 100 : downloadProgress;
 
   return (
-    <PageContainer title={t("setting")} className="overflow-hidden p-0">
+    <div className="h-full min-h-0 overflow-hidden">
       <SettingsContent onCheckUpdate={handleCheckUpdate} />
 
       <Dialog open={openUpdateModal} onOpenChange={setOpenUpdateModal}>
@@ -189,7 +188,7 @@ const SettingPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </PageContainer>
+    </div>
   );
 };
 
