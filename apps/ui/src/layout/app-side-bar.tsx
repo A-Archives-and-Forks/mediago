@@ -1,6 +1,12 @@
 import { useMemoizedFn } from "ahooks";
 import { ExternalLink, PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import { useEffect, useRef } from "react";
+import {
+  type CSSProperties,
+  type KeyboardEvent,
+  type PointerEvent,
+  useEffect,
+  useRef,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { HelpButton } from "@/components/help-button";
@@ -14,9 +20,29 @@ import { cn, isWeb } from "@/utils";
 import { AppBrand } from "./app-brand";
 import { useNavigationItems } from "./navigation";
 import { ServerAccountMenu } from "./server-account-menu";
+import {
+  SIDEBAR_COLLAPSED_WIDTH,
+  SIDEBAR_MAX_WIDTH,
+  SIDEBAR_MIN_WIDTH,
+  resolveSidebarResize,
+} from "./sidebar-sizing";
 
 interface Props {
   className?: string;
+}
+
+const SIDEBAR_SNAP_ANIMATION_MS = 150;
+
+interface SidebarResizeSession {
+  latestExpandedWidth: number;
+  pendingWidth: number;
+  pointerId: number;
+  previousBodyCursor: string;
+  previousBodyUserSelect: string;
+  resizeAnimationFrame: number | null;
+  snapAnimationTimer: ReturnType<typeof setTimeout> | null;
+  startWidth: number;
+  startX: number;
 }
 
 export function AppSideBar({ className }: Props) {
@@ -31,8 +57,12 @@ export function AppSideBar({ className }: Props) {
   const openInNewWindow = useAppStore((state) => state.openInNewWindow);
   const setAppStore = useAppStore((state) => state.setAppStore);
   const collapsed = useShellStore((state) => state.sidebarCollapsed);
+  const sidebarWidth = useShellStore((state) => state.sidebarWidth);
   const toggleSidebar = useShellStore((state) => state.toggleSidebar);
   const previousOpenInNewWindow = useRef(openInNewWindow);
+  const sidebarRef = useRef<HTMLElement>(null);
+  const resizeHandleRef = useRef<HTMLDivElement>(null);
+  const resizeSessionRef = useRef<SidebarResizeSession | null>(null);
   const helpIconOnly = isWeb || collapsed;
 
   useEffect(() => {
@@ -70,13 +100,191 @@ export function AppSideBar({ className }: Props) {
     },
   );
 
+  const startSidebarSnapAnimation = useMemoizedFn(() => {
+    const session = resizeSessionRef.current;
+    const sidebar = sidebarRef.current;
+    if (!session || !sidebar) return;
+
+    if (session.snapAnimationTimer) {
+      clearTimeout(session.snapAnimationTimer);
+    }
+    delete sidebar.dataset.resizing;
+    sidebar.dataset.snapping = "true";
+    session.snapAnimationTimer = setTimeout(() => {
+      if (resizeSessionRef.current !== session) return;
+      session.snapAnimationTimer = null;
+      delete sidebar.dataset.snapping;
+      sidebarRef.current?.setAttribute("data-resizing", "true");
+    }, SIDEBAR_SNAP_ANIMATION_MS);
+  });
+
+  const finishSidebarResize = useMemoizedFn((pointerId?: number) => {
+    const session = resizeSessionRef.current;
+    if (
+      !session ||
+      (pointerId !== undefined && session.pointerId !== pointerId)
+    )
+      return;
+
+    if (session.resizeAnimationFrame !== null) {
+      cancelAnimationFrame(session.resizeAnimationFrame);
+      session.resizeAnimationFrame = null;
+      sidebarRef.current?.style.setProperty(
+        "--sidebar-width",
+        `${session.pendingWidth}px`,
+      );
+    }
+    if (session.snapAnimationTimer) {
+      clearTimeout(session.snapAnimationTimer);
+    }
+    resizeSessionRef.current = null;
+    const state = useShellStore.getState();
+    if (!state.sidebarCollapsed) {
+      state.setSidebarExpandedWidth(session.latestExpandedWidth);
+    }
+
+    delete sidebarRef.current?.dataset.resizing;
+    delete sidebarRef.current?.dataset.snapping;
+    document.body.style.cursor = session.previousBodyCursor;
+    document.body.style.userSelect = session.previousBodyUserSelect;
+
+    const handle = resizeHandleRef.current;
+    if (handle?.hasPointerCapture(session.pointerId)) {
+      handle.releasePointerCapture(session.pointerId);
+    }
+  });
+
+  useEffect(
+    () => () => {
+      const session = resizeSessionRef.current;
+      if (!session) return;
+      resizeSessionRef.current = null;
+      if (session.resizeAnimationFrame !== null) {
+        cancelAnimationFrame(session.resizeAnimationFrame);
+      }
+      if (session.snapAnimationTimer) {
+        clearTimeout(session.snapAnimationTimer);
+      }
+      document.body.style.cursor = session.previousBodyCursor;
+      document.body.style.userSelect = session.previousBodyUserSelect;
+    },
+    [],
+  );
+
+  const handleResizePointerDown = useMemoizedFn(
+    (event: PointerEvent<HTMLDivElement>) => {
+      if (event.button !== 0 || !event.isPrimary) return;
+      event.preventDefault();
+
+      const state = useShellStore.getState();
+      const startWidth = state.sidebarCollapsed
+        ? SIDEBAR_COLLAPSED_WIDTH
+        : state.sidebarWidth;
+      resizeSessionRef.current = {
+        latestExpandedWidth: state.sidebarWidth,
+        pendingWidth: startWidth,
+        pointerId: event.pointerId,
+        previousBodyCursor: document.body.style.cursor,
+        previousBodyUserSelect: document.body.style.userSelect,
+        resizeAnimationFrame: null,
+        snapAnimationTimer: null,
+        startWidth,
+        startX: event.clientX,
+      };
+
+      sidebarRef.current?.setAttribute("data-resizing", "true");
+      event.currentTarget.setPointerCapture(event.pointerId);
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+    },
+  );
+
+  const handleResizePointerMove = useMemoizedFn(
+    (event: PointerEvent<HTMLDivElement>) => {
+      const session = resizeSessionRef.current;
+      if (!session || session.pointerId !== event.pointerId) return;
+
+      const requestedWidth =
+        session.startWidth + event.clientX - session.startX;
+      const result = resolveSidebarResize(requestedWidth);
+      const state = useShellStore.getState();
+      if (result.collapsed !== state.sidebarCollapsed) {
+        startSidebarSnapAnimation();
+      }
+
+      session.pendingWidth = result.width;
+      if (session.resizeAnimationFrame === null) {
+        session.resizeAnimationFrame = requestAnimationFrame(() => {
+          if (resizeSessionRef.current !== session) return;
+          session.resizeAnimationFrame = null;
+          sidebarRef.current?.style.setProperty(
+            "--sidebar-width",
+            `${session.pendingWidth}px`,
+          );
+        });
+      }
+
+      if (result.collapsed) {
+        if (!state.sidebarCollapsed) state.setSidebarCollapsed(true);
+        return;
+      }
+
+      session.latestExpandedWidth = result.width;
+      if (state.sidebarCollapsed) {
+        state.setSidebarExpandedWidth(result.width);
+      }
+    },
+  );
+
+  const handleResizeKeyDown = useMemoizedFn(
+    (event: KeyboardEvent<HTMLDivElement>) => {
+      const state = useShellStore.getState();
+      let requestedWidth: number;
+
+      switch (event.key) {
+        case "ArrowLeft":
+          requestedWidth = state.sidebarCollapsed
+            ? SIDEBAR_COLLAPSED_WIDTH
+            : state.sidebarWidth - 16;
+          break;
+        case "ArrowRight":
+          requestedWidth = state.sidebarCollapsed
+            ? SIDEBAR_MIN_WIDTH
+            : state.sidebarWidth + 16;
+          break;
+        case "Home":
+          requestedWidth = SIDEBAR_COLLAPSED_WIDTH;
+          break;
+        case "End":
+          requestedWidth = SIDEBAR_MAX_WIDTH;
+          break;
+        default:
+          return;
+      }
+
+      event.preventDefault();
+      const result = resolveSidebarResize(requestedWidth);
+      if (result.collapsed) {
+        state.setSidebarCollapsed(true);
+      } else {
+        state.setSidebarExpandedWidth(result.width);
+      }
+    },
+  );
+
   const compact = collapsed;
+  const renderedSidebarWidth = compact ? SIDEBAR_COLLAPSED_WIDTH : sidebarWidth;
 
   return (
     <aside
+      ref={sidebarRef}
+      style={
+        {
+          "--sidebar-width": `${renderedSidebarWidth}px`,
+        } as CSSProperties
+      }
       className={cn(
-        "relative my-3 ml-3 hidden shrink-0 flex-col overflow-hidden rounded-lg border bg-sidebar transition-[width] duration-200 min-[720px]:flex",
-        compact ? "w-16" : "w-[204px] max-[1079px]:w-16",
+        "relative my-3 ml-3 hidden w-[var(--sidebar-width)] shrink-0 flex-col overflow-visible rounded-lg border bg-sidebar transition-[width] duration-200 ease-out data-[resizing=true]:duration-0 data-[snapping=true]:duration-[150ms] motion-reduce:transition-none max-[1079px]:w-16 min-[720px]:flex",
         className,
       )}
     >
@@ -184,6 +392,27 @@ export function AppSideBar({ className }: Props) {
           )}
         </Button>
       </div>
+      <div
+        ref={resizeHandleRef}
+        role="separator"
+        aria-label="Resize sidebar"
+        aria-orientation="vertical"
+        aria-valuemin={SIDEBAR_COLLAPSED_WIDTH}
+        aria-valuemax={SIDEBAR_MAX_WIDTH}
+        aria-valuenow={renderedSidebarWidth}
+        aria-valuetext={
+          compact ? "Sidebar collapsed" : `${renderedSidebarWidth} pixels`
+        }
+        tabIndex={0}
+        title="Resize sidebar"
+        className="absolute inset-y-0 -right-3 z-20 w-6 cursor-col-resize touch-none focus-visible:bg-ring/10 focus-visible:outline-none max-[1079px]:hidden"
+        onKeyDown={handleResizeKeyDown}
+        onLostPointerCapture={(event) => finishSidebarResize(event.pointerId)}
+        onPointerCancel={(event) => finishSidebarResize(event.pointerId)}
+        onPointerDown={handleResizePointerDown}
+        onPointerMove={handleResizePointerMove}
+        onPointerUp={(event) => finishSidebarResize(event.pointerId)}
+      />
     </aside>
   );
 }
