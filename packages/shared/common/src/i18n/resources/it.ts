@@ -141,6 +141,7 @@ export const it = {
   terminal: "Apri terminale",
   close: "Chiudi",
   loading: "Caricamento",
+  startingMediaGo: "Avvio di MediaGo…",
   pagination: "Paginazione",
   previousPage: "Pagina precedente",
   nextPage: "Pagina successiva",

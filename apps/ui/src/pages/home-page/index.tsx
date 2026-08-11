@@ -102,7 +102,7 @@ const HomePage: FC<Props> = ({ filter = DownloadFilter.list }) => {
       />
 
       <PaginationControl
-        className="flex justify-end"
+        className="flex justify-end max-[719px]:pr-16"
         page={pagination.page}
         pageSize={pagination.pageSize}
         onPageChange={setPage}

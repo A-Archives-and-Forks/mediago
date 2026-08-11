@@ -140,6 +140,7 @@ export const en = {
   terminal: "Open terminal",
   close: "Close",
   loading: "Loading",
+  startingMediaGo: "Starting MediaGo…",
   pagination: "Pagination",
   previousPage: "Previous page",
   nextPage: "Next page",

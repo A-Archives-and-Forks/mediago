@@ -136,6 +136,7 @@ export const zh = {
   terminal: "打开控制台",
   close: "关闭",
   loading: "加载中",
+  startingMediaGo: "正在启动 MediaGo…",
   pagination: "分页",
   previousPage: "上一页",
   nextPage: "下一页",

@@ -1,6 +1,12 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 
+const initialTheme =
+  typeof document !== "undefined" &&
+  document.documentElement.classList.contains("dark")
+    ? "dark"
+    : "light";
+
 type State = {
   updateAvailable: boolean;
   updateChecking: boolean;
@@ -21,7 +27,7 @@ export const useSessionStore = create<State & Actions>()(
   immer((set) => ({
     updateAvailable: false,
     updateChecking: true,
-    theme: "light",
+    theme: initialTheme,
     setUpdateAvailable: (available) => {
       set((state) => {
         state.updateAvailable = available;

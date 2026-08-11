@@ -3,6 +3,7 @@ import { Route, Routes } from "react-router-dom";
 import "dayjs/locale/zh-cn";
 import "dayjs/locale/it";
 import { useMemoizedFn } from "ahooks";
+import { AppBootScreen } from "./components/app-boot-screen";
 import Loading from "./components/loading";
 import { Toaster } from "./components/ui/sonner";
 import { PAGE_LOAD } from "./const";
@@ -363,7 +364,7 @@ const App: FC = () => {
     document.documentElement.classList.toggle("dark", theme === "dark");
   }, [theme]);
 
-  if (!adapterReady) return <Loading />;
+  if (!adapterReady) return <AppBootScreen />;
 
   return (
     <>
@@ -373,7 +374,7 @@ const App: FC = () => {
           <Route
             path="/"
             element={
-              <Suspense fallback={<Loading />}>
+              <Suspense fallback={<AppBootScreen />}>
                 <AppLayout />
               </Suspense>
             }
