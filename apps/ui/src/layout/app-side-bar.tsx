@@ -1,6 +1,7 @@
 import { useMemoizedFn } from "ahooks";
 import { ExternalLink, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { HelpButton } from "@/components/help-button";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ interface Props {
 
 export function AppSideBar({ className }: Props) {
   const { app } = usePlatform();
+  const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const items = useNavigationItems();
@@ -31,6 +33,7 @@ export function AppSideBar({ className }: Props) {
   const collapsed = useShellStore((state) => state.sidebarCollapsed);
   const toggleSidebar = useShellStore((state) => state.toggleSidebar);
   const previousOpenInNewWindow = useRef(openInNewWindow);
+  const helpIconOnly = isWeb || collapsed;
 
   useEffect(() => {
     const wasOpenInNewWindow = previousOpenInNewWindow.current;
@@ -123,12 +126,13 @@ export function AppSideBar({ className }: Props) {
               {key === "source" && !compact ? (
                 <button
                   type="button"
-                  title={
-                    openInNewWindow
-                      ? "Merge to main window"
-                      : "Open in new window"
-                  }
-                  className="opacity-0 transition-opacity group-hover:opacity-100 max-[1079px]:hidden"
+                  title={t(
+                    openInNewWindow ? "openInMainWindow" : "openInNewWindow",
+                  )}
+                  aria-label={t(
+                    openInNewWindow ? "openInMainWindow" : "openInNewWindow",
+                  )}
+                  className="cursor-pointer opacity-0 transition-opacity group-hover:opacity-100 max-[1079px]:hidden"
                   onClick={handleExternalLink}
                 >
                   <ExternalLink
@@ -155,8 +159,13 @@ export function AppSideBar({ className }: Props) {
           </div>
         ) : null}
         <HelpButton
-          iconOnly
-          className="size-9 shrink-0 rounded-md p-0 text-muted-foreground"
+          iconOnly={helpIconOnly}
+          className={cn(
+            "rounded-md text-muted-foreground",
+            helpIconOnly
+              ? "size-9 p-0"
+              : "h-9 min-w-0 flex-1 justify-start px-3 text-sm font-normal max-[1079px]:size-9 max-[1079px]:flex-none max-[1079px]:justify-center max-[1079px]:gap-0 max-[1079px]:px-0 max-[1079px]:text-[0px]",
+          )}
           iconClassName="size-5 stroke-[1.75]"
         />
         <Button

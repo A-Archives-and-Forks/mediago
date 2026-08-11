@@ -21,9 +21,10 @@ const computeRect = (rect: DivRect) => {
 
 interface WebViewProps {
   className?: string;
+  boundsInset?: Partial<Record<"top" | "right" | "bottom" | "left", number>>;
 }
 
-const WebView: FC<WebViewProps> = ({ className }) => {
+const WebView: FC<WebViewProps> = ({ className, boundsInset }) => {
   const webviewRef = useRef<HTMLDivElement>(null);
   const resizeObserver = useRef<ResizeObserver>(null);
   const rafId = useRef<number>(0);
@@ -42,8 +43,14 @@ const WebView: FC<WebViewProps> = ({ className }) => {
         const rect = computeRect(webviewRef.current.getBoundingClientRect());
         const entry = entries[0];
         const viewRect = computeRect(entry.contentRect);
-        viewRect.x += rect.x;
-        viewRect.y += rect.y;
+        const top = boundsInset?.top ?? 0;
+        const right = boundsInset?.right ?? 0;
+        const bottom = boundsInset?.bottom ?? 0;
+        const left = boundsInset?.left ?? 0;
+        viewRect.x += rect.x + left;
+        viewRect.y += rect.y + top;
+        viewRect.width = Math.max(0, viewRect.width - left - right);
+        viewRect.height = Math.max(0, viewRect.height - top - bottom);
         browser.setBounds(viewRect);
       });
     });

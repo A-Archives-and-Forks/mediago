@@ -89,7 +89,7 @@ const SettingsContent = memo(function SettingsContent({
 }) {
   return (
     <SettingsFormProvider>
-      <div className="h-full min-h-0 overflow-x-hidden overflow-y-auto p-4">
+      <div className="h-full min-h-0 overflow-x-hidden overflow-y-auto p-3">
         <SettingsCards onCheckUpdate={onCheckUpdate} />
       </div>
     </SettingsFormProvider>

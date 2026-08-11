@@ -58,7 +58,10 @@ export function BrowserView() {
     if (status === BrowserStatus.Loading || status === BrowserStatus.Loaded) {
       return (
         <div className="relative h-full w-full flex-1">
-          <WebView className="h-full w-full flex-1" />
+          <WebView
+            className="h-full w-full flex-1"
+            boundsInset={{ right: 1, bottom: 1, left: 1 }}
+          />
           {status === BrowserStatus.Loading ? (
             <div className="absolute inset-0 flex items-center justify-center bg-white/60 dark:bg-black/40">
               <Spinner className="size-5" />

@@ -278,7 +278,7 @@ export const SettingCard = memo(function SettingCard({
         className,
       )}
     >
-      <CardHeader className="border-b px-5 py-3.5">
+      <CardHeader className="flex h-14 items-center border-b px-5 py-0 [.border-b]:pb-0">
         <CardTitle id={titleId} className="text-sm font-semibold">
           {title}
         </CardTitle>

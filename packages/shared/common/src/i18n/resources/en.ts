@@ -31,6 +31,7 @@ export const en = {
   selectedItems: "{{count}} selected",
   help: "Help",
   openInNewWindow: "Open in new window",
+  openInMainWindow: "Open in main window",
   switchToMobileMode: "Switch to mobile mode",
   home: "Home",
   back: "Back",

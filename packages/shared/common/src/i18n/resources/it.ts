@@ -31,6 +31,7 @@ export const it = {
   selectedItems: "{{count}} selezionato",
   help: "Aiuto",
   openInNewWindow: "Apri in una nuova finestra",
+  openInMainWindow: "Apri nella finestra principale",
   switchToMobileMode: "Passa al modo mobile",
   home: "Home",
   back: "Indietro",

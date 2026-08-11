@@ -31,6 +31,7 @@ export const zh = {
   selectedItems: "已选择 {{count}} 项",
   help: "使用帮助",
   openInNewWindow: "在新窗口中打开",
+  openInMainWindow: "在主窗口中打开",
   switchToMobileMode: "切换为手机模式",
   home: "首页",
   back: "回退",

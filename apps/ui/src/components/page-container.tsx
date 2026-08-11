@@ -27,7 +27,7 @@ const PageContainer: FC<PageContainerProps> = ({
       )}
     >
       {title ? (
-        <header className="flex min-h-12 shrink-0 flex-row items-center justify-between rounded-t-lg border bg-surface px-4 py-2">
+        <header className="flex h-14 shrink-0 flex-row items-center justify-between rounded-t-lg border bg-surface px-4">
           <div className="flex min-w-0 flex-row items-center gap-3">
             <div className="text-sm font-medium text-foreground">{title}</div>
             {titleExtra ? <div>{titleExtra}</div> : null}

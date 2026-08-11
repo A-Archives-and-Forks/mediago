@@ -116,7 +116,7 @@ export function ToolBar({ page }: Props) {
   });
 
   return (
-    <div className="flex flex-row items-center gap-2 border-b bg-surface px-3 py-2">
+    <div className="flex h-14 shrink-0 flex-row items-center gap-2 border-b bg-surface px-3">
       <IconButton
         title={t("switchToMobileMode")}
         onClick={onSetDefaultUA}
