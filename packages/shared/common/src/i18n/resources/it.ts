@@ -305,4 +305,7 @@ export const it = {
   mcpRunningHint:
     "MediaGo deve rimanere in esecuzione; MCP resta disponibile se ridotto nella barra delle applicazioni.",
   confirm: "Conferma",
+  shareIntentInvalid: "Nessun link scaricabile valido trovato",
+  shareIntentLegacyAutomaticActionDisabled:
+    "Per sicurezza, i parametri di importazione silenziosa o download immediato del link precedente sono stati ignorati. Controlla il modulo per continuare.",
 };

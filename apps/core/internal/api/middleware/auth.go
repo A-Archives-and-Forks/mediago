@@ -17,10 +17,17 @@ import (
 // Whitelisted paths bypass authentication.
 func AuthMiddleware(confStore handler.ConfigStore) gin.HandlerFunc {
 	whitelist := map[string]bool{
-		"/healthy":          true,
-		"/api/auth/setup":   true,
-		"/api/auth/signin":  true,
-		"/api/auth/status":  true,
+		"/healthy":               true,
+		"/api/auth/setup":        true,
+		"/api/auth/signin":       true,
+		"/api/auth/status":       true,
+		"/manifest.json":         true,
+		"/service-worker.js":     true,
+		"/apple-touch-icon.png":  true,
+		"/icon-192.png":          true,
+		"/icon-512.png":          true,
+		"/icon-192-maskable.png": true,
+		"/icon-512-maskable.png": true,
 	}
 
 	return func(c *gin.Context) {

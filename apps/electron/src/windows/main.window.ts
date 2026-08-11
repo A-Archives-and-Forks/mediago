@@ -16,7 +16,7 @@ import { inject, injectable } from "inversify";
 import _ from "lodash";
 import Window from "../core/window";
 import { preloadUrl } from "../utils";
-import { defaultScheme, isWin } from "../constants";
+import { defaultScheme } from "../constants";
 import GoConfigCache from "../services/go-config-cache";
 import ElectronLogger from "../vendor/ElectronLogger";
 import ElectronStore from "../vendor/ElectronStore";
@@ -25,7 +25,6 @@ import ElectronStore from "../vendor/ElectronStore";
 @provide()
 export default class MainWindow extends Window {
   url = isDev ? "http://localhost:8500/" : `${defaultScheme}://index.html/`;
-  private initialUrl: string | null = null;
 
   constructor(
     @inject(ElectronLogger)
@@ -74,8 +73,7 @@ export default class MainWindow extends Window {
 
   init(): void {
     if (this.window) {
-      // If the window already exists, it is displayed directly
-      this.window.show();
+      this.focusWindow();
       return;
     }
 
@@ -89,11 +87,6 @@ export default class MainWindow extends Window {
     // Handle current window resize
     this.window.on("resized", this.handleResize);
     this.window.on("close", this.closeMainWindow);
-
-    app.on("open-url", (event, url) => {
-      event.preventDefault();
-      this.handleUrl(url);
-    });
   }
 
   handleResize = () => {
@@ -154,42 +147,15 @@ export default class MainWindow extends Window {
     this.send(DOWNLOAD_EVENT_NAME, data);
   };
 
-  showWindow(url?: string) {
-    if (isWin) {
-      if (this.window) {
-        if (this.window.isMinimized()) {
-          this.window.restore();
-        }
-        if (this.window.isVisible()) {
-          this.window.focus();
-        } else {
-          this.window.show();
-        }
-      } else {
-        this.init();
-      }
-
-      if (url) {
-        this.window!.loadURL(url);
-      }
-    }
+  showWindow() {
+    if (!this.window) this.init();
+    this.focusWindow();
   }
 
-  // Handle URL in the form of mediago://
-  handleUrl(url: string) {
-    if (!this.window) {
-      this.init();
-    }
-
-    if (this.window) {
-      if (this.window.isMinimized()) {
-        this.window.restore();
-      }
-      this.window.focus();
-    }
-
-    if (url) {
-      this.window!.loadURL(url);
-    }
+  private focusWindow() {
+    if (!this.window) return;
+    if (this.window.isMinimized()) this.window.restore();
+    if (!this.window.isVisible()) this.window.show();
+    this.window.focus();
   }
 }

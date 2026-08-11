@@ -145,7 +145,7 @@ export function ServerCard() {
           <p className="rounded-lg border border-border bg-surface-200 p-4 font-serif text-[13px] leading-relaxed text-muted-foreground">
             {t("options.server.schemaNoteLead")}{" "}
             <code className="rounded-xs bg-surface-400 px-1.5 py-0.5 font-mono text-[11px] text-foreground">
-              mediago-community://index.html/?n=1&amp;silent=1&amp;url=...
+              mediago-community://share?v=1&amp;url=...
             </code>{" "}
             {t("options.server.schemaNoteMid")}{" "}
             <strong className="font-medium text-foreground">

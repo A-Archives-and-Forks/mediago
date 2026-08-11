@@ -10,6 +10,7 @@ import { resolveExtensionDir } from "../utils/binaryResolver";
 import ElectronUpdater from "../vendor/ElectronUpdater";
 import BrowserWindow from "../windows/browser.window";
 import MainWindow from "../windows/main.window";
+import ShareIntentService from "../services/share-intent.service";
 
 @injectable()
 @provide(TYPES.Controller)
@@ -25,6 +26,8 @@ export default class HomeController implements Controller {
     private readonly updater: ElectronUpdater,
     @inject(DownloaderServer)
     private readonly downloaderServer: DownloaderServer,
+    @inject(ShareIntentService)
+    private readonly shareIntentService: ShareIntentService,
   ) {}
 
   @handle(IPC.app.getEnvPath)
@@ -82,6 +85,10 @@ export default class HomeController implements Controller {
     this.sharedState = state;
   }
 
+  @handle(IPC.app.drainShareIntents)
+  drainShareIntents() {
+    return this.shareIntentService.drain();
+  }
   @handle(IPC.update.check)
   async checkUpdate() {
     this.updater.manualUpdate();

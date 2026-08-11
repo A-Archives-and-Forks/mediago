@@ -296,4 +296,7 @@ export const zh = {
   mcpTokenRegenerated: "MCP 令牌已更新",
   mcpRunningHint: "MediaGo 需要保持运行；最小化到托盘时 MCP 仍可使用。",
   confirm: "确认",
+  shareIntentInvalid: "未找到可下载的有效链接",
+  shareIntentLegacyAutomaticActionDisabled:
+    "为安全起见，旧链接中的静默或立即下载参数已忽略，请在表单中确认后继续。",
 };

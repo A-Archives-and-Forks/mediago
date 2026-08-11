@@ -5,7 +5,6 @@ import { DownloaderServer } from "./services/downloader.server";
 import {
   app,
   BrowserWindow,
-  type Event,
   Menu,
   nativeImage,
   nativeTheme,
@@ -26,13 +25,15 @@ import BrowserWindowService from "./windows/browser.window";
 import MainWindow from "./windows/main.window";
 import "./controller";
 import ElectronLogger from "./vendor/ElectronLogger";
-import { AppTheme, resolveAppLanguage } from "@mediago/shared-common";
+import { AppTheme, IpcEvent, resolveAppLanguage } from "@mediago/shared-common";
 import { installApplicationMenu } from "./core/application-menu";
+import ShareIntentService from "./services/share-intent.service";
 
 @injectable()
 @provide()
 export default class ElectronApp {
   private tray?: Tray;
+  private externalPresentationPending = false;
 
   constructor(
     @inject(MainWindow)
@@ -57,11 +58,41 @@ export default class ElectronApp {
     private readonly browserWindow: BrowserWindowService,
     @inject(ElectronLogger)
     private readonly logger: ElectronLogger,
+    @inject(ShareIntentService)
+    private readonly shareIntentService: ShareIntentService,
   ) {}
 
   private async serviceInit(): Promise<void> {
     this.mainWindow.init();
     this.overlayDialogService.init();
+  }
+  handleExternalCommandLine(
+    commandLine: readonly string[],
+    present = true,
+  ): boolean {
+    const result = this.shareIntentService.handleCommandLine(commandLine);
+    return this.acceptExternalInvocation(result.handled, present);
+  }
+
+  handleExternalUrl(url: string, present = true): boolean {
+    const result = this.shareIntentService.handleProtocolUrl(url);
+    return this.acceptExternalInvocation(result.handled, present);
+  }
+
+  presentPendingExternalInvocations() {
+    if (!this.externalPresentationPending) return;
+    this.externalPresentationPending = false;
+    this.mainWindow.showWindow();
+    if (this.shareIntentService.hasPending()) {
+      this.mainWindow.send(IpcEvent.app.shareIntentAvailable);
+    }
+  }
+
+  private acceptExternalInvocation(handled: boolean, present: boolean) {
+    if (!handled) return false;
+    this.externalPresentationPending = true;
+    if (present) this.presentPendingExternalInvocations();
+    return true;
   }
 
   private async vendorInit() {
@@ -151,6 +182,7 @@ export default class ElectronApp {
     );
 
     await this.serviceInit();
+    this.presentPendingExternalInvocations();
   }
 
   initTray() {
@@ -188,9 +220,4 @@ export default class ElectronApp {
     ]);
     this.tray.setContextMenu(contextMenu);
   }
-
-  secondInstance = (event: Event, commandLine: string[]) => {
-    const url = commandLine.pop() || "";
-    this.mainWindow.showWindow(url);
-  };
 }

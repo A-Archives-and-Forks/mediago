@@ -28,8 +28,7 @@ const resource: ExtensionResources = {
     pageTitle: "Impostazioni estensione MediaGo",
     language: {
       title: "Lingua interfaccia",
-      description:
-        `Lingua usata dal popup e dalla pagina delle opzioni. Scelte "Usa stessa lingua sistema" in base alla lingua dell'interfaccia utente del browser.`,
+      description: `Lingua usata dal popup e dalla pagina delle opzioni. Scelte "Usa stessa lingua sistema" in base alla lingua dell'interfaccia utente del browser.`,
       system: "Usa stessa lingua sistema",
       zh: "中文",
       en: "English",
@@ -41,7 +40,7 @@ const resource: ExtensionResources = {
         "L'estensione non fallisce mai silenziosamente. Una volta scelta una modalità, qualsiasi errore viene segnalato così com'è: se necessario cambia modalità manualmente in questa pagina.",
       modeSchemaTitle: "Desktop · Protocollo schema",
       modeSchemaDesc:
-        "Passa tramite il protocollo mediago-community:// (avvia desktop se non è in esecuzione). Richiede l'installazione locale dell'app MediaGo Desktop.",
+        "Apre MediaGo Desktop tramite mediago-community:// e mostra una finestra di revisione precompilata. Desktop viene avviato automaticamente se necessario.",
       modeDesktopHttpTitle: "Desktop · HTTP locale",
       modeDesktopHttpDesc:
         "Parla con l'app desktop in esecuzione tramite {{base}}. Richiede che l'app desktop sia in esecuzione, ma non c'è nessuna finestra di conferma.",
@@ -53,37 +52,35 @@ const resource: ExtensionResources = {
       apiKeyLabel: "Chiave API",
       apiKeyOptional: "(opzionale)",
       apiKeyPlaceholder: "Lascia vuoto per saltare l'intestazione X-API-Key",
-      schemaNoteLead: "Usa MediaGo esistente",
+      schemaNoteLead: "Usa il nuovo",
       schemaNoteMid:
-        "Protocollo di instradamento del renderer per richiamare Desktop. La scheda attiva viene indirizzata all'URL del protocollo (stesso schema di cat-catch). Chrome visualizza la prima volta una finestra di dialogo 'Apri MediaGo-community?'",
+        "protocollo Share Intent per richiamare Desktop. La scheda attiva apre l'URL del protocollo. Quando Chrome mostra per la prima volta 'Apri MediaGo-community?', scegli",
       schemaAllow: "Consenti",
       schemaAlways: "Consenti sempre",
-      schemaAfter: "per rendere silenziosi i successivi passaggi di consegna.",
+      schemaAfter:
+        "così Chrome non chiederà più; MediaGo mostrerà comunque la finestra di revisione.",
       limitationLabel: "Limitazione",
       limitationBody:
-        "Lo schema invia solo un'attività alla volta: per le importazioni batch usa la modalità HTTP.",
+        "Lo schema invia un'attività senza intestazioni. Usa HTTP per batch o sorgenti che richiedono intestazioni.",
       desktopHttpNoteLead: "Collegati sempre a",
       desktopHttpNoteTail:
         "Il desktop ascolta automaticamente all'avvio; per verificare che sia online usa 'Verifica connessione'.",
     },
     importBehaviour: {
       title: "Comportamento importazione",
-      descriptionLead: "Questi switch si basano sulla stringa di query del collegamento diretto (",
-      descriptionMid: ") o dal corpo HTTP (",
-      descriptionTail: ") e dicono a MediaGo cosa fare con l'attività in arrivo.",
+      httpDescription:
+        "Le modalità HTTP possono aggiungere attività direttamente e avviare subito il download.",
+      schemaReviewOnly:
+        "La modalità Schema apre MediaGo con una finestra di revisione e non crea né avvia attività automaticamente.",
       downloadNowLabel: "Avvia immediatamente download",
       downloadNowDesc:
-        "ON: l'attività è in coda e AVVIATA. OFF: viene solo aggiunta all'elenco, in attesa che l'utente la avvii. Si applica sia alla modalità Schema che a quella HTTP.",
-      schemaSilentLabel: "Importazione silenziosa (modalità schema)",
-      schemaSilentActive:
-        "ON: il deeplink porta silent=1 quindi MediaGo crea immediatamente l'attività. OFF: MediaGo apre il modulo di download precompilato con il nome/tipo/cartella sniffata per la revisione.",
-      schemaSilentInactive:
-        "Ha effetto solo in modalità sSchema: la modalità HTTP non prevede il concetto di dialogo ed è sempre silenziosa.",
+        "ON: l'attività viene aggiunta e avviata. OFF: viene solo aggiunta all'elenco. Si applica solo alle modalità HTTP.",
     },
     rules: {
       title: "Regole sniffing",
       descriptionLead: "Le regole vengono mantenute centralmente in",
-      descriptionTail: "e condivise tra app desktop e l'estensione del browser.",
+      descriptionTail:
+        "e condivise tra app desktop e l'estensione del browser.",
       m3u8Label: "Stream HLS/m3u8",
       directLabel: "File multimediali diretti",
       bilibiliLabel: "Pagine video Bilibili",
@@ -103,6 +100,8 @@ const resource: ExtensionResources = {
       "La modalità schema può inviare solo un'attività alla volta. Per le importazioni batch passa alla modalità HTTP (pagina Opzioni).",
     schemaNoActiveTab:
       "Nessuna scheda attiva nella finestra attuale: impossibile richiamare il protocollo",
+    schemaHeadersNotSupported:
+      "La modalità Schema non invia le intestazioni; usa la modalità HTTP per questa sorgente.",
     schemaInvoked:
       "Invocato mediago-community://: se la finestra desktop non viene visualizzata, assicurati che MediaGo Desktop sia installato.",
     serverNotConfigured: "Server MediaGo non configurato",

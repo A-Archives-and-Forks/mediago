@@ -115,35 +115,18 @@ async function importViaHttp(
 /* --------------------------- Schema path --------------------------- */
 
 /**
- * Build a single-task deeplink that reuses MediaGo's existing renderer
- * route protocol — see `apps/ui/src/hooks/use-url-invoke.ts`:
- *
- *   mediago-community://index.html/?n=1&silent=1&url=…&name=…&type=…&headers=…
- *
- * The Electron main window just `window.loadURL(url)`s this; the
- * renderer's `useUrlInvoke` hook parses `location.search`, picks up
- * the task, and calls `createDownloadTasks` against the in-process
- * Go Core. `n=1` is the trigger flag; `silent=1` skips the download
- * form dialog.
- *
- * Because the route binds a *single* task into query params, batch
- * imports are serialised (one deeplink at a time) in `importViaSchema`.
+ * Build a review-only Share Intent deeplink. Electron's main process
+ * validates and queues this payload, then the renderer opens the existing
+ * download form through IPC. Scheme invocations never create tasks directly.
  */
-interface SchemaFlags {
-  silent: boolean;
-  downloadNow: boolean;
-}
 
-function buildTaskDeeplink(source: DetectedSource, flags: SchemaFlags): string {
+function buildTaskDeeplink(source: DetectedSource): string {
   const params = new URLSearchParams();
-  params.set("n", "1"); // required trigger for useUrlInvoke
-  if (flags.silent) params.set("silent", "1");
-  if (flags.downloadNow) params.set("downloadNow", "1");
+  params.set("v", "1");
   params.set("url", source.url);
   if (source.name) params.set("name", source.name);
   params.set("type", source.type);
-  if (source.headers) params.set("headers", source.headers);
-  return `${MEDIAGO_SCHEME}://index.html/?${params.toString()}`;
+  return `${MEDIAGO_SCHEME}://share?${params.toString()}`;
 }
 
 /**
@@ -189,7 +172,6 @@ function schemaError(err: unknown): LocalizedMessage | string {
 
 async function importViaSchema(
   sources: DetectedSource[],
-  flags: SchemaFlags,
 ): Promise<ImportResult> {
   // `chrome.tabs.update` navigates THE single active tab — there's
   // no way to chain more than one scheme invocation without racing
@@ -203,8 +185,15 @@ async function importViaSchema(
       error: { key: "errors.schemaBatchNotSupported" },
     };
   }
+  if (sources[0].headers) {
+    return {
+      ok: false,
+      count: 0,
+      error: { key: "errors.schemaHeadersNotSupported" },
+    };
+  }
   try {
-    await openDeeplink(buildTaskDeeplink(sources[0], flags));
+    await openDeeplink(buildTaskDeeplink(sources[0]));
     return { ok: true, count: 1 };
   } catch (err) {
     return { ok: false, count: 0, error: schemaError(err) };
@@ -212,13 +201,11 @@ async function importViaSchema(
 }
 
 async function probeSchemaPing(): Promise<ServerStatus> {
-  // No silent way to probe an OS protocol handler. Open the renderer
-  // root (no `n=1` so useUrlInvoke is a no-op) — if the OS has a
-  // registered handler the window surfaces; if not, Chrome shows its
-  // "no app handles this URL" sheet and the user knows to install the
-  // Desktop build.
+  // There is no silent way to probe an OS protocol handler. The test opens
+  // MediaGo without a task; if no handler exists, Chrome shows its standard
+  // unsupported-protocol prompt.
   try {
-    await openDeeplink(`${MEDIAGO_SCHEME}://index.html/`);
+    await openDeeplink(`${MEDIAGO_SCHEME}://open`);
     return { ok: true, message: { key: "errors.schemaInvoked" } };
   } catch (err) {
     return { ok: false, message: schemaError(err) };
@@ -269,10 +256,7 @@ export async function importSources(
 
   switch (settings.mode) {
     case "desktop-schema":
-      return importViaSchema(sources, {
-        silent: settings.schemaSilent,
-        downloadNow: settings.downloadNow,
-      });
+      return importViaSchema(sources);
     case "desktop-http":
       return importViaHttp({ serverUrl: DESKTOP_HTTP_BASE }, sources, {
         startDownload: settings.downloadNow,

@@ -301,4 +301,7 @@ export const en = {
   mcpRunningHint:
     "MediaGo must be running; MCP remains available while minimized to the tray.",
   confirm: "Confirm",
+  shareIntentInvalid: "No valid downloadable link was found",
+  shareIntentLegacyAutomaticActionDisabled:
+    "For safety, silent or immediate-download flags in this legacy link were ignored. Please review the form to continue.",
 };

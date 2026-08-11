@@ -78,8 +78,8 @@ export function useOptions() {
     setSaving(true);
     try {
       // Re-fetch the current persisted settings so we merge on top
-      // instead of wiping fields this card doesn't own (downloadNow,
-      // schemaSilent, language — managed by other cards).
+      // instead of wiping fields this card doesn't own (downloadNow and
+      // language are managed by other cards).
       const current = await sendMessage<ExtensionResponse>({
         type: "GET_SETTINGS",
       });

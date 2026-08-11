@@ -138,17 +138,52 @@ func New(queue *core.TaskQueue, logs *tasklog.Manager, database *db.Database, co
 	return srv
 }
 
-// serveStatic configures the engine to serve static files and SPA fallback.
+var pwaRootFiles = []string{
+	"manifest.json",
+	"service-worker.js",
+	"apple-touch-icon.png",
+	"icon-192.png",
+	"icon-512.png",
+	"icon-192-maskable.png",
+	"icon-512-maskable.png",
+}
+
+// serveStatic configures static assets, the PWA share target, and SPA fallback.
 func (s *Server) serveStatic(dir string) {
 	s.engine.Static("/assets", filepath.Join(dir, "assets"))
 	s.engine.StaticFile("/favicon.ico", filepath.Join(dir, "favicon.ico"))
 
-	// SPA fallback: serve index.html for any unmatched route
+	for _, name := range pwaRootFiles {
+		filePath := filepath.Join(dir, name)
+		if _, err := os.Stat(filePath); err != nil {
+			continue
+		}
+
+		route := "/" + name
+		if name == "service-worker.js" {
+			s.engine.GET(route, func(c *gin.Context) {
+				c.Header("Cache-Control", "no-cache")
+				c.File(filePath)
+			})
+			continue
+		}
+		s.engine.StaticFile(route, filePath)
+	}
+
+	s.engine.POST("/share", handleWebShareTarget)
+
+	// SPA fallback: serve index.html only for unmatched navigation requests.
 	indexPath := filepath.Join(dir, "index.html")
 	s.engine.NoRoute(func(c *gin.Context) {
+		if c.Request.Method != "GET" && c.Request.Method != "HEAD" {
+			c.Status(404)
+			return
+		}
 		if _, err := os.Stat(indexPath); err == nil {
 			c.File(indexPath)
+			return
 		}
+		c.Status(404)
 	})
 }
 

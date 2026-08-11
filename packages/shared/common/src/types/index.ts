@@ -70,6 +70,34 @@ export enum DownloadType {
   mediago = "mediago",
   youtube = "youtube",
 }
+export type ShareIntentSource = "web" | "pwa" | "electron" | "legacy-electron";
+
+export type ShareIntentWarning = "legacy-auto-action-disabled";
+
+/**
+ * A validated request to prefill MediaGo's existing download dialog.
+ * Share intents never create or start downloads by themselves.
+ */
+export interface ShareIntent {
+  id: string;
+  version: 1;
+  source: ShareIntentSource;
+  createdAt: number;
+  url: string;
+  name?: string;
+  type: DownloadType;
+  warning?: ShareIntentWarning;
+}
+
+export interface ShareIntentInput {
+  id?: string;
+  source: ShareIntentSource;
+  createdAt?: number;
+  url?: string | null;
+  name?: string | null;
+  type?: string | null;
+  warning?: ShareIntentWarning;
+}
 
 export interface DownloadParams {
   id: number;
@@ -394,6 +422,7 @@ export interface PlatformApi {
     setSharedState(state: unknown): Promise<void>;
     showBrowserWindow(): Promise<void>;
     combineToHomePage(store: BrowserStore): Promise<void>;
+    drainShareIntents(): Promise<ShareIntent[]>;
   };
   dialog: {
     open(options: DialogOpenOptions): Promise<string[]>;

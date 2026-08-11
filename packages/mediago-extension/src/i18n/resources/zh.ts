@@ -39,7 +39,7 @@ const resource = {
         "扩展不会自动降级。选定模式后，调用失败会直接报错——如需切换请返回此页面手动更改。",
       modeSchemaTitle: "Desktop · Schema 协议",
       modeSchemaDesc:
-        "通过 mediago-community:// 协议唤起桌面版（未运行时自动拉起）。仅适用于本机安装了 MediaGo Desktop 的用户。",
+        "通过 mediago-community:// 协议唤起桌面版，并打开预填的下载确认表单。桌面版未运行时会自动拉起。",
       modeDesktopHttpTitle: "Desktop · HTTP 本地接口",
       modeDesktopHttpDesc:
         "通过 {{base}} 与运行中的桌面版通信。要求 Desktop 处于运行状态，但无需授权弹窗。",
@@ -51,31 +51,27 @@ const resource = {
       apiKeyLabel: "API Key",
       apiKeyOptional: "（可选）",
       apiKeyPlaceholder: "留空则不发送 X-API-Key",
-      schemaNoteLead: "通过 MediaGo 既有的",
+      schemaNoteLead: "通过新的",
       schemaNoteMid:
-        '渲染路由协议调用桌面版。调用时会把当前 tab 跳到该协议 URL（参照 cat-catch 的做法），Chrome 首次弹出 "Open MediaGo-community?" 对话框，点',
+        'Share Intent 协议调用桌面版。当前 tab 会跳到协议 URL，Chrome 首次弹出 "Open MediaGo-community?" 对话框时，请点',
       schemaAllow: "允许",
       schemaAlways: "总是允许",
-      schemaAfter: "之后即可静默直通。",
+      schemaAfter: "后续浏览器不再重复确认，MediaGo 仍会打开下载表单供你核对。",
       limitationLabel: "限制",
-      limitationBody: "Schema 一次只能发送一条；批量请切 HTTP 模式。",
+      limitationBody:
+        "Schema 一次只能发送一条且不传递请求头；批量或带 Headers 的任务请切 HTTP 模式。",
       desktopHttpNoteLead: "固定连接",
       desktopHttpNoteTail:
         '——桌面版随应用启动自动监听，点击"测试连接"可确认当前是否在线。',
     },
     importBehaviour: {
       title: "导入行为",
-      descriptionLead: "这些选项通过 deeplink 查询串（",
-      descriptionMid: "）或 HTTP body（",
-      descriptionTail: "）告诉 MediaGo 收到任务后怎么处理。",
+      httpDescription: "HTTP 模式可以直接添加任务，并可选择是否立即开始下载。",
+      schemaReviewOnly:
+        "Schema 模式只负责唤起 MediaGo 并打开确认表单，不会自动创建或开始下载。",
       downloadNowLabel: "立即开始下载",
       downloadNowDesc:
-        "开：任务进队列并立刻开跑。关：仅加入下载列表，等用户手动触发。对 Schema 和 HTTP 两种模式都生效。",
-      schemaSilentLabel: "静默导入（Schema 模式）",
-      schemaSilentActive:
-        "开：deeplink 携带 silent=1，MediaGo 收到即创建任务。关：MediaGo 会弹出下载表单让用户核对名字 / 类型 / 保存路径再提交。",
-      schemaSilentInactive:
-        "仅 Schema 模式生效 —— HTTP 模式没有桌面弹窗概念，总是静默。",
+        "开：任务进队列并立刻开跑。关：仅加入下载列表，等用户手动触发。仅对 HTTP 模式生效。",
     },
     rules: {
       title: "嗅探规则",
@@ -98,6 +94,8 @@ const resource = {
     dockerServerRequired: "Docker 模式必须填写服务器 URL",
     schemaBatchNotSupported:
       "Schema 模式一次只能导入一条；批量导入请切换到 HTTP 模式（Options 页）",
+    schemaHeadersNotSupported:
+      "Schema 模式不传递请求头；请切换到 HTTP 模式导入该资源",
     schemaNoActiveTab: "当前窗口没有活动 tab，无法发起协议调用",
     schemaInvoked:
       "已唤起 mediago-community:// 协议，如 Desktop 窗口未出现请确认是否已安装",

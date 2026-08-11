@@ -1,13 +1,15 @@
+import "./bootstrap-share-intent";
 import "./utils/sentry";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
+import { registerPwaServiceWorker } from "./services/pwa";
 import { isWeb, tdApp } from "./utils";
 import "./i18n";
 import "./globals.css";
 import { BrowserRouter } from "react-router-dom";
-
 tdApp.init();
+if (isWeb) registerPwaServiceWorker();
 
 const application = (
   <BrowserRouter>

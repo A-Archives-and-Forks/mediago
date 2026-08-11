@@ -2,6 +2,7 @@ import { Plus } from "lucide-react";
 import { type FC, useEffect } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { GlobalDownloadForm } from "@/components/global-download-form";
+import { ShareIntentConsumer } from "@/components/share-intent-consumer";
 import { CHANGE_PAGE } from "@/const";
 import { useDownloadDialogStore } from "@/store/download-dialog";
 import { tdApp } from "@/utils";
@@ -27,6 +28,7 @@ const App: FC = () => {
 
   return (
     <div className="flex h-full w-full flex-col overflow-hidden bg-canvas min-[720px]:flex-row">
+      <ShareIntentConsumer />
       <PageAnalytics />
       <AppBrand className="min-[720px]:hidden" />
       <AppSideBar />

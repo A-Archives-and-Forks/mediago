@@ -5,7 +5,6 @@ import { app, protocol } from "electron";
 import { Container } from "inversify";
 import ElectronApp from "./app";
 import { defaultScheme, noop } from "./utils";
-import isDev from "electron-is-dev";
 import path from "node:path";
 
 if (process.env.PORTABLE_EXECUTABLE_DIR) {
@@ -20,6 +19,27 @@ const container = new Container({
 });
 
 const gotTheLock = app.requestSingleInstanceLock();
+let mediagoApp: ElectronApp | null = null;
+let mediagoReady = false;
+const pendingCommandLines: string[][] = [process.argv];
+const pendingProtocolUrls: string[] = [];
+
+app.on("open-url", (event, url) => {
+  event.preventDefault();
+  if (mediagoApp) {
+    mediagoApp.handleExternalUrl(url, mediagoReady);
+  } else {
+    pendingProtocolUrls.push(url);
+  }
+});
+
+app.on("second-instance", (_event, commandLine) => {
+  if (mediagoApp) {
+    mediagoApp.handleExternalCommandLine(commandLine, mediagoReady);
+  } else {
+    pendingCommandLines.push(commandLine);
+  }
+});
 
 if (process.defaultApp) {
   if (process.argv.length >= 2) {
@@ -48,10 +68,20 @@ const start = async (): Promise<void> => {
   ]);
   await app.whenReady();
   await container.load(buildProviderModule());
-  const mediago = container.get(ElectronApp);
-  await mediago.init();
+  const initializedApp = container.get(ElectronApp);
+  mediagoApp = initializedApp;
+  pendingCommandLines
+    .splice(0)
+    .forEach((commandLine) =>
+      initializedApp.handleExternalCommandLine(commandLine, false),
+    );
+  pendingProtocolUrls
+    .splice(0)
+    .forEach((url) => initializedApp.handleExternalUrl(url, false));
+  await initializedApp.init();
+  mediagoReady = true;
+  initializedApp.presentPendingExternalInvocations();
   app.on("window-all-closed", noop);
-  app.on("second-instance", mediago.secondInstance);
 };
 
 void start();

@@ -41,7 +41,7 @@ const resource: ExtensionResources = {
         "The extension never silently falls back. Once a mode is chosen, any failure is reported as-is — switch modes manually on this page if you need to.",
       modeSchemaTitle: "Desktop · Schema protocol",
       modeSchemaDesc:
-        "Hand off via the mediago-community:// protocol (launches Desktop if it isn't running). Requires the MediaGo Desktop app installed locally.",
+        "Open MediaGo Desktop through mediago-community:// and show a prefilled review dialog. Desktop launches automatically when needed.",
       modeDesktopHttpTitle: "Desktop · HTTP local",
       modeDesktopHttpDesc:
         "Talk to a running Desktop through {{base}}. Requires Desktop to be running, but no confirmation dialog.",
@@ -53,32 +53,29 @@ const resource: ExtensionResources = {
       apiKeyLabel: "API Key",
       apiKeyOptional: "(optional)",
       apiKeyPlaceholder: "Leave blank to skip the X-API-Key header",
-      schemaNoteLead: "Uses MediaGo's existing",
+      schemaNoteLead: "Uses the new",
       schemaNoteMid:
-        'renderer route protocol to invoke Desktop. The active tab is navigated to the protocol URL (same pattern as cat-catch). Chrome shows an "Open MediaGo-community?" dialog the first time — tap',
+        'Share Intent protocol to invoke Desktop. The active tab navigates to the protocol URL. When Chrome first shows "Open MediaGo-community?", choose',
       schemaAllow: "Allow",
       schemaAlways: "Always allow",
-      schemaAfter: "to make subsequent hand-offs silent.",
+      schemaAfter:
+        "so Chrome stops asking; MediaGo still opens its review dialog.",
       limitationLabel: "Limitation",
       limitationBody:
-        "Schema only dispatches one task at a time — use HTTP mode for batch imports.",
+        "Schema sends one task without headers. Use HTTP mode for batches or sources that require headers.",
       desktopHttpNoteLead: "Always connects to",
       desktopHttpNoteTail:
         ' — Desktop listens automatically on startup; use "Test connection" to verify it\'s online.',
     },
     importBehaviour: {
       title: "Import Behaviour",
-      descriptionLead: "These toggles ride on the deeplink query string (",
-      descriptionMid: ") or the HTTP body (",
-      descriptionTail: ") and tell MediaGo what to do with the incoming task.",
+      httpDescription:
+        "HTTP modes can add tasks directly and optionally start downloading immediately.",
+      schemaReviewOnly:
+        "Schema only opens MediaGo with a review dialog. It never creates or starts a task automatically.",
       downloadNowLabel: "Start downloading immediately",
       downloadNowDesc:
-        "On: the task is queued AND started. Off: it's only added to the list, waiting for the user to start it. Applies to both Schema and HTTP modes.",
-      schemaSilentLabel: "Silent import (Schema mode)",
-      schemaSilentActive:
-        "On: the deeplink carries silent=1 so MediaGo creates the task immediately. Off: MediaGo opens its download form prefilled with the sniffed name / type / folder for review.",
-      schemaSilentInactive:
-        "Only takes effect in Schema mode — HTTP mode has no dialog concept and is always silent.",
+        "On: the task is queued and started. Off: it is only added to the list. Applies to HTTP modes only.",
     },
     rules: {
       title: "Sniffing Rules",
@@ -103,6 +100,8 @@ const resource: ExtensionResources = {
       "Schema mode can only dispatch one task at a time; switch to HTTP mode (Options page) for batch imports.",
     schemaNoActiveTab:
       "No active tab in the current window — cannot invoke the protocol",
+    schemaHeadersNotSupported:
+      "Schema mode does not send request headers; use HTTP mode for this source.",
     schemaInvoked:
       "Invoked mediago-community:// — if the Desktop window didn't appear, make sure MediaGo Desktop is installed.",
     serverNotConfigured: "MediaGo server not configured",

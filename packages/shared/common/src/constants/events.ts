@@ -24,6 +24,7 @@ export const IPC = {
     setSharedState: "app.setSharedState",
     showBrowserWindow: "app.showBrowserWindow",
     combineToHomePage: "app.combineToHomePage",
+    drainShareIntents: "app.drainShareIntents",
   },
   dialog: {
     open: "dialog.open",
@@ -51,6 +52,9 @@ export const IPC = {
 // ============================================================
 
 export const IpcEvent = {
+  app: {
+    shareIntentAvailable: "app:shareIntentAvailable",
+  },
   browser: {
     domReady: "browser:domReady",
     didNavigate: "browser:didNavigate",

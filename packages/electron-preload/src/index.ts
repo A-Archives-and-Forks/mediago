@@ -78,6 +78,9 @@ const electronApi: PlatformApi = {
     combineToHomePage(store: BrowserStore): Promise<void> {
       return ipcRenderer.invoke(IPC.app.combineToHomePage, store);
     },
+    drainShareIntents() {
+      return ipcRenderer.invoke(IPC.app.drainShareIntents);
+    },
   },
   dialog: {
     open(options: DialogOpenOptions): Promise<string[]> {

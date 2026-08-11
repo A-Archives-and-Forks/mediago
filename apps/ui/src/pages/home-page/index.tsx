@@ -18,12 +18,8 @@ import { CLICK_DOWNLOAD } from "@/const";
 import { useEnvPath } from "@/hooks/use-config";
 import { usePlatform } from "@/hooks/use-platform";
 import { useTasks } from "@/hooks/use-tasks";
-import { useUrlInvoke } from "@/hooks/use-url-invoke";
 import { appStoreSelector, useAppStore } from "@/store/app";
-import {
-  type DownloadFormItem,
-  useDownloadDialogStore,
-} from "@/store/download-dialog";
+import { useDownloadDialogStore } from "@/store/download-dialog";
 import { isWeb, tdApp } from "@/utils";
 import { DownloadList } from "./components/download-list";
 
@@ -39,11 +35,6 @@ const HomePage: FC<Props> = ({ filter = DownloadFilter.list }) => {
   const { data, isLoading, pagination, total, mutate, setPage, setPageSize } =
     useTasks(filter);
   const { envPath } = useEnvPath();
-
-  useUrlInvoke({
-    onOpenForm: (item: DownloadFormItem) => openNew(item),
-    refresh: () => mutate(),
-  });
 
   const handleOpenForm = useMemoizedFn(() => {
     tdApp.onEvent(CLICK_DOWNLOAD);

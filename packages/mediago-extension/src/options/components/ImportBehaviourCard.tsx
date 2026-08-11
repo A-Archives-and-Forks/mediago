@@ -19,7 +19,6 @@ export function ImportBehaviourCard() {
   const { settings, patch } = useImportBehaviour();
   const disabled = settings === null;
   const downloadNow = settings?.downloadNow ?? false;
-  const schemaSilent = settings?.schemaSilent ?? true;
   const schemaOnly = settings?.mode === "desktop-schema";
 
   const apply = async (update: Partial<ExtensionSettings>) => {
@@ -37,41 +36,25 @@ export function ImportBehaviourCard() {
         </div>
         <CardTitle>{t("options.importBehaviour.title")}</CardTitle>
         <CardDescription>
-          {t("options.importBehaviour.descriptionLead")}
-          <code className="mx-0.5 rounded-xs bg-surface-300 px-1 py-0.5 font-mono text-[11px] text-foreground">
-            silent
-          </code>
-          {" / "}
-          <code className="mx-0.5 rounded-xs bg-surface-300 px-1 py-0.5 font-mono text-[11px] text-foreground">
-            downloadNow
-          </code>
-          {t("options.importBehaviour.descriptionMid")}
-          <code className="mx-0.5 rounded-xs bg-surface-300 px-1 py-0.5 font-mono text-[11px] text-foreground">
-            startDownload
-          </code>
-          {t("options.importBehaviour.descriptionTail")}
+          {schemaOnly
+            ? t("options.importBehaviour.schemaReviewOnly")
+            : t("options.importBehaviour.httpDescription")}
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-3">
-        <ToggleRow
-          label={t("options.importBehaviour.downloadNowLabel")}
-          description={t("options.importBehaviour.downloadNowDesc")}
-          checked={downloadNow}
-          disabled={disabled}
-          onCheckedChange={(v) => apply({ downloadNow: v })}
-        />
-
-        <ToggleRow
-          label={t("options.importBehaviour.schemaSilentLabel")}
-          description={
-            schemaOnly
-              ? t("options.importBehaviour.schemaSilentActive")
-              : t("options.importBehaviour.schemaSilentInactive")
-          }
-          checked={schemaSilent}
-          disabled={disabled || !schemaOnly}
-          onCheckedChange={(v) => apply({ schemaSilent: v })}
-        />
+      <CardContent>
+        {schemaOnly ? (
+          <div className="rounded-lg border border-border bg-surface-200 p-4 font-serif text-[13px] leading-relaxed text-muted-foreground">
+            {t("options.importBehaviour.schemaReviewOnly")}
+          </div>
+        ) : (
+          <ToggleRow
+            label={t("options.importBehaviour.downloadNowLabel")}
+            description={t("options.importBehaviour.downloadNowDesc")}
+            checked={downloadNow}
+            disabled={disabled}
+            onCheckedChange={(v) => apply({ downloadNow: v })}
+          />
+        )}
       </CardContent>
     </Card>
   );

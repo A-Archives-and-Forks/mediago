@@ -1,6 +1,8 @@
 {
   "name": "MediaGo",
   "short_name": "MediaGo",
+  "id": "/",
+  "scope": "/",
   "icons": [
     {
       "src": "/favicon.ico",
@@ -31,6 +33,16 @@
     }
   ],
   "start_url": "/",
+  "share_target": {
+    "action": "/share",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
   "display": "standalone",
   "background_color": "#f5f7fb",
   "theme_color": "#1677ff"

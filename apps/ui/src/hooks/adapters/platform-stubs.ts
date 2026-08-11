@@ -42,6 +42,7 @@ export const webPlatformStubs: PlatformApi = {
     setSharedState: noop,
     showBrowserWindow: noop,
     combineToHomePage: noop,
+    drainShareIntents: async () => [],
   },
   dialog: {
     open: async () => [],
