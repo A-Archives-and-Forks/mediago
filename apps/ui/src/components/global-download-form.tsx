@@ -1,11 +1,10 @@
-import { useEffect, useRef } from "react";
+import { useMemo } from "react";
 import { useSWRConfig } from "swr";
 import { useConfigStore } from "@/store/config";
 import { useDownloadDialogStore } from "@/store/download-dialog";
-import DownloadForm, { type DownloadFormRef } from "./download-form";
+import DownloadForm from "./download-form";
 
 export function GlobalDownloadForm() {
-  const formRef = useRef<DownloadFormRef>(null);
   const { mutate } = useSWRConfig();
   const mode = useDownloadDialogStore((state) => state.mode);
   const open = useDownloadDialogStore((state) => state.open);
@@ -13,19 +12,15 @@ export function GlobalDownloadForm() {
   const values = useDownloadDialogStore((state) => state.values);
   const close = useDownloadDialogStore((state) => state.close);
 
-  useEffect(() => {
-    if (!open) return;
+  const initialValues = useMemo(() => {
+    if (mode === "edit") return values;
     const { lastIsBatch, lastDownloadTypes } = useConfigStore.getState();
-    formRef.current?.openModal(
-      mode === "new"
-        ? {
-            batch: lastIsBatch,
-            type: lastDownloadTypes,
-            ...values,
-          }
-        : values,
-    );
-  }, [mode, open, requestId, values]);
+    return {
+      batch: lastIsBatch,
+      type: lastDownloadTypes,
+      ...values,
+    };
+  }, [mode, values]);
 
   const refreshTasks = () =>
     mutate(
@@ -38,11 +33,15 @@ export function GlobalDownloadForm() {
 
   return (
     <DownloadForm
+      key={requestId}
       id="global-download-form"
-      ref={formRef}
+      initialValues={initialValues}
       isEdit={mode === "edit"}
-      onConfirm={refreshTasks}
-      onFormVisibleChange={(visible) => {
+      open={open}
+      onConfirm={() => {
+        void refreshTasks();
+      }}
+      onOpenChange={(visible) => {
         if (!visible) close();
       }}
     />

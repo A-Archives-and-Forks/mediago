@@ -1,6 +1,17 @@
 import { DownloadType, type DownloadTask } from "@mediago/shared-common";
+import type { DownloadFormItem } from "@/store/download-dialog";
 
 export const DOWNLOAD_URL_RE = /^(?:(?:file|https?):\/\/.+|magnet:\?.+)/i;
+
+export const DEFAULT_DOWNLOAD_FORM_VALUES: DownloadFormItem = {
+  batch: false,
+  batchList: "",
+  folder: "",
+  headers: "",
+  name: "",
+  type: DownloadType.m3u8,
+  url: "",
+};
 
 export interface BatchDownloadRow {
   folder: string;
@@ -8,6 +19,12 @@ export interface BatchDownloadRow {
   name: string;
   url: string;
   valid: boolean;
+}
+
+export function createDownloadFormValues(
+  values: DownloadFormItem = {},
+): DownloadFormItem {
+  return { ...DEFAULT_DOWNLOAD_FORM_VALUES, ...values };
 }
 
 export function parseBatchDownloadRows(text: string): BatchDownloadRow[] {
@@ -40,4 +57,25 @@ export function buildBatchDownloadTasks(
     type,
     folder: folder || undefined,
   }));
+}
+
+export function buildDownloadTasks(
+  values: DownloadFormItem,
+): Omit<DownloadTask, "id">[] {
+  if (values.batch) {
+    return buildBatchDownloadTasks(
+      parseBatchDownloadRows(values.batchList ?? ""),
+      values.type ?? DownloadType.m3u8,
+      values.headers,
+    );
+  }
+
+  const {
+    name = "",
+    url = "",
+    headers,
+    type = DownloadType.m3u8,
+    folder,
+  } = values;
+  return [{ name, url, headers, type, folder }];
 }

@@ -3,6 +3,8 @@ import test from "node:test";
 import { DownloadType } from "@mediago/shared-common";
 import {
   buildBatchDownloadTasks,
+  buildDownloadTasks,
+  createDownloadFormValues,
   DOWNLOAD_URL_RE,
   parseBatchDownloadRows,
 } from "./download-form-logic";
@@ -12,6 +14,18 @@ test("accepts supported download URL schemes", () => {
   assert.equal(DOWNLOAD_URL_RE.test("file://C:/video.mp4"), true);
   assert.equal(DOWNLOAD_URL_RE.test("magnet:?xt=urn:btih:abc"), true);
   assert.equal(DOWNLOAD_URL_RE.test("javascript:alert(1)"), false);
+});
+
+test("fills form defaults without replacing supplied values", () => {
+  assert.deepEqual(createDownloadFormValues({ name: "episode" }), {
+    batch: false,
+    batchList: "",
+    folder: "",
+    headers: "",
+    name: "episode",
+    type: DownloadType.m3u8,
+    url: "",
+  });
 });
 
 test("ignores blank lines and accepts repeated whitespace", () => {
@@ -56,6 +70,26 @@ test("builds tasks without leaking preview-only fields", () => {
         folder: "folder",
         headers: "Referer: example.com",
         type: DownloadType.m3u8,
+      },
+    ],
+  );
+});
+
+test("builds one task from single-download form values", () => {
+  assert.deepEqual(
+    buildDownloadTasks({
+      name: "episode",
+      url: "https://a.example/1.m3u8",
+      type: DownloadType.m3u8,
+      folder: "season",
+    }),
+    [
+      {
+        name: "episode",
+        url: "https://a.example/1.m3u8",
+        headers: undefined,
+        type: DownloadType.m3u8,
+        folder: "season",
       },
     ],
   );

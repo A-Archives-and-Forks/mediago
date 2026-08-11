@@ -3,8 +3,10 @@ import {
   DownloadType,
   IpcEvent,
 } from "@mediago/shared-common";
-import { useEffect, useId, useRef } from "react";
-import DownloadForm, { type DownloadFormRef } from "@/components/download-form";
+import { useEffect, useId, useState } from "react";
+import DownloadForm, {
+  type DownloadFormItem,
+} from "@/components/download-form";
 import { usePlatform } from "@/hooks/use-platform";
 
 import "./index.css";
@@ -27,10 +29,20 @@ function isOverlayDownloadTask(
   );
 }
 
+interface OverlayDialogState {
+  open: boolean;
+  requestId: number;
+  values: DownloadFormItem;
+}
+
 export default function OverlayDialog() {
   const { on, off, browser } = usePlatform();
-  const downloadForm = useRef<DownloadFormRef>(null);
   const dialogId = useId();
+  const [dialog, setDialog] = useState<OverlayDialogState>({
+    open: false,
+    requestId: 0,
+    values: {},
+  });
 
   useEffect(() => {
     const onShowOverlayDialog = (...args: unknown[]) => {
@@ -39,13 +51,17 @@ export default function OverlayDialog() {
         return;
       }
       const item = data[0];
-      downloadForm.current?.openModal({
-        batch: false,
-        type: item.type,
-        url: item.url,
-        name: item.name,
-        headers: item.headers,
-      });
+      setDialog((current) => ({
+        open: true,
+        requestId: current.requestId + 1,
+        values: {
+          batch: false,
+          type: item.type,
+          url: item.url,
+          name: item.name,
+          headers: item.headers,
+        },
+      }));
     };
 
     on(IpcEvent.browser.showOverlayDialog, onShowOverlayDialog);
@@ -55,18 +71,20 @@ export default function OverlayDialog() {
     };
   }, [on, off]);
 
-  const handleFormVisibleChange = (visible: boolean) => {
-    if (!visible) {
-      browser.dismissOverlayDialog();
-    }
+  const handleOpenChange = (open: boolean) => {
+    if (open) return;
+    setDialog((current) => ({ ...current, open: false }));
+    browser.dismissOverlayDialog();
   };
 
   return (
     <DownloadForm
+      key={dialog.requestId}
       id={dialogId}
+      initialValues={dialog.values}
       isEdit
-      ref={downloadForm}
-      onFormVisibleChange={handleFormVisibleChange}
+      open={dialog.open}
+      onOpenChange={handleOpenChange}
     />
   );
 }
