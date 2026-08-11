@@ -168,10 +168,13 @@ const Converter = () => {
 
   const handleOpenFolder = useMemoizedFn(async (targetPath: string) => {
     try {
-      const dir =
-        targetPath.substring(0, targetPath.lastIndexOf("/")) ||
-        targetPath.substring(0, targetPath.lastIndexOf("\\"));
-      await shell.open(dir || targetPath);
+      const separatorIndex = Math.max(
+        targetPath.lastIndexOf("/"),
+        targetPath.lastIndexOf("\\"),
+      );
+      const directory =
+        separatorIndex > 0 ? targetPath.slice(0, separatorIndex) : targetPath;
+      await shell.open(directory);
     } catch {
       // ignore
     }

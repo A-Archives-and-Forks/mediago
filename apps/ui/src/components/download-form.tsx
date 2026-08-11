@@ -1,17 +1,30 @@
 import { useAsyncEffect, useMemoizedFn } from "ahooks";
-import { ChevronDown, Container, Download, ListPlus } from "lucide-react";
+import {
+  ChevronDown,
+  CircleAlert,
+  CircleCheck,
+  Container,
+  Download,
+  ListPlus,
+} from "lucide-react";
 import {
   forwardRef,
   type ReactNode,
   useId,
   useImperativeHandle,
+  useMemo,
   useState,
 } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { useShallow } from "zustand/react/shallow";
-import { createDownloadTasks, getDownloadFolders } from "@/api/download-task";
+import {
+  createDownloadTasks,
+  editDownloadTask,
+  getDownloadFolders,
+  startDownload,
+} from "@/api/download-task";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -35,20 +48,17 @@ import { useDockerApi } from "@/hooks/use-docker-api";
 import { usePlatform } from "@/hooks/use-platform";
 import { appStoreSelector, useAppStore } from "@/store/app";
 import { downloadFormSelector, useConfigStore } from "@/store/config";
+import type { DownloadFormItem } from "@/store/download-dialog";
 import { cn, tdApp } from "@/utils";
 import { DownloadTask, DownloadType } from "@mediago/shared-common";
 import { BatchUrlTextarea } from "./batchurl-textarea";
+import {
+  buildBatchDownloadTasks,
+  DOWNLOAD_URL_RE,
+  parseBatchDownloadRows,
+} from "./download-form-logic";
 
-export interface DownloadFormItem {
-  batch?: boolean;
-  batchList?: string;
-  name?: string;
-  type?: DownloadType;
-  headers?: string;
-  url?: string;
-  id?: number;
-  folder?: string;
-}
+export type { DownloadFormItem } from "@/store/download-dialog";
 
 export interface DownloadFormProps {
   isEdit?: boolean;
@@ -144,6 +154,12 @@ export default forwardRef<DownloadFormRef, DownloadFormProps>(
     });
     const isBatch = useWatch({ control: form.control, name: "batch" });
     const selectedType = useWatch({ control: form.control, name: "type" });
+    const batchText = useWatch({ control: form.control, name: "batchList" });
+    const batchRows = useMemo(
+      () => parseBatchDownloadRows(batchText ?? ""),
+      [batchText],
+    );
+    const validBatchCount = batchRows.filter((row) => row.valid).length;
 
     useAsyncEffect(async () => {
       if (!modalOpen) return;
@@ -191,21 +207,13 @@ export default forwardRef<DownloadFormRef, DownloadFormProps>(
 
     const validateForm = useMemoizedFn(async () => form.trigger());
 
-    const getFormItems = useMemoizedFn(async () => {
+    const getFormItems = useMemoizedFn(() => {
       const values = form.getValues();
       if (values.batch) {
-        const { batchList = "", headers, type = DownloadType.m3u8 } = values;
-        return Promise.all(
-          batchList.split("\n").map(async (line) => {
-            const [url, customName, folder] = line.trim().split(" ");
-            return {
-              url: url.trim(),
-              name: customName?.trim(),
-              headers,
-              type,
-              folder,
-            } satisfies Omit<DownloadTask, "id">;
-          }),
+        return buildBatchDownloadTasks(
+          parseBatchDownloadRows(values.batchList ?? ""),
+          values.type ?? DownloadType.m3u8,
+          values.headers,
         );
       }
 
@@ -222,12 +230,16 @@ export default forwardRef<DownloadFormRef, DownloadFormProps>(
     const handleSave = useMemoizedFn(async () => {
       if (!(await validateForm())) return;
       try {
-        const tasks = await getFormItems();
-        await createDownloadTasks(tasks);
         const values = form.getValues();
+        const tasks = getFormItems();
+        if (isEdit && values.id !== undefined) {
+          await editDownloadTask(values.id, tasks[0]);
+        } else {
+          await createDownloadTasks(tasks);
+          tdApp.onEvent(ADD_TO_LIST, { id });
+        }
         setOpen(false);
         onConfirm?.(values);
-        tdApp.onEvent(ADD_TO_LIST, { id });
       } catch (error: unknown) {
         toast.error(
           (error as Error)?.message || t("pleaseEnterCorrectFormInfo"),
@@ -250,9 +262,14 @@ export default forwardRef<DownloadFormRef, DownloadFormProps>(
     const handleDownloadNow = useMemoizedFn(async () => {
       if (!(await validateForm())) return;
       try {
-        const tasks = await getFormItems();
-        await createDownloadTasks(tasks, true);
         const values = form.getValues();
+        const tasks = getFormItems();
+        if (isEdit && values.id !== undefined) {
+          await editDownloadTask(values.id, tasks[0]);
+          await startDownload(values.id);
+        } else {
+          await createDownloadTasks(tasks, true);
+        }
         setOpen(false);
         onConfirm?.(values);
         tdApp.onEvent(DOWNLOAD_NOW, { id });
@@ -265,7 +282,7 @@ export default forwardRef<DownloadFormRef, DownloadFormProps>(
 
     return (
       <Dialog open={modalOpen} onOpenChange={setOpen}>
-        <DialogContent className="grid max-h-[calc(100vh-2rem)] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0 sm:max-w-[680px]">
+        <DialogContent className="grid max-h-[calc(100vh-2rem)] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0 sm:max-w-[680px] max-sm:bottom-0 max-sm:top-auto max-sm:max-h-[94vh] max-sm:translate-y-0 max-sm:rounded-b-none">
           <DialogHeader className="border-b px-6 py-4 pr-14 sm:px-7 sm:pr-14">
             <DialogTitle>
               {isEdit ? t("editDownload") : t("newDownload")}
@@ -313,7 +330,7 @@ export default forwardRef<DownloadFormRef, DownloadFormProps>(
                           className={cn(
                             "h-[30px] rounded-sm px-2.5 text-sm font-medium text-muted-foreground outline-none transition-[background-color,color,box-shadow] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/15",
                             !batchMode &&
-                              "bg-surface text-foreground shadow-sm",
+                              "bg-surface-raised text-foreground shadow-sm",
                           )}
                         >
                           {t("singleDownload")}
@@ -324,7 +341,8 @@ export default forwardRef<DownloadFormRef, DownloadFormProps>(
                           onClick={() => selectMode(true)}
                           className={cn(
                             "h-[30px] rounded-sm px-2.5 text-sm font-medium text-muted-foreground outline-none transition-[background-color,color,box-shadow] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/15",
-                            batchMode && "bg-surface text-foreground shadow-sm",
+                            batchMode &&
+                              "bg-surface-raised text-foreground shadow-sm",
                           )}
                         >
                           {t("batchDownload")}
@@ -425,17 +443,11 @@ export default forwardRef<DownloadFormRef, DownloadFormProps>(
                   rules={{
                     validate: (value) => {
                       if (!isBatch || isEdit) return true;
-                      if (!value?.trim()) return t("pleaseEnterVideoLink");
-                      for (const line of value.split("\n")) {
-                        const params = line.trim().split(" ");
-                        if (
-                          params.length > 3 ||
-                          !/^(https?):\/\/.+/.test(params[0] ?? "")
-                        ) {
-                          return t("pleaseEnterCorrectBatchList");
-                        }
-                      }
-                      return true;
+                      const rows = parseBatchDownloadRows(value ?? "");
+                      if (rows.length === 0) return t("pleaseEnterVideoLink");
+                      return rows.every((row) => row.valid)
+                        ? true
+                        : t("pleaseEnterCorrectBatchList");
                     },
                   }}
                   render={({ field }) => (
@@ -461,6 +473,49 @@ export default forwardRef<DownloadFormRef, DownloadFormProps>(
                 >
                   {t("batchListHelp")}
                 </p>
+                <div className="overflow-hidden rounded-md border bg-surface-subtle/40">
+                  <div className="flex items-center justify-between border-b px-3 py-2 text-xs font-medium">
+                    <span>{t("parsePreview")}</span>
+                    <span className="flex items-center gap-3 text-muted-foreground">
+                      <span className="inline-flex items-center gap-1 text-success">
+                        <CircleCheck className="size-3.5" />
+                        {t("validCount", { count: validBatchCount })}
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-destructive">
+                        <CircleAlert className="size-3.5" />
+                        {t("invalidCount", {
+                          count: batchRows.length - validBatchCount,
+                        })}
+                      </span>
+                    </span>
+                  </div>
+                  <div className="max-h-36 overflow-y-auto p-2">
+                    {batchRows.length > 0 ? (
+                      batchRows.map((row) => (
+                        <div
+                          key={`${row.line}:${row.url}`}
+                          className="grid grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-2 rounded px-2 py-1 text-xs odd:bg-surface"
+                        >
+                          <span className="text-muted-foreground">
+                            {row.line}
+                          </span>
+                          <span className="truncate font-mono" title={row.url}>
+                            {row.url}
+                          </span>
+                          {row.valid ? (
+                            <CircleCheck className="size-3.5 text-success" />
+                          ) : (
+                            <CircleAlert className="size-3.5 text-destructive" />
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <p className="px-2 py-3 text-center text-xs text-muted-foreground">
+                        {t("batchEmptyHint")}
+                      </p>
+                    )}
+                  </div>
+                </div>
               </FormRow>
             ) : null}
 
@@ -486,7 +541,7 @@ export default forwardRef<DownloadFormRef, DownloadFormProps>(
                     validate: (value) => {
                       if (isBatch && !isEdit) return true;
                       if (!value?.trim()) return t("pleaseEnterOnlineVideoUrl");
-                      return /^(file|https?):\/\/.+/.test(value)
+                      return DOWNLOAD_URL_RE.test(value.trim())
                         ? true
                         : t("pleaseEnterCorrectVideoLink");
                     },
@@ -579,7 +634,7 @@ export default forwardRef<DownloadFormRef, DownloadFormProps>(
               ) : null}
               <Button type="button" variant="outline" onClick={handleSave}>
                 <ListPlus className="size-4" />
-                {t("addToList")}
+                {isEdit ? t("save") : t("addToList")}
               </Button>
               <Button type="button" onClick={handleDownloadNow}>
                 <Download className="size-4" />

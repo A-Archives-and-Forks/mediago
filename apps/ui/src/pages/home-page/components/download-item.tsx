@@ -31,7 +31,8 @@ import {
 } from "@/const";
 import type { DownloadTaskDetails } from "@/hooks/use-tasks";
 import { appStoreSelector, useAppStore } from "@/store/app";
-import { cn, fromatDateTime, tdApp } from "@/utils";
+import { cn, fromatDateTime, isWeb, tdApp } from "@/utils";
+import { TaskActionsMenu } from "./task-actions-menu";
 import { TerminalDialog } from "./terminal-dialog";
 import { usePlatform } from "@/hooks/use-platform";
 import { useEnvPath } from "@/hooks/use-config";
@@ -39,10 +40,13 @@ import { useEnvPath } from "@/hooks/use-config";
 interface Props {
   task: DownloadTaskDetails;
   onSelectChange: (id: number) => void;
+  onSelect: (id: number) => void;
   selected: boolean;
   onStartDownload: (id: number) => void;
   onStopDownload: (taskId: number) => void;
   onContextMenu: (taskId: number) => void;
+  onDelete: (taskId: number) => void;
+  onRefresh: () => void;
   progress?: DownloadProgress;
   onShowEditForm?: (value: DownloadTask) => void;
   downloadStatus?: DownloadStatus;
@@ -51,10 +55,13 @@ interface Props {
 export const DownloadTaskItem = memo(function DownloadTaskItem({
   task,
   onSelectChange,
+  onSelect,
   selected,
   onStartDownload,
   onStopDownload,
   onContextMenu,
+  onDelete,
+  onRefresh,
   onShowEditForm,
 }: Props) {
   const appStore = useAppStore(useShallow(appStoreSelector));
@@ -271,7 +278,7 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
         const val = Math.round(Number(item.percent));
 
         return (
-          <div className="flex flex-row items-center gap-2 text-xs text-foreground/80">
+          <div className="flex flex-row items-center gap-2 text-xs text-foreground-secondary">
             <Progress value={val} className="rounded-none" />
             <div className="min-w-5 shrink-0">{val}%</div>
             <div className="min-w-20 shrink-0">{item.speed}</div>
@@ -313,7 +320,14 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
           "opacity-70": task.status === DownloadStatus.Success && !task.exists,
         },
       )}
-      onContextMenu={() => onContextMenu(task.id)}
+      onContextMenu={
+        isWeb
+          ? undefined
+          : (event) => {
+              event.preventDefault();
+              void onContextMenu(task.id);
+            }
+      }
     >
       <Checkbox
         className="mt-2"
@@ -324,9 +338,34 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
         <div className="relative flex flex-row items-center gap-2">
           {renderTitle(task)}
           <div className="flex shrink-0 grow flex-row gap-2">{tags}</div>
-          <div className="flex flex-row items-center gap-1">
+          <div
+            className={cn(
+              "flex flex-row items-center gap-1",
+              isWeb && "hidden",
+            )}
+          >
             {actionButtons}
           </div>
+          {isWeb ? (
+            <TaskActionsMenu
+              task={task}
+              onSelect={() => onSelect(task.id)}
+              onStart={() =>
+                startWithEvent(
+                  task.status === DownloadStatus.Failed
+                    ? RESTART_DOWNLOAD
+                    : task.status === DownloadStatus.Stopped
+                      ? CONTINUE_DOWNLOAD
+                      : DOWNLOAD_NOW,
+                )
+              }
+              onStop={handleStop}
+              onPlay={handlePlay}
+              onEdit={() => onShowEditForm?.(task)}
+              onRefresh={onRefresh}
+              onDelete={() => onDelete(task.id)}
+            />
+          ) : null}
         </div>
         {renderDescription(task)}
       </div>

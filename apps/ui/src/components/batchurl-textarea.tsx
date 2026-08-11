@@ -56,7 +56,7 @@ export function BatchUrlTextarea({
   };
 
   return (
-    <div className="relative inline-block w-full rounded-md bg-surface">
+    <div className="relative inline-block w-full rounded-md bg-surface-raised">
       <div
         ref={highlightRef}
         className={cn(

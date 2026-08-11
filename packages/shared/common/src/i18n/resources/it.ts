@@ -111,6 +111,13 @@ export const it = {
   editDownload: "Modifica download",
   batchDownload: "Download batch",
   downloadMode: "Modalità di download",
+  actions: "Azioni",
+  downloadStarted: "Download avviato",
+  parsePreview: "Anteprima analisi",
+  validCount: "{{count}} validi",
+  invalidCount: "{{count}} non validi",
+  batchEmptyHint:
+    "Le righe analizzate appariranno qui dopo aver inserito i link",
   singleDownload: "Download singolo",
   batchListHelp:
     "Inserisci un link per riga. Se necessario, aggiungi il nome del video e la cartella dopo il link.",

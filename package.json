@@ -16,6 +16,7 @@
     "build:web": "cross-env APP_TARGET=server NODE_ENV=production turbo run build -F @mediago/ui",
     "dev:extension": "pnpm -F @mediago/extension run dev",
     "build:extension": "turbo run build -F @mediago/extension",
+    "dev:all": "pnpm core:build && pnpm build:electron && concurrently --kill-others-on-fail --names backend,electron-ui,server-ui \"cross-env APP_TARGET=electron turbo run dev -F @mediago/server -F @mediago/electron\" \"cross-env APP_TARGET=electron pnpm -F @mediago/ui run dev\" \"cross-env APP_TARGET=server pnpm -F @mediago/ui run dev\"",
     "pack:extension": "pnpm build:extension && tsx scripts/pack-extension.ts",
     "lint": "oxlint .",
     "lint:fix": "oxlint --fix .",
@@ -50,6 +51,7 @@
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^24.9.2",
+    "concurrently": "^10.0.4",
     "cross-env": "^10.1.0",
     "husky": "^9.1.7",
     "knip": "^6.1.1",

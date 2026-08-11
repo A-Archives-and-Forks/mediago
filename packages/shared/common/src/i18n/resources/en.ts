@@ -111,6 +111,12 @@ export const en = {
   editDownload: "Edit download",
   batchDownload: "Batch download",
   downloadMode: "Download mode",
+  actions: "Actions",
+  downloadStarted: "Download started",
+  parsePreview: "Parse preview",
+  validCount: "{{count}} valid",
+  invalidCount: "{{count}} invalid",
+  batchEmptyHint: "Parsed rows will appear here after you enter links",
   singleDownload: "Single download",
   batchListHelp:
     "Enter one link per line. Add a video name and folder after the link if needed.",

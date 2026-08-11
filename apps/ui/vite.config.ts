@@ -13,9 +13,10 @@ const pkg = JSON.parse(await fs.readFile(packageJsonPath, "utf-8"));
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  cacheDir: isWeb ? "node_modules/.vite-server" : "node_modules/.vite-electron",
   server: {
     host: true,
-    port: 8500,
+    port: isWeb ? 8501 : 8500,
     strictPort: true,
   },
   define: {

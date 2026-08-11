@@ -22,3 +22,5 @@ docs/.vitepress/seo-keyword-map*.md
 docs/.vitepress/private/
 
 .codex-previews
+design-qa.md
+*.tsbuildinfo

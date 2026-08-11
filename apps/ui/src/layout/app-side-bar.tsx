@@ -1,88 +1,17 @@
 import { useMemoizedFn } from "ahooks";
-import {
-  BadgeCheck,
-  CloudDownload,
-  ExternalLink,
-  FileCog,
-  ScanSearch,
-  Settings,
-} from "lucide-react";
-import {
-  cloneElement,
-  type PropsWithChildren,
-  type ReactElement,
-  useEffect,
-  useMemo,
-  useRef,
-} from "react";
-import { useTranslation } from "react-i18next";
+import { ExternalLink, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { useShallow } from "zustand/react/shallow";
-import { Badge } from "@/components/ui/badge";
 import { HelpButton } from "@/components/help-button";
-import { useAppStore } from "@/store/app";
-import { downloadStoreSelector, useDownloadStore } from "@/store/download";
-import { useSessionStore } from "@/store/session";
-import { cn, isWeb } from "@/utils";
+import { Button } from "@/components/ui/button";
 import { usePlatform } from "@/hooks/use-platform";
+import { useAppStore } from "@/store/app";
+import { useDownloadStore } from "@/store/download";
+import { useSessionStore } from "@/store/session";
+import { useShellStore } from "@/store/shell";
+import { cn } from "@/utils";
 import { AppBrand } from "./app-brand";
-
-function processLocation(pathname: string) {
-  const name = pathname === "/" ? "/home" : pathname;
-  return name.substring(1);
-}
-
-type MenuItem = {
-  label: ReactElement;
-  key: string;
-};
-
-const SIDEBAR_HELP_BUTTON_CLASS =
-  "h-9 justify-start gap-1 rounded-md px-3 text-sm font-normal text-muted-foreground hover:bg-surface-hover hover:text-foreground";
-
-interface AppMenuItemProps extends PropsWithChildren {
-  onClick?: (event: React.MouseEvent<HTMLAnchorElement>) => void;
-  link: string;
-  activeKey: string;
-  className?: string;
-  icon?: ReactElement<{ className?: string }>;
-}
-
-function AppMenuItem({
-  children,
-  onClick,
-  link,
-  activeKey,
-  className,
-  icon,
-}: AppMenuItemProps) {
-  const isActive = activeKey === processLocation(link);
-
-  return (
-    <Link discover="render" to={link} onClick={onClick}>
-      <div
-        className={cn(
-          "flex h-9 flex-row items-center gap-1 rounded-md px-3 text-sm text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground",
-          {
-            "bg-primary text-primary-foreground hover:bg-brand-hover hover:text-primary-foreground":
-              isActive,
-          },
-          className,
-        )}
-      >
-        {icon
-          ? cloneElement(icon, {
-              className: cn(
-                "size-5 shrink-0 stroke-[1.75] text-current",
-                icon.props.className,
-              ),
-            })
-          : null}
-        {children}
-      </div>
-    </Link>
-  );
-}
+import { useNavigationItems } from "./navigation";
 
 interface Props {
   className?: string;
@@ -90,26 +19,21 @@ interface Props {
 
 export function AppSideBar({ className }: Props) {
   const { app } = usePlatform();
-  const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
-  const { count, clearCount } = useDownloadStore(
-    useShallow(downloadStoreSelector),
-  );
+  const items = useNavigationItems();
+  const count = useDownloadStore((state) => state.count);
+  const clearCount = useDownloadStore((state) => state.clearCount);
+  const updateAvailable = useSessionStore((state) => state.updateAvailable);
   const openInNewWindow = useAppStore((state) => state.openInNewWindow);
   const setAppStore = useAppStore((state) => state.setAppStore);
-  const updateAvailable = useSessionStore((state) => state.updateAvailable);
+  const collapsed = useShellStore((state) => state.sidebarCollapsed);
+  const toggleSidebar = useShellStore((state) => state.toggleSidebar);
   const previousOpenInNewWindow = useRef(openInNewWindow);
-
-  const activeKey = useMemo(
-    () => processLocation(location.pathname),
-    [location.pathname],
-  );
 
   useEffect(() => {
     const wasOpenInNewWindow = previousOpenInNewWindow.current;
     previousOpenInNewWindow.current = openInNewWindow;
-
     if (
       wasOpenInNewWindow &&
       !openInNewWindow &&
@@ -119,180 +43,133 @@ export function AppSideBar({ className }: Props) {
     }
   }, [location.pathname, navigate, openInNewWindow]);
 
-  const handleExternalLink = useMemoizedFn(
-    async (event: React.MouseEvent<HTMLDivElement>) => {
-      event.stopPropagation();
-      event.preventDefault();
-
-      if (openInNewWindow) {
-        setAppStore({ openInNewWindow: false });
-        await app.combineToHomePage({ url: "", sourceList: [] });
-      } else {
-        setAppStore({ openInNewWindow: true });
-        if (location.pathname === "/source") {
-          navigate("/", { replace: true });
-        }
-        await app.showBrowserWindow();
-      }
-    },
-  );
-
-  const handleClearCount = useMemoizedFn(() => {
-    clearCount();
+  const handleExternalLink = useMemoizedFn(async (event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (openInNewWindow) {
+      setAppStore({ openInNewWindow: false });
+      await app.combineToHomePage({ url: "", sourceList: [] });
+      return;
+    }
+    setAppStore({ openInNewWindow: true });
+    if (location.pathname === "/source") navigate("/", { replace: true });
+    await app.showBrowserWindow();
   });
 
-  const handleExtractPage = useMemoizedFn(
-    (event: React.MouseEvent<HTMLAnchorElement>) => {
-      if (!openInNewWindow) return;
+  const handleNavigation = useMemoizedFn(
+    (event: React.MouseEvent<HTMLAnchorElement>, key: string) => {
+      if (key === "home") clearCount();
+      if (key !== "source" || !openInNewWindow) return;
       event.preventDefault();
       event.stopPropagation();
-      app.showBrowserWindow();
+      void app.showBrowserWindow();
     },
   );
 
-  const items = useMemo<MenuItem[]>(
-    () => [
-      {
-        label: (
-          <AppMenuItem
-            link="/"
-            onClick={handleClearCount}
-            activeKey={activeKey}
-            icon={<CloudDownload />}
-          >
-            <span>{t("downloadList")}</span>
-            {count > 0 ? (
-              <Badge
-                className="relative left-[5px] top-px h-4 min-w-4 border-0 bg-destructive px-1 py-0 text-[10px] leading-4 text-destructive-foreground"
-                title={String(count)}
-                aria-label={`${t("downloadList")}: ${count}`}
-              >
-                {count > 99 ? "99+" : count}
-              </Badge>
-            ) : null}
-          </AppMenuItem>
-        ),
-        key: "home",
-      },
-      {
-        label: (
-          <AppMenuItem link="/done" activeKey={activeKey} icon={<BadgeCheck />}>
-            <span>{t("downloadComplete")}</span>
-          </AppMenuItem>
-        ),
-        key: "done",
-      },
-      {
-        label: (
-          <AppMenuItem
-            link="/converter"
-            activeKey={activeKey}
-            icon={<FileCog />}
-          >
-            <span>{t("converter")}</span>
-          </AppMenuItem>
-        ),
-        key: "converter",
-      },
-      {
-        label: (
-          <AppMenuItem
-            link="/source"
-            activeKey={activeKey}
-            className="group"
-            icon={<ScanSearch />}
-            onClick={handleExtractPage}
-          >
-            <span className="flex flex-1">{t("materialExtraction")}</span>
-            <div
-              title={t(
-                openInNewWindow ? "mergeToMainWindow" : "openInNewWindow",
-              )}
-              aria-label={t(
-                openInNewWindow ? "mergeToMainWindow" : "openInNewWindow",
-              )}
-              className={cn(
-                "hover:opacity-70",
-                openInNewWindow ? "block" : "hidden group-hover:block",
-              )}
-              onClick={handleExternalLink}
-            >
-              <ExternalLink
-                className={cn(
-                  "size-5 shrink-0 stroke-[1.75] transition-transform",
-                  openInNewWindow && "rotate-180",
-                )}
-              />
-            </div>
-          </AppMenuItem>
-        ),
-        key: "source",
-      },
-      {
-        label: (
-          <AppMenuItem
-            link="/settings"
-            activeKey={activeKey}
-            icon={<Settings />}
-          >
-            <span>{t("setting")}</span>
-            {updateAvailable ? (
-              <span className="relative size-0">
-                <Badge className="absolute -left-[13px] -top-[3px] size-1.5 border-0 bg-destructive p-0" />
-              </span>
-            ) : null}
-          </AppMenuItem>
-        ),
-        key: "settings",
-      },
-    ],
-    [
-      activeKey,
-      count,
-      handleClearCount,
-      handleExternalLink,
-      handleExtractPage,
-      location.pathname,
-      openInNewWindow,
-      t,
-      updateAvailable,
-    ],
-  );
-
-  const visibleItems = useMemo(
-    () =>
-      items.filter((item) =>
-        isWeb ? item.key !== "source" && item.key !== "converter" : true,
-      ),
-    [items],
-  );
+  const compact = collapsed;
 
   return (
     <aside
       className={cn(
-        "relative flex shrink-0 flex-col overflow-hidden border-b bg-surface sm:h-full sm:w-[204px] sm:border-r sm:border-b-0",
+        "relative my-3 ml-3 hidden shrink-0 flex-col overflow-hidden rounded-lg border bg-sidebar transition-[width] duration-200 min-[720px]:flex",
+        compact ? "w-16" : "w-[204px] max-[1079px]:w-16",
         className,
       )}
     >
-      <AppBrand />
-      <nav className="min-h-0 overflow-x-auto p-3 sm:flex-1 sm:overflow-x-hidden sm:overflow-y-auto">
-        <div className="flex min-w-max flex-row gap-2 sm:min-w-0 sm:flex-col">
-          {visibleItems.map((item) =>
-            cloneElement(item.label, { key: item.key }),
-          )}
-          <div className="sm:hidden">
-            <HelpButton
-              className={SIDEBAR_HELP_BUTTON_CLASS}
-              iconClassName="size-5 stroke-[1.75]"
-            />
-          </div>
+      <AppBrand
+        collapsed={compact}
+        className="max-[1079px]:justify-center max-[1079px]:px-2 max-[1079px]:[&>span]:hidden max-[1079px]:[&>img]:mr-0"
+      />
+      <nav className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-3 max-[1079px]:px-2">
+        <div className="flex flex-col gap-2">
+          {items.map(({ active, Icon, key, label, to }) => (
+            <Link
+              key={key}
+              to={to}
+              title={label}
+              onClick={(event) => handleNavigation(event, key)}
+              className={cn(
+                "group relative flex h-9 items-center gap-2 rounded-md px-3 text-sm text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground max-[1079px]:justify-center max-[1079px]:px-0",
+                compact && "justify-center px-0",
+                active &&
+                  "bg-primary text-primary-foreground hover:bg-brand-hover hover:text-primary-foreground",
+              )}
+            >
+              <span className="relative shrink-0">
+                <Icon className="size-5 stroke-[1.75]" />
+                {key === "settings" && updateAvailable ? (
+                  <span className="absolute -right-1 -top-0.5 size-1.5 rounded-full bg-destructive" />
+                ) : null}
+              </span>
+              <span
+                className={cn(
+                  "min-w-0 flex-1 truncate max-[1079px]:hidden",
+                  compact && "hidden",
+                )}
+              >
+                {label}
+              </span>
+              {key === "home" && count > 0 ? (
+                <span
+                  className={cn(
+                    "min-w-4 rounded-full bg-destructive px-1 text-center text-[10px] leading-4 text-destructive-foreground max-[1079px]:absolute max-[1079px]:right-0 max-[1079px]:top-0",
+                    compact && "absolute right-0 top-0",
+                  )}
+                >
+                  {count > 99 ? "99+" : count}
+                </span>
+              ) : null}
+              {key === "source" && !compact ? (
+                <button
+                  type="button"
+                  title={
+                    openInNewWindow
+                      ? "Merge to main window"
+                      : "Open in new window"
+                  }
+                  className="opacity-0 transition-opacity group-hover:opacity-100 max-[1079px]:hidden"
+                  onClick={handleExternalLink}
+                >
+                  <ExternalLink
+                    className={cn(
+                      "size-4 stroke-[1.75]",
+                      openInNewWindow && "rotate-180",
+                    )}
+                  />
+                </button>
+              ) : null}
+            </Link>
+          ))}
         </div>
       </nav>
-      <div className="hidden shrink-0 border-t p-3 sm:block">
+      <div
+        className={cn(
+          "flex shrink-0 items-center gap-1 border-t p-3 max-[1079px]:px-2",
+          compact && "flex-col px-2",
+        )}
+      >
         <HelpButton
-          className={cn(SIDEBAR_HELP_BUTTON_CLASS, "w-full")}
+          className={cn(
+            "h-9 min-w-0 flex-1 justify-start rounded-md px-3 text-sm font-normal text-muted-foreground max-[1079px]:w-9 max-[1079px]:flex-none max-[1079px]:justify-center max-[1079px]:gap-0 max-[1079px]:px-0 max-[1079px]:text-[0px]",
+            compact && "w-9 flex-none justify-center gap-0 px-0 text-[0px]",
+          )}
           iconClassName="size-5 stroke-[1.75]"
         />
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          className="size-9 shrink-0 p-0 text-muted-foreground max-[1079px]:hidden"
+          onClick={toggleSidebar}
+        >
+          {collapsed ? (
+            <PanelLeftOpen className="size-5" strokeWidth={1.75} />
+          ) : (
+            <PanelLeftClose className="size-5" strokeWidth={1.75} />
+          )}
+        </Button>
       </div>
     </aside>
   );

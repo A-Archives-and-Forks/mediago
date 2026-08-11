@@ -21,6 +21,7 @@ import {
 } from "./services/config-change-order";
 import { DownloadFilter, type AppStore } from "@mediago/shared-common";
 import { AuthGuard } from "./hooks/use-auth";
+import { resolveAppTheme } from "./utils/app-theme";
 
 const AppLayout = lazy(() => import("./layout/app-layout"));
 const HomePage = lazy(() => import("./pages/home-page"));
@@ -100,6 +101,7 @@ const App: FC = () => {
   );
   const setUploadChecking = useSessionStore((state) => state.setUploadChecking);
   const setAppStore = useAppStore((state) => state.setAppStore);
+  const appTheme = useAppStore((state) => state.theme);
   const setBrowserStore = useBrowserStore((state) => state.setBrowserStore);
   const theme = useSessionStore((state) => state.theme);
   const setTheme = useSessionStore((state) => state.setTheme);
@@ -112,10 +114,6 @@ const App: FC = () => {
   const configReconcileRetry = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
-  const themeChange = useMemoizedFn((event: MediaQueryListEvent) => {
-    setTheme(event.matches ? "dark" : "light");
-  });
-
   const applyConfigChange = useMemoizedFn((data: ConfigChange) => {
     if (!isAppStoreKey(data.key)) return true;
     const key = data.key;
@@ -352,14 +350,14 @@ const App: FC = () => {
   );
 
   useEffect(() => {
-    const isDarkTheme = matchMedia("(prefers-color-scheme: dark)");
-    isDarkTheme.addEventListener("change", themeChange);
-    setTheme(isDarkTheme.matches ? "dark" : "light");
-
-    return () => {
-      isDarkTheme.removeEventListener("change", themeChange);
+    const systemTheme = matchMedia("(prefers-color-scheme: dark)");
+    const applyTheme = () => {
+      setTheme(resolveAppTheme(appTheme, systemTheme.matches));
     };
-  }, []);
+    applyTheme();
+    systemTheme.addEventListener("change", applyTheme);
+    return () => systemTheme.removeEventListener("change", applyTheme);
+  }, [appTheme, setTheme]);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");

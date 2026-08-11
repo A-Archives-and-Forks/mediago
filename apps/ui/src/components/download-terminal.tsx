@@ -1,11 +1,11 @@
-import { type FC, type ReactNode, useEffect, useRef } from "react";
-import "@xterm/xterm/css/xterm.css";
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal as XTerminal } from "@xterm/xterm";
-import { cn } from "@/utils";
-import { usePlatform } from "@/hooks/use-platform";
+import "@xterm/xterm/css/xterm.css";
+import { type FC, type ReactNode, useEffect, useRef } from "react";
 import useSWR from "swr";
 import { getDownloadLog } from "@/api/download-task";
+import { usePlatform } from "@/hooks/use-platform";
+import { cn } from "@/utils";
 
 interface TerminalProps {
   className?: string;
@@ -21,76 +21,85 @@ const Terminal: FC<TerminalProps> = ({ className, id, header }) => {
   );
 
   useEffect(() => {
-    if (!terminalRef.current) return;
+    const element = terminalRef.current;
+    if (!element) return;
 
     const terminal = new XTerminal({
-      fontFamily: "Consolas, 'Courier New', monospace",
-      disableStdin: true,
-      cursorBlink: false,
       allowProposedApi: true,
       convertEol: true,
+      cursorBlink: false,
+      disableStdin: true,
+      fontFamily: "'Cascadia Mono', Consolas, 'Courier New', monospace",
+      fontSize: 12,
+      lineHeight: 1.35,
+      scrollback: 3000,
+      theme: {
+        background: "#0b0d12",
+        foreground: "#c8d0dc",
+        cursor: "#34d399",
+        selectionBackground: "#334155",
+        black: "#111827",
+        red: "#fb7185",
+        green: "#34d399",
+        yellow: "#fbbf24",
+        blue: "#60a5fa",
+        magenta: "#c084fc",
+        cyan: "#22d3ee",
+        white: "#e5e7eb",
+      },
     });
     const fitAddon = new FitAddon();
     terminal.loadAddon(fitAddon);
-    terminal.open(terminalRef.current);
-    fitAddon.fit();
+    terminal.open(element);
+    const fit = () => {
+      try {
+        fitAddon.fit();
+      } catch {
+        // The dialog may be closing while ResizeObserver delivers a frame.
+      }
+    };
+    const frame = requestAnimationFrame(fit);
 
-    // Copy-on-shortcut. xterm doesn't bind Ctrl+C / Cmd+C to "copy
-    // selection" by default (it passes them through as control chars).
-    // Since stdin is disabled for this read-only log view, hijacking
-    // those keys is safe — when there's a selection we copy it and tell
-    // xterm to stop handling the event; otherwise we let it through.
-    terminal.attachCustomKeyEventHandler((ev) => {
-      if (ev.type !== "keydown") return true;
+    terminal.attachCustomKeyEventHandler((event) => {
+      if (event.type !== "keydown") return true;
       const isCopy =
-        (ev.ctrlKey || ev.metaKey) &&
-        !ev.altKey &&
-        !ev.shiftKey &&
-        ev.key.toLowerCase() === "c";
+        (event.ctrlKey || event.metaKey) &&
+        !event.altKey &&
+        !event.shiftKey &&
+        event.key.toLowerCase() === "c";
       if (!isCopy) return true;
-      const sel = terminal.getSelection();
-      if (!sel) return true;
-      void navigator.clipboard.writeText(sel).catch(() => {
-        /* clipboard API may be unavailable in non-secure contexts; ignore */
-      });
-      ev.preventDefault();
+      const selection = terminal.getSelection();
+      if (!selection) return true;
+      void navigator.clipboard.writeText(selection).catch(() => undefined);
+      event.preventDefault();
       return false;
     });
 
-    if (data?.log) {
-      terminal.write(data.log);
-    }
+    if (data?.log) terminal.write(data.log);
 
-    const onDownloadMessage = (
-      _: unknown,
-      messageId: number,
-      message: string,
-    ) => {
-      if (id === messageId) {
+    const onDownloadMessage = (...args: unknown[]) => {
+      const messageId = args[1];
+      const message = args[2];
+      if (id === messageId && typeof message === "string") {
         terminal.write(message);
       }
     };
-
-    const resize = () => {
-      fitAddon.fit();
-    };
-
+    const resizeObserver = new ResizeObserver(fit);
+    resizeObserver.observe(element);
     on("download-message", onDownloadMessage);
-    window.addEventListener("resize", resize);
 
     return () => {
+      cancelAnimationFrame(frame);
+      resizeObserver.disconnect();
       off("download-message", onDownloadMessage);
-      window.removeEventListener("resize", resize);
       terminal.dispose();
     };
-  }, [id, data]);
+  }, [data, id, off, on]);
 
   return (
-    <div className={cn("flex flex-col", className)}>
+    <div className={cn("flex min-h-0 flex-col", className)}>
       {header}
-      <div className="flex-1">
-        <div ref={terminalRef} />
-      </div>
+      <div ref={terminalRef} className="min-h-0 flex-1 overflow-hidden" />
     </div>
   );
 };

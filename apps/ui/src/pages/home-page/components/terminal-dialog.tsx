@@ -1,15 +1,16 @@
-import { useMemoizedFn } from "ahooks";
+import { X } from "lucide-react";
 import type React from "react";
+import { useTranslation } from "react-i18next";
+import { useMemoizedFn } from "ahooks";
+import Terminal from "@/components/download-terminal";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
-  DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import Terminal from "@/components/download-terminal";
-import { useTranslation } from "react-i18next";
 
 interface Props {
   trigger: React.ReactNode;
@@ -20,33 +21,40 @@ interface Props {
 
 export function TerminalDialog({ trigger, title, id, asChild }: Props) {
   const { t } = useTranslation();
-
-  // Radix Dialog portals the DOM to document.body, but React synthetic
-  // events still bubble up through the React tree — that means a
-  // right-click inside this dialog would otherwise propagate to the
-  // underlying DownloadTaskItem's `onContextMenu` and pop its "select /
-  // download / refresh / delete" menu instead of the native "Copy"
-  // menu. Stop React-level bubbling so the item handler is isolated;
-  // don't preventDefault, so Chromium's built-in context menu still
-  // fires for the xterm selection.
   const stopContextPropagation = useMemoizedFn(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      e.stopPropagation();
-    },
+    (event: React.MouseEvent<HTMLDivElement>) => event.stopPropagation(),
   );
 
   return (
     <Dialog>
       <DialogTrigger asChild={asChild}>{trigger}</DialogTrigger>
       <DialogContent
-        className="min-w-fit"
+        showCloseButton={false}
+        className="gap-0 overflow-hidden border-[#252936] bg-[#0b0d12] p-0 text-[#d7dce5] shadow-2xl sm:max-w-[780px]"
         onContextMenu={stopContextPropagation}
       >
-        <DialogHeader>
-          <DialogTitle>{t("downloadLog")}</DialogTitle>
-          <DialogDescription>{title}</DialogDescription>
-        </DialogHeader>
-        <Terminal id={id} />
+        <div className="flex h-12 items-center gap-2 border-b border-[#252936] bg-[#13161d] px-4">
+          <span className="size-2.5 rounded-full bg-[#ff5f57]" />
+          <span className="size-2.5 rounded-full bg-[#febc2e]" />
+          <span className="size-2.5 rounded-full bg-[#28c840]" />
+          <div className="ml-2 min-w-0 flex-1">
+            <DialogTitle className="truncate font-mono text-xs font-medium text-[#c5cbd6]">
+              {t("downloadLog")} · {title}
+            </DialogTitle>
+            <DialogDescription className="sr-only">{title}</DialogDescription>
+          </div>
+          <DialogClose asChild>
+            <button
+              type="button"
+              title={t("close")}
+              aria-label={t("close")}
+              className="flex size-7 items-center justify-center rounded-md text-[#7f8795] transition-colors hover:bg-white/10 hover:text-white"
+            >
+              <X className="size-4" />
+            </button>
+          </DialogClose>
+        </div>
+        <Terminal id={id} className="h-[min(58vh,400px)] w-full p-3" />
       </DialogContent>
     </Dialog>
   );

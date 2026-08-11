@@ -103,6 +103,12 @@ export const zh = {
   editDownload: "编辑下载",
   batchDownload: "批量下载",
   downloadMode: "下载模式",
+  actions: "操作",
+  downloadStarted: "下载已开始",
+  parsePreview: "解析预览",
+  validCount: "{{count}} 条有效",
+  invalidCount: "{{count}} 条无效",
+  batchEmptyHint: "输入批量链接后会在这里显示解析结果",
   singleDownload: "单个下载",
   batchListHelp: "每行一个链接，可在链接后填写视频名称和文件夹名称。",
   additionalHeadersHelp:
