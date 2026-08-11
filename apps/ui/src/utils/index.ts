@@ -1,11 +1,16 @@
 import { type ClassValue, clsx } from "clsx";
 import dayjs from "dayjs";
+import relativeTime from "dayjs/plugin/relativeTime";
+import "dayjs/locale/it";
+import "dayjs/locale/zh-cn";
 import { twMerge } from "tailwind-merge";
 import { isUrl } from "./url";
 import {
   DownloadType,
   resolveAppLanguage as sharedResolveAppLanguage,
 } from "@mediago/shared-common";
+
+dayjs.extend(relativeTime);
 
 export { http, setupHttp } from "./http";
 export { tdApp } from "./tdapp";
@@ -65,6 +70,23 @@ export function fromatDateTime(
   if (!d) return "";
 
   return dayjs(d).format(tmpStr);
+}
+
+export function formatRelativeTime(
+  d: string | number | Date | undefined,
+  language: string,
+) {
+  if (!d) return "";
+
+  const value = dayjs(d);
+  if (!value.isValid()) return "";
+
+  const locale = language.startsWith("zh")
+    ? "zh-cn"
+    : language.startsWith("it")
+      ? "it"
+      : "en";
+  return value.locale(locale).fromNow();
 }
 
 export function getFileName(url: string) {

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
@@ -13,6 +14,13 @@ import (
 	"time"
 
 	"caorushizi.cn/mediago/internal/logger"
+)
+
+const maxFFmpegErrorLines = 24
+
+var (
+	ffmpegTimeRegex     = regexp.MustCompile(`time=(\d+):(\d+):(\d+)\.(\d+)`)
+	ffmpegDurationRegex = regexp.MustCompile(`Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)`)
 )
 
 // ProgressCallback is called with the conversion progress (0-100).
@@ -75,14 +83,20 @@ func (c *Converter) Start(id int64, inputPath, outputFormat, quality string, onP
 		return "", fmt.Errorf("failed to start ffmpeg: %w", err)
 	}
 
-	// Parse progress from stderr
-	if duration > 0 && onProgress != nil {
-		scanner := bufio.NewScanner(stderr)
-		scanner.Split(scanFFmpegOutput)
-		timeRegex := regexp.MustCompile(`time=(\d+):(\d+):(\d+)\.(\d+)`)
-		for scanner.Scan() {
-			line := scanner.Text()
-			if matches := timeRegex.FindStringSubmatch(line); matches != nil {
+	// Always consume stderr. Leaving it unread can block ffmpeg once the pipe buffer fills.
+	scanner := bufio.NewScanner(stderr)
+	scanner.Split(scanFFmpegOutput)
+	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
+	errorLines := make([]string, 0, maxFFmpegErrorLines)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+
+		errorLines = appendRecentLine(errorLines, line)
+		if duration > 0 && onProgress != nil {
+			if matches := ffmpegTimeRegex.FindStringSubmatch(line); matches != nil {
 				h, _ := strconv.Atoi(matches[1])
 				m, _ := strconv.Atoi(matches[2])
 				s, _ := strconv.Atoi(matches[3])
@@ -95,12 +109,16 @@ func (c *Converter) Start(id int64, inputPath, outputFormat, quality string, onP
 			}
 		}
 	}
+	scanErr := scanner.Err()
 
-	if err := cmd.Wait(); err != nil {
+	if waitErr := cmd.Wait(); waitErr != nil {
 		if ctx.Err() == context.Canceled {
 			return "", fmt.Errorf("conversion cancelled")
 		}
-		return "", fmt.Errorf("ffmpeg failed: %w", err)
+		return "", formatFFmpegFailure(outputFormat, waitErr, errorLines)
+	}
+	if scanErr != nil {
+		return "", fmt.Errorf("failed to read ffmpeg output: %w", scanErr)
 	}
 
 	return outputPath, nil
@@ -117,24 +135,109 @@ func (c *Converter) Stop(id int64) {
 
 // probeDuration uses ffprobe to get the input file duration.
 func (c *Converter) probeDuration(inputPath string) time.Duration {
-	ffprobe := strings.TrimSuffix(c.ffmpegBin, filepath.Ext(c.ffmpegBin))
-	if !strings.HasSuffix(ffprobe, "ffprobe") {
-		// Derive ffprobe path from ffmpeg path (same directory)
-		ffprobe = filepath.Join(filepath.Dir(c.ffmpegBin), "ffprobe")
+	ffprobe := companionBinaryPath(c.ffmpegBin, "ffprobe")
+	if _, err := os.Stat(ffprobe); err == nil {
+		cmd := exec.Command(ffprobe, "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", inputPath)
+		out, cmdErr := cmd.Output()
+		if cmdErr == nil {
+			if duration := parseSecondsDuration(strings.TrimSpace(string(out))); duration > 0 {
+				return duration
+			}
+		} else {
+			logger.Warnf("ffprobe failed for %s: %v", inputPath, cmdErr)
+		}
 	}
 
-	cmd := exec.Command(ffprobe, "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", inputPath)
-	out, err := cmd.Output()
-	if err != nil {
-		logger.Warnf("ffprobe failed for %s: %v", inputPath, err)
-		return 0
+	// Some dependency bundles contain ffmpeg without ffprobe. Reading the input
+	// metadata through ffmpeg is fast and still provides the duration.
+	cmd := exec.Command(c.ffmpegBin, "-hide_banner", "-i", inputPath)
+	out, _ := cmd.CombinedOutput()
+	if duration := parseFFmpegDuration(string(out)); duration > 0 {
+		return duration
 	}
-	s := strings.TrimSpace(string(out))
-	seconds, err := strconv.ParseFloat(s, 64)
+
+	logger.Warnf("unable to determine media duration for %s", inputPath)
+	return 0
+}
+
+func companionBinaryPath(binaryPath, binaryName string) string {
+	return filepath.Join(filepath.Dir(binaryPath), binaryName+filepath.Ext(binaryPath))
+}
+
+func parseSecondsDuration(value string) time.Duration {
+	seconds, err := strconv.ParseFloat(value, 64)
 	if err != nil {
 		return 0
 	}
 	return time.Duration(seconds * float64(time.Second))
+}
+
+func parseFFmpegDuration(output string) time.Duration {
+	matches := ffmpegDurationRegex.FindStringSubmatch(output)
+	if matches == nil {
+		return 0
+	}
+
+	hours, _ := strconv.Atoi(matches[1])
+	minutes, _ := strconv.Atoi(matches[2])
+	seconds, err := strconv.ParseFloat(matches[3], 64)
+	if err != nil {
+		return 0
+	}
+
+	return time.Duration(hours)*time.Hour + time.Duration(minutes)*time.Minute + time.Duration(seconds*float64(time.Second))
+}
+
+func appendRecentLine(lines []string, line string) []string {
+	if len(lines) == maxFFmpegErrorLines {
+		copy(lines, lines[1:])
+		lines[len(lines)-1] = line
+		return lines
+	}
+	return append(lines, line)
+}
+
+func formatFFmpegFailure(outputFormat string, runErr error, lines []string) error {
+	detail := summarizeFFmpegError(lines)
+	if isAudioOutputFormat(outputFormat) && strings.Contains(strings.ToLower(detail), "output file does not contain any stream") {
+		return fmt.Errorf("source file has no audio stream")
+	}
+	if detail != "" {
+		return fmt.Errorf("ffmpeg failed: %s", detail)
+	}
+	return fmt.Errorf("ffmpeg failed: %w", runErr)
+}
+
+func summarizeFFmpegError(lines []string) string {
+	priorities := []string{
+		"output file does not contain any stream",
+		"matches no streams",
+		"invalid data found",
+		"permission denied",
+		"no such file or directory",
+		"unknown encoder",
+		"error",
+	}
+	for _, priority := range priorities {
+		for i := len(lines) - 1; i >= 0; i-- {
+			if strings.Contains(strings.ToLower(lines[i]), priority) {
+				return lines[i]
+			}
+		}
+	}
+	if len(lines) > 0 {
+		return lines[len(lines)-1]
+	}
+	return ""
+}
+
+func isAudioOutputFormat(format string) bool {
+	switch strings.ToLower(format) {
+	case "mp3", "aac", "flac", "wav":
+		return true
+	default:
+		return false
+	}
 }
 
 // scanFFmpegOutput is a split function for bufio.Scanner that splits on \r or \n.

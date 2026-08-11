@@ -9,7 +9,7 @@ import {
   type ContextMenuItem,
   type CLIInstallOptions,
 } from "@mediago/shared-common";
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer, webUtils } from "electron";
 
 const apiKey = "electron";
 
@@ -62,6 +62,9 @@ const electronApi: PlatformApi = {
   app: {
     getEnvPath(): Promise<EnvPath> {
       return ipcRenderer.invoke(IPC.app.getEnvPath);
+    },
+    async getPathForFile(file: File): Promise<string> {
+      return webUtils.getPathForFile(file);
     },
     getExtensionDir(): Promise<string> {
       return ipcRenderer.invoke(IPC.app.getExtensionDir);

@@ -411,6 +411,7 @@ export interface PlatformApi {
   };
   app: {
     getEnvPath(): Promise<EnvPath>;
+    getPathForFile(file: File): Promise<string>;
     /**
      * Absolute path to the bundled browser-extension directory.
      * Electron-only (web/server stub returns an empty string). Paired

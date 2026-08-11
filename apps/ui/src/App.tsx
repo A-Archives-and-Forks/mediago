@@ -1,7 +1,5 @@
 import { type FC, lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Route, Routes } from "react-router-dom";
-import "dayjs/locale/zh-cn";
-import "dayjs/locale/it";
 import { useMemoizedFn } from "ahooks";
 import { AppBootScreen } from "./components/app-boot-screen";
 import Loading from "./components/loading";

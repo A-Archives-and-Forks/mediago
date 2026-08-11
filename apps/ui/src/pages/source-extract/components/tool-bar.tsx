@@ -14,7 +14,7 @@ import {
 import { type KeyboardEvent, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
-import { IconButton } from "@/components/icon-button";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Tooltip,
@@ -117,40 +117,80 @@ export function ToolBar({ page }: Props) {
 
   return (
     <div className="flex h-14 shrink-0 flex-row items-center gap-2 border-b bg-surface px-3">
-      <IconButton
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="text-muted-foreground hover:text-foreground"
         title={t("switchToMobileMode")}
+        aria-label={t("switchToMobileMode")}
         onClick={onSetDefaultUA}
-        icon={appStore.isMobile ? <Smartphone /> : <Monitor />}
-      />
-      <IconButton
+      >
+        {appStore.isMobile ? <Smartphone /> : <Monitor />}
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="text-muted-foreground hover:text-foreground"
         disabled={disabled}
         title={t("home")}
+        aria-label={t("home")}
         onClick={goHome}
-        icon={<House />}
-      />
-      <IconButton
+      >
+        <House />
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="text-muted-foreground hover:text-foreground"
         disabled={store.mode === PageMode.Default}
         title={t("back")}
+        aria-label={t("back")}
         onClick={onClickGoBack}
-        icon={<ArrowLeft />}
-      />
+      >
+        <ArrowLeft />
+      </Button>
       {store.mode === PageMode.Browser &&
       store.status === BrowserStatus.Loading ? (
-        <IconButton title={t("cancle")} onClick={goHome} icon={<X />} />
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="text-muted-foreground hover:text-foreground"
+          title={t("cancle")}
+          aria-label={t("cancle")}
+          onClick={goHome}
+        >
+          <X />
+        </Button>
       ) : (
-        <IconButton
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="text-muted-foreground hover:text-foreground"
           disabled={disabled}
           title={t("refresh")}
+          aria-label={t("refresh")}
           onClick={() => goto(store.url)}
-          icon={<RefreshCw />}
-        />
+        >
+          <RefreshCw />
+        </Button>
       )}
-      <IconButton
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="text-muted-foreground hover:text-foreground"
         title={curIsFavorite ? t("cancelFavorite") : t("favorite")}
+        aria-label={curIsFavorite ? t("cancelFavorite") : t("favorite")}
         onClick={onClickAddFavorite}
         disabled={disabled}
-        icon={<Star className={cn(curIsFavorite && "fill-current")} />}
-      />
+      >
+        <Star className={cn(curIsFavorite && "fill-current")} />
+      </Button>
       <div className="relative min-w-0 flex-1">
         {appStore.privacy ? (
           <TooltipProvider>
@@ -180,18 +220,30 @@ export function ToolBar({ page }: Props) {
           placeholder={t("pleaseEnterUrl")}
         />
       </div>
-      <IconButton
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="text-muted-foreground hover:text-foreground"
         title={t("visit")}
+        aria-label={t("visit")}
         onClick={onClickEnter}
         disabled={!store.url}
-        icon={<Send />}
-      />
+      >
+        <Send />
+      </Button>
       {page ? (
-        <IconButton
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="text-muted-foreground hover:text-foreground"
           title={t("mergeToMainWindow")}
+          aria-label={t("mergeToMainWindow")}
           onClick={onCombineToHome}
-          icon={<Combine />}
-        />
+        >
+          <Combine />
+        </Button>
       ) : null}
     </div>
   );

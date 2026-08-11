@@ -19,7 +19,7 @@ import { memo, type ReactNode, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { DownloadTag } from "@/components/download-tag";
-import { IconButton } from "@/components/icon-button";
+import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -31,7 +31,7 @@ import {
 } from "@/const";
 import type { DownloadTaskDetails } from "@/hooks/use-tasks";
 import { appStoreSelector, useAppStore } from "@/store/app";
-import { cn, fromatDateTime, isWeb, tdApp } from "@/utils";
+import { cn, formatRelativeTime, fromatDateTime, isWeb, tdApp } from "@/utils";
 import { TaskActionsMenu } from "./task-actions-menu";
 import { TerminalDialog } from "./terminal-dialog";
 import { usePlatform } from "@/hooks/use-platform";
@@ -65,7 +65,7 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
   onShowEditForm,
 }: Props) {
   const appStore = useAppStore(useShallow(appStoreSelector));
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { shell } = usePlatform();
   const { envPath } = useEnvPath();
 
@@ -94,12 +94,18 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
     const terminalBtn = appStore.showTerminal ? (
       <TerminalDialog
         key="terminal"
+        asChild
         trigger={
-          <IconButton
-            key="terminal"
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground hover:text-foreground"
             title={t("terminal")}
-            icon={<SquareTerminal />}
-          />
+            aria-label={t("terminal")}
+          >
+            <SquareTerminal className="size-[19px]" />
+          </Button>
         }
         title={task.name}
         id={task.id}
@@ -107,12 +113,18 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
     ) : null;
 
     const editBtn = (
-      <IconButton
+      <Button
         key="edit"
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="text-muted-foreground hover:text-foreground"
         title={t("edit")}
-        icon={<Pencil />}
+        aria-label={t("edit")}
         onClick={() => onShowEditForm?.(task)}
-      />
+      >
+        <Pencil className="size-[17px]" />
+      </Button>
     );
 
     switch (task.status) {
@@ -120,35 +132,53 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
         if (terminalBtn) buttons.push(terminalBtn);
         buttons.push(editBtn);
         buttons.push(
-          <IconButton
+          <Button
             key="download"
-            icon={<CircleArrowDown />}
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground hover:text-foreground"
             title={t("download")}
+            aria-label={t("download")}
             onClick={() => startWithEvent(DOWNLOAD_NOW)}
-          />,
+          >
+            <CircleArrowDown className="size-4" />
+          </Button>,
         );
         break;
       case DownloadStatus.Downloading:
         if (terminalBtn) buttons.push(terminalBtn);
         buttons.push(
-          <IconButton
+          <Button
             key="stop"
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground hover:text-foreground"
             title={t("pause")}
-            icon={<CirclePause />}
+            aria-label={t("pause")}
             onClick={handleStop}
-          />,
+          >
+            <CirclePause className="size-4" />
+          </Button>,
         );
         break;
       case DownloadStatus.Failed:
         if (terminalBtn) buttons.push(terminalBtn);
         buttons.push(editBtn);
         buttons.push(
-          <IconButton
+          <Button
             key="redownload"
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground hover:text-foreground"
             title={t("redownload")}
-            icon={<CircleArrowDown />}
+            aria-label={t("redownload")}
             onClick={() => startWithEvent(RESTART_DOWNLOAD)}
-          />,
+          >
+            <CircleArrowDown className="size-4" />
+          </Button>,
         );
         break;
       case DownloadStatus.Pending:
@@ -158,24 +188,36 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
         if (terminalBtn) buttons.push(terminalBtn);
         buttons.push(editBtn);
         buttons.push(
-          <IconButton
+          <Button
             key="restart"
-            icon={<CircleArrowDown />}
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground hover:text-foreground"
             title={t("continueDownload")}
+            aria-label={t("continueDownload")}
             onClick={() => startWithEvent(CONTINUE_DOWNLOAD)}
-          />,
+          >
+            <CircleArrowDown className="size-4" />
+          </Button>,
         );
         break;
       default:
         // Success
         buttons.push(
-          <IconButton
+          <Button
             key="play"
-            icon={<CirclePlay />}
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground hover:text-foreground"
             title={t("playVideo")}
+            aria-label={t("playVideo")}
             disabled={!task.exists}
             onClick={handlePlay}
-          />,
+          >
+            <CirclePlay className="size-4" />
+          </Button>,
         );
         break;
     }
@@ -285,27 +327,57 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
           </div>
         );
       }
+      const exactCreatedTime = fromatDateTime(item.createdDate);
+      const createdDate = item.createdDate ? new Date(item.createdDate) : null;
+      const createdDateTime =
+        createdDate && Number.isFinite(createdDate.getTime())
+          ? createdDate.toISOString()
+          : undefined;
+      const relativeCreatedTime = formatRelativeTime(
+        item.createdDate,
+        i18n.resolvedLanguage ?? i18n.language,
+      );
+      const displayedCreatedTime = relativeCreatedTime || exactCreatedTime;
+
       return (
-        <div
-          className="relative flex flex-col gap-1 text-xs text-muted-foreground"
-          title={item.url}
-        >
-          <div className="truncate">{item.url}</div>
-          <div className="truncate">
-            {t("createdAt")} {fromatDateTime(item.createdDate)}
+        <div className="relative flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+          <div className="min-w-0 shrink truncate" title={item.url}>
+            {item.url}
           </div>
-          {item.status === DownloadStatus.Failed && (
-            <TerminalDialog
-              asChild
-              trigger={
-                <div className="cursor-pointer truncate text-destructive">
-                  {t("failReason")}: ...
-                </div>
-              }
-              title={item.name}
-              id={item.id}
-            />
-          )}
+          {displayedCreatedTime ? (
+            <>
+              <span className="shrink-0 text-border-strong" aria-hidden="true">
+                ·
+              </span>
+              <time
+                className="shrink-0 whitespace-nowrap"
+                dateTime={createdDateTime}
+                title={`${t("createdAt")} ${exactCreatedTime}`}
+              >
+                {t("createdAt")} {displayedCreatedTime}
+              </time>
+            </>
+          ) : null}
+          {item.status === DownloadStatus.Failed ? (
+            <>
+              <span className="shrink-0 text-border-strong" aria-hidden="true">
+                ·
+              </span>
+              <TerminalDialog
+                asChild
+                trigger={
+                  <button
+                    type="button"
+                    className="shrink-0 cursor-pointer whitespace-nowrap text-destructive underline-offset-2 hover:underline"
+                  >
+                    {t("viewFailureReason")}
+                  </button>
+                }
+                title={item.name}
+                id={item.id}
+              />
+            </>
+          ) : null}
         </div>
       );
     },
