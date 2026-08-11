@@ -1,4 +1,3 @@
-import vueI18n from "@intlify/unplugin-vue-i18n/vite";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, type HeadConfig } from "vitepress";
 import { baiduAnalytics, googleAnalytics } from "./plugins";
@@ -469,11 +468,6 @@ export default defineConfig({
   },
 
   vite: {
-    plugins: [
-      vueI18n({
-        ssr: true,
-      }) as any,
-      tailwindcss(),
-    ],
+    plugins: [tailwindcss()],
   },
 });

@@ -54,9 +54,14 @@ const app = new NodeApp();
 
 export default defineConfig({
   outDir: "build",
+  dts: false,
+  fixedExtension: false,
   shims: true,
-  external: ["@mediago/core", "@mediago/deps"],
-  noExternal: [/.*/],
+  deps: {
+    alwaysBundle: [/.*/],
+    onlyBundle: false,
+    neverBundle: ["@mediago/core", "@mediago/deps"],
+  },
   define: {
     "process.env.NODE_ENV": JSON.stringify(
       process.env.NODE_ENV || "production",

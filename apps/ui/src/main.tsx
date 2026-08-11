@@ -1,5 +1,4 @@
 import "./bootstrap-share-intent";
-import "./utils/sentry";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";

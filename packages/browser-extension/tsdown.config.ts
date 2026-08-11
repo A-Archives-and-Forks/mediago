@@ -4,7 +4,10 @@ export default defineConfig({
   exports: true,
   platform: "browser",
   outDir: "build",
-  noExternal: [/.*/],
+  deps: {
+    alwaysBundle: [/.*/],
+    onlyBundle: false,
+  },
   minify: true,
   sourcemap: true,
 });

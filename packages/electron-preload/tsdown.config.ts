@@ -5,8 +5,11 @@ export default defineConfig({
   platform: "browser",
   outDir: "build",
   format: "cjs",
-  noExternal: [/.*/],
-  external: ["electron"],
+  deps: {
+    alwaysBundle: [/.*/],
+    onlyBundle: false,
+    neverBundle: ["electron"],
+  },
   minify: true,
   sourcemap: true,
 });

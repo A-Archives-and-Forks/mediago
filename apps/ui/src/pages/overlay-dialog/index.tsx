@@ -1,9 +1,31 @@
-import { type DownloadTask, IpcEvent } from "@mediago/shared-common";
+import {
+  type DownloadTask,
+  DownloadType,
+  IpcEvent,
+} from "@mediago/shared-common";
 import { useEffect, useId, useRef } from "react";
 import DownloadForm, { type DownloadFormRef } from "@/components/download-form";
 import { usePlatform } from "@/hooks/use-platform";
 
 import "./index.css";
+
+const downloadTypes = new Set<unknown>(Object.values(DownloadType));
+
+function isOverlayDownloadTask(
+  value: unknown,
+): value is Omit<DownloadTask, "id"> {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const task = value as Record<string, unknown>;
+  return (
+    downloadTypes.has(task.type) &&
+    typeof task.name === "string" &&
+    typeof task.url === "string" &&
+    (task.headers === undefined || typeof task.headers === "string")
+  );
+}
 
 export default function OverlayDialog() {
   const { on, off, browser } = usePlatform();
@@ -11,10 +33,11 @@ export default function OverlayDialog() {
   const dialogId = useId();
 
   useEffect(() => {
-    const onShowOverlayDialog = (
-      _e: unknown,
-      data: Omit<DownloadTask, "id">[],
-    ) => {
+    const onShowOverlayDialog = (...args: unknown[]) => {
+      const data = args[1];
+      if (!Array.isArray(data) || !isOverlayDownloadTask(data[0])) {
+        return;
+      }
       const item = data[0];
       downloadForm.current?.openModal({
         batch: false,

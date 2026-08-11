@@ -13,11 +13,9 @@
   },
   "devDependencies": {
     "@types/node": "^24.7.2",
-    "typescript": "^6.0.2",
-    "tsdown": "^0.15.9"
+    "tsdown": "^0.22.14",
+    "typescript": "^7.0.2"
   },
-  "main": "./build/index.js",
-  "module": "./build/index.js",
   "types": "./build/index.d.ts",
   "exports": {
     ".": "./build/index.js",

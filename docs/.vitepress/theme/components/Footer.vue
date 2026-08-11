@@ -67,9 +67,53 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
+import { useData } from "vitepress";
 import { useLayout } from "vitepress/theme";
-import { useI18n } from "vue-i18n";
 
-const { t } = useI18n();
+const messages = {
+  en: {
+    slogan: "Easy to use, fast download",
+    help: "Help",
+    blog: "Blog",
+    privacy: "Privacy Policy",
+  },
+  jp: {
+    slogan: "使いやすく、ダウンロードも速い",
+    help: "ヘルプ",
+    blog: "ブログ",
+    privacy: "プライバシーポリシー",
+  },
+  zh: {
+    slogan: "简单易用，快速下载",
+    help: "帮助",
+    blog: "博客",
+    privacy: "隐私政策",
+  },
+  it: {
+    slogan: "Facile da usare, download veloce",
+    help: "Aiuto",
+    blog: "Blog",
+    privacy: "Informativa sulla privacy",
+  },
+} as const;
+
+type MessageKey = keyof (typeof messages)["zh"];
+type SupportedLocale = keyof typeof messages;
+
+function isSupportedLocale(locale: string): locale is SupportedLocale {
+  return (
+    locale === "en" || locale === "jp" || locale === "zh" || locale === "it"
+  );
+}
+
+const { lang } = useData();
 const { hasSidebar } = useLayout();
+const localizedMessages = computed(() =>
+  isSupportedLocale(lang.value) ? messages[lang.value] : messages.zh,
+);
+
+function t(key: MessageKey) {
+  return localizedMessages.value[key];
+}
 </script>

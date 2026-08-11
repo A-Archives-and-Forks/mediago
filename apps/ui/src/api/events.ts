@@ -1,16 +1,18 @@
 // DOWNLOAD_EVENT_NAME is used as the channel name for dispatching download events
+import type { DownloadEvent } from "@mediago/shared-common";
 import { http, isWeb } from "@/utils";
 import { useDownloadStore } from "@/store/download";
 import { useAppStore } from "@/store/app";
 
 type Callback = (...args: unknown[]) => void;
+type DownloadEventCallback = (_event: null, data: DownloadEvent) => void;
 
 let es: EventSource | null = null;
 let currentCoreUrl: string | null = null;
 let connectedApiKey = "";
 let stopWatchingApiKey: (() => void) | null = null;
 
-const downloadListeners = new Set<Callback>();
+const downloadListeners = new Set<DownloadEventCallback>();
 const configListeners = new Set<Callback>();
 
 let pollingTimer: ReturnType<typeof setTimeout> | null = null;
@@ -133,7 +135,7 @@ export function initGoEvents(coreUrl: string) {
  * Callback receives (null, eventData) to match existing consumer pattern.
  * Returns an unsubscribe function.
  */
-export function onDownloadEvent(cb: Callback): () => void {
+export function onDownloadEvent(cb: DownloadEventCallback): () => void {
   downloadListeners.add(cb);
   return () => {
     downloadListeners.delete(cb);
@@ -152,7 +154,7 @@ export function onConfigChanged(cb: Callback): () => void {
   };
 }
 
-function dispatchDownload(data: unknown) {
+function dispatchDownload(data: DownloadEvent) {
   downloadListeners.forEach((cb) => cb(null, data));
 }
 

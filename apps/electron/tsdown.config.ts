@@ -61,9 +61,14 @@ const app = new ElectronApp();
 
 export default defineConfig({
   outDir: "build",
+  dts: false,
+  fixedExtension: false,
   shims: true,
-  external: ["electron"],
-  noExternal: [/.*/],
+  deps: {
+    alwaysBundle: [/.*/],
+    onlyBundle: false,
+    neverBundle: ["electron"],
+  },
   minify: !isDev,
   sourcemap: isDev,
   define: {

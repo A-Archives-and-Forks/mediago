@@ -4,11 +4,9 @@ import { useData, inBrowser, useRoute } from "vitepress";
 import { computed, watchEffect } from "vue";
 import Comments from "./components/Comments.vue";
 import Footer from "./components/Footer.vue";
-import { useI18n } from "vue-i18n";
 
 const { lang } = useData();
 const route = useRoute();
-const { locale } = useI18n();
 
 const translatedBlogPaths = new Set([
   "/blog/video-downloader-review/",
@@ -41,8 +39,6 @@ const blogTranslationLink = computed(
 );
 
 watchEffect(() => {
-  locale.value = lang.value;
-
   if (inBrowser) {
     const isBlogPage =
       normalizedPath.value.startsWith("/blog/") ||
