@@ -12,6 +12,23 @@ Run `pnpm install` once per clone. Use `pnpm dev` for the unified desktop + web 
 
 Target modern TypeScript with ES modules, two-space indentation, UTF-8, and LF endings per `.editorconfig`. Components, hooks, and services adopt PascalCase (e.g. `UserPreferencesPanel.tsx`). Utilities and helpers stay camelCase, and constants use SCREAMING_SNAKE_CASE. Always run `pnpm format` before committing; reserve comments for clarifying complex logic.
 
+## UI Interaction and Cursor Semantics
+
+Mouse cursors must communicate what an element will do. Define cursor behavior in shared UI primitives whenever possible so every consumer inherits it.
+
+| Interaction                                                                      | Cursor                                    |
+| -------------------------------------------------------------------------------- | ----------------------------------------- |
+| Enabled buttons, links, menu items, select options, toggles, and clickable cards | pointer                                   |
+| Disabled or unavailable controls                                                 | not-allowed                               |
+| Editable text                                                                    | text                                      |
+| Draggable content                                                                | grab, changing to grabbing while dragging |
+| Horizontal or vertical resize handles                                            | col-resize or row-resize                  |
+| Work continuing in the background                                                | progress                                  |
+| Blocking work where the UI cannot accept input                                   | wait                                      |
+| Non-interactive content                                                          | default                                   |
+
+Do not use cursor-default on an enabled interactive element. Avoid pointer-events: none on disabled controls when it prevents the not-allowed cursor from being shown; use native disabled, aria-disabled, or the component library's disabled state to block the action. Cursor styling does not replace semantic HTML, keyboard interaction, focus states, or accessible names.
+
 ## Testing Guidelines
 
 Integration suites live under `tests/*.test.ts` and execute via `pnpm test` using the Node `tsx` runner. Name files descriptively like `download.queue.integration.test.ts`. Mock external services, prefer shared fixtures in `tests/fixtures/`, and cover happy path, recovery, and edge behaviors when touching runtime code.

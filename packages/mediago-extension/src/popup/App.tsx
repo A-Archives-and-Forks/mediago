@@ -20,6 +20,16 @@ export function App() {
 
   const { sources, tab, settings, serverStatus, importing } = data;
   const hasSources = sources.length > 0;
+  const needsSetup =
+    settings?.mode === "docker-http" && !settings.serverUrl.trim();
+
+  const handleEmptyAction = () => {
+    if (needsSetup) {
+      void chrome.runtime.openOptionsPage();
+      return;
+    }
+    if (tab?.id) void chrome.tabs.reload(tab.id);
+  };
 
   return (
     // max-h-[inherit] picks up the body.popup cap from globals.css, so
@@ -63,7 +73,12 @@ export function App() {
           the wrapper hits max-h */}
       <main className="min-h-0 flex-1 overflow-y-auto border-t border-border bg-background px-3 py-3">
         {!hasSources ? (
-          <EmptyState />
+          <EmptyState
+            actionLabel={
+              needsSetup ? t("empty.openSettings") : t("empty.reloadPage")
+            }
+            onAction={handleEmptyAction}
+          />
         ) : (
           <ul className="flex flex-col gap-2">
             {sources.map((s) => (

@@ -1,17 +1,21 @@
 import { DownloadFilter, type DownloadTask } from "@mediago/shared-common";
 import { useMemoizedFn } from "ahooks";
-import { InboxIcon, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import {
   deleteDownloadTask,
   startDownload,
   stopDownload,
 } from "@/api/download-task";
+import emptyCompleted from "@/assets/images/empty-states/empty-completed.png";
+import emptyDownloads from "@/assets/images/empty-states/empty-downloads.png";
+import emptyError from "@/assets/images/empty-states/empty-error.png";
+import { AppEmptyState } from "@/components/app-empty-state";
 import Loading from "@/components/loading";
 import { Button } from "@/components/ui/button";
-import { Empty, EmptyDescription, EmptyMedia } from "@/components/ui/empty";
 import { EDIT_DOWNLOAD } from "@/const";
 import { usePlatform } from "@/hooks/use-platform";
 import type { DownloadTaskDetails } from "@/hooks/use-tasks";
@@ -24,10 +28,17 @@ interface Props {
   filter: DownloadFilter;
   data: DownloadTaskDetails[];
   isLoading: boolean;
+  error?: unknown;
   mutate: () => Promise<unknown>;
 }
 
-export function DownloadTaskList({ filter, data, isLoading, mutate }: Props) {
+export function DownloadTaskList({
+  filter,
+  data,
+  isLoading,
+  error,
+  mutate,
+}: Props) {
   const [selected, setSelected] = useState<number[]>([]);
   const { contextMenu } = usePlatform();
   const { t } = useTranslation();
@@ -133,21 +144,48 @@ export function DownloadTaskList({ filter, data, isLoading, mutate }: Props) {
       />
       <div className={cn("flex w-full flex-1 shrink-0 flex-col overflow-auto")}>
         {isLoading ? <Loading /> : null}
-        {data.length === 0 && !isLoading ? (
-          <div className="flex h-full flex-1 flex-col items-center justify-center gap-3">
-            <Empty>
-              <EmptyMedia variant="icon">
-                <InboxIcon />
-              </EmptyMedia>
-              <EmptyDescription>{t("noData")}</EmptyDescription>
-            </Empty>
-            {filter === DownloadFilter.list ? (
-              <Button type="button" onClick={() => openNew()}>
-                <Plus />
-                {t("newDownload")}
+        {!isLoading && error && data.length === 0 ? (
+          <AppEmptyState
+            className="h-full"
+            illustration={emptyError}
+            title={t("loadFailed")}
+            description={t("loadFailedDescription")}
+            actions={
+              <Button type="button" onClick={() => void mutate()}>
+                {t("refresh")}
               </Button>
-            ) : null}
-          </div>
+            }
+          />
+        ) : null}
+        {!isLoading && !error && data.length === 0 ? (
+          <AppEmptyState
+            className="h-full"
+            illustration={
+              filter === DownloadFilter.list ? emptyDownloads : emptyCompleted
+            }
+            title={
+              filter === DownloadFilter.list
+                ? t("emptyDownloadsTitle")
+                : t("emptyCompletedTitle")
+            }
+            description={
+              filter === DownloadFilter.list
+                ? t("emptyDownloadsDescription")
+                : t("emptyCompletedDescription")
+            }
+            actions={
+              filter === DownloadFilter.list ? (
+                <Button type="button" onClick={() => openNew()}>
+                  <Plus />
+                  {t("newDownload")}
+                </Button>
+              ) : (
+                <Button asChild variant="outline">
+                  <Link to="/">{t("downloadList")}</Link>
+                </Button>
+              )
+            }
+          />
         ) : null}
         {data.map((task) => (
           <DownloadTaskItem

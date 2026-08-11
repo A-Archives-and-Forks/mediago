@@ -3,6 +3,9 @@ import { Plus } from "lucide-react";
 import { type FormEvent, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import emptyError from "@/assets/images/empty-states/empty-error.png";
+import emptyFavorites from "@/assets/images/empty-states/empty-favorites.png";
+import { AppEmptyState } from "@/components/app-empty-state";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -29,6 +32,7 @@ export function FavoriteList() {
     error,
     addFavorite,
     removeFavorite,
+    mutate,
   } = useFavorites();
   const { contextMenu } = usePlatform();
   const { loadUrl } = useBrowserActions();
@@ -133,32 +137,57 @@ export function FavoriteList() {
 
   if (error) {
     return (
-      <div className="flex h-full w-full items-center justify-center text-red-500">
-        {t("loadFailed")}
+      <div className="flex h-full w-full items-center justify-center">
+        <AppEmptyState
+          compact
+          illustration={emptyError}
+          title={t("loadFailed")}
+          description={t("loadFailedDescription")}
+          actions={
+            <Button type="button" onClick={() => void mutate()}>
+              {t("refresh")}
+            </Button>
+          }
+        />
       </div>
     );
   }
 
   return (
-    <div className="h-full w-full py-4">
-      <div className="grid grid-cols-4 place-items-center gap-4 overflow-auto md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-9">
-        {favoriteList.map((item) => (
-          <FavItem
-            key={item.id}
-            onContextMenu={() => handleContextMenu(item)}
-            onClick={() => onClickLoadItem(item)}
-            onClose={() => handleRemoveFavorite(item.id)}
-            src={item.icon}
-            title={item.title}
-          />
-        ))}
-        <FavItem
-          key={"add"}
-          onClick={showModal}
-          icon={<Plus className="size-5" />}
-          title={t("addFavorite")}
+    <div className="flex h-full w-full flex-col overflow-auto py-4">
+      {favoriteList.length === 0 ? (
+        <AppEmptyState
+          className="min-h-full"
+          illustration={emptyFavorites}
+          title={t("emptyFavoritesTitle")}
+          description={t("emptyFavoritesDescription")}
+          actions={
+            <Button type="button" onClick={showModal}>
+              <Plus />
+              {t("addFavorite")}
+            </Button>
+          }
         />
-      </div>
+      ) : (
+        <div className="grid grid-cols-4 place-items-center gap-4 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-9">
+          {favoriteList.map((item) => (
+            <FavItem
+              key={item.id}
+              onContextMenu={() => handleContextMenu(item)}
+              onClick={() => onClickLoadItem(item)}
+              onClose={() => handleRemoveFavorite(item.id)}
+              src={item.icon}
+              title={item.title}
+            />
+          ))}
+          <FavItem
+            key={"add"}
+            onClick={showModal}
+            icon={<Plus className="size-5" />}
+            title={t("addFavorite")}
+          />
+        </div>
+      )}
       <Dialog open={isModalOpen} onOpenChange={handleOpenChange}>
         <DialogContent className="sm:max-w-[500px]">
           <form className="flex flex-col gap-4" noValidate onSubmit={handleOk}>

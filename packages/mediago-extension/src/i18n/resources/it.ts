@@ -19,6 +19,8 @@ const resource: ExtensionResources = {
   empty: {
     title: "Nessuna risorsa scaricabile rilevata in questa pagina.",
     hint: "Durante la navigazione le sorgenti corrispondenti vengono visualizzate automaticamente qui.",
+    reloadPage: "Ricarica la pagina corrente",
+    openSettings: "Apri impostazioni",
   },
   source: {
     unnamed: "(senza titolo)",

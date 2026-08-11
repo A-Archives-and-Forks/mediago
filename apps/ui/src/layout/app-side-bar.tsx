@@ -9,9 +9,10 @@ import { useAppStore } from "@/store/app";
 import { useDownloadStore } from "@/store/download";
 import { useSessionStore } from "@/store/session";
 import { useShellStore } from "@/store/shell";
-import { cn } from "@/utils";
+import { cn, isWeb } from "@/utils";
 import { AppBrand } from "./app-brand";
 import { useNavigationItems } from "./navigation";
+import { ServerAccountMenu } from "./server-account-menu";
 
 interface Props {
   className?: string;
@@ -144,15 +145,18 @@ export function AppSideBar({ className }: Props) {
       </nav>
       <div
         className={cn(
-          "flex shrink-0 items-center gap-1 border-t p-3 max-[1079px]:px-2",
+          "flex shrink-0 items-center gap-1 border-t p-3 max-[1079px]:flex-col max-[1079px]:px-2",
           compact && "flex-col px-2",
         )}
       >
+        {isWeb ? (
+          <div className="min-w-0 flex-1 max-[1079px]:flex-none">
+            <ServerAccountMenu compact={compact} />
+          </div>
+        ) : null}
         <HelpButton
-          className={cn(
-            "h-9 min-w-0 flex-1 justify-start rounded-md px-3 text-sm font-normal text-muted-foreground max-[1079px]:w-9 max-[1079px]:flex-none max-[1079px]:justify-center max-[1079px]:gap-0 max-[1079px]:px-0 max-[1079px]:text-[0px]",
-            compact && "w-9 flex-none justify-center gap-0 px-0 text-[0px]",
-          )}
+          iconOnly
+          className="size-9 shrink-0 rounded-md p-0 text-muted-foreground"
           iconClassName="size-5 stroke-[1.75]"
         />
         <Button

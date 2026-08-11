@@ -1,16 +1,12 @@
 import { type Conversion } from "@mediago/shared-common";
 import { useMemoizedFn } from "ahooks";
-import {
-  ArrowRight,
-  FileQuestion,
-  FolderOpen,
-  Pause,
-  Play,
-  Trash2,
-} from "lucide-react";
+import { ArrowRight, FolderOpen, Pause, Play, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import emptyConversions from "@/assets/images/empty-states/empty-conversions.png";
+import emptyError from "@/assets/images/empty-states/empty-error.png";
+import { AppEmptyState } from "@/components/app-empty-state";
 import { IconButton } from "@/components/icon-button";
 import PageContainer from "@/components/page-container";
 import { Badge } from "@/components/ui/badge";
@@ -23,12 +19,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-} from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { PaginationControl } from "@/components/ui/pagination";
 import { Progress } from "@/components/ui/progress";
@@ -93,6 +83,7 @@ const Converter = () => {
   const [pageSize, setPageSize] = useState(10);
   const {
     data,
+    error,
     isLoading,
     mutate,
     addConversion,
@@ -334,17 +325,31 @@ const Converter = () => {
 
       <div className="flex min-h-0 flex-1 flex-col overflow-auto">
         {isLoading ? <Loading /> : null}
-        {!isLoading && data?.list?.length === 0 ? (
-          <div className="flex h-full flex-1 flex-row items-center justify-center">
-            <Empty>
-              <EmptyHeader>
-                <EmptyMedia variant="icon">
-                  <FileQuestion />
-                </EmptyMedia>
-                <EmptyDescription>{t("noData")}</EmptyDescription>
-              </EmptyHeader>
-            </Empty>
-          </div>
+        {!isLoading && error && !data?.list?.length ? (
+          <AppEmptyState
+            className="h-full"
+            illustration={emptyError}
+            title={t("loadFailed")}
+            description={t("loadFailedDescription")}
+            actions={
+              <Button type="button" onClick={() => void mutate()}>
+                {t("refresh")}
+              </Button>
+            }
+          />
+        ) : null}
+        {!isLoading && !error && data?.list?.length === 0 ? (
+          <AppEmptyState
+            className="h-full"
+            illustration={emptyConversions}
+            title={t("emptyConversionsTitle")}
+            description={t("emptyConversionsDescription")}
+            actions={
+              <Button type="button" onClick={handleOpenModal}>
+                {t("addFile")}
+              </Button>
+            }
+          />
         ) : null}
         {!isLoading &&
           Array.isArray(data?.list) &&

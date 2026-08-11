@@ -10,9 +10,11 @@ const HELP_URL = "https://downloader.caorushizi.cn/guides.html?form=client";
 export function HelpButton({
   className,
   iconClassName,
+  iconOnly = false,
 }: {
   className?: string;
   iconClassName?: string;
+  iconOnly?: boolean;
 }) {
   const { shell } = usePlatform();
   const { t } = useTranslation();
@@ -25,12 +27,14 @@ export function HelpButton({
     <Button
       type="button"
       variant="ghost"
-      size="sm"
+      size={iconOnly ? "icon" : "sm"}
+      title={iconOnly ? t("help") : undefined}
+      aria-label={iconOnly ? t("help") : undefined}
       className={cn("shrink-0 text-brand hover:text-brand", className)}
       onClick={openHelpUrl}
     >
       <CircleHelp className={cn("size-4", iconClassName)} />
-      {t("help")}
+      {iconOnly ? <span className="sr-only">{t("help")}</span> : t("help")}
     </Button>
   );
 }

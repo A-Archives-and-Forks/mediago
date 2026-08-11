@@ -1,5 +1,5 @@
 import { useMemoizedFn, useSize } from "ahooks";
-import { ListVideo } from "lucide-react";
+import { ListVideo, LoaderCircle, RefreshCw } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
 import videojs from "video.js";
 import "video.js/dist/video-js.css";
@@ -7,6 +7,8 @@ import "@videojs/themes/dist/sea/index.css";
 import "./player-theme.css";
 import useSWR from "swr";
 import type Player from "video.js/dist/types/player";
+import emptyPlayer from "@/assets/images/empty-player.png";
+import errorPlayer from "@/assets/images/error-player.png";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Sheet,
@@ -76,6 +78,53 @@ const PlaylistItem = memo(function PlaylistItem({
   );
 });
 
+interface PlayerFeedbackProps {
+  title: string;
+  description: string;
+  illustration?: string;
+  loading?: boolean;
+  onRetry?: () => void;
+}
+
+function PlayerFeedback({
+  title,
+  description,
+  illustration,
+  loading = false,
+  onRetry,
+}: PlayerFeedbackProps) {
+  return (
+    <div className="flex h-full w-full items-center justify-center bg-[#141415] px-6 text-white">
+      <div className="flex max-w-sm flex-col items-center gap-4 text-center">
+        {loading ? (
+          <LoaderCircle className="size-8 animate-spin text-blue-400" />
+        ) : illustration ? (
+          <img
+            src={illustration}
+            alt=""
+            aria-hidden="true"
+            className="h-36 w-52 object-contain sm:h-40 sm:w-60"
+          />
+        ) : null}
+        <div className="space-y-1.5">
+          <h1 className="text-base font-semibold">{title}</h1>
+          <p className="text-sm text-white/60">{description}</p>
+        </div>
+        {onRetry ? (
+          <button
+            type="button"
+            onClick={onRetry}
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-blue-500 px-4 text-sm font-medium text-white transition-colors hover:bg-blue-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
+          >
+            <RefreshCw className="size-4" />
+            Refresh
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export default function PlayerPage() {
   const [currentVideo, setCurrentVideo] = useState("");
   const [open, setOpen] = useState(false);
@@ -84,10 +133,16 @@ export default function PlayerPage() {
   const playerRef = useRef<Player | null>(null);
   const size = useSize(videoContainer);
 
-  const { data: videoList } = useSWR(getVideoListKey, getVideoList, {
+  const {
+    data: videoList,
+    error,
+    isLoading,
+    mutate,
+  } = useSWR(getVideoListKey, getVideoList, {
     revalidateOnFocus: false,
     revalidateOnReconnect: false,
   });
+  const hasVideos = Array.isArray(videoList) && videoList.length > 0;
 
   const { calculateAndSetPlayerSize } = usePlayerSize(
     playerRef,
@@ -107,6 +162,8 @@ export default function PlayerPage() {
   });
 
   useEffect(() => {
+    if (!hasVideos) return;
+
     if (!playerRef.current) {
       const videoElement = document.createElement("video-js");
       videoRef.current?.appendChild(videoElement);
@@ -136,7 +193,7 @@ export default function PlayerPage() {
         playerRef.current = null;
       }
     };
-  }, [calculateAndSetPlayerSize]);
+  }, [calculateAndSetPlayerSize, hasVideos]);
 
   useEffect(() => {
     if (!playerRef.current) return;
@@ -181,6 +238,38 @@ export default function PlayerPage() {
   const handleOpen = useMemoizedFn(() => {
     setOpen(true);
   });
+
+  if (isLoading) {
+    return (
+      <PlayerFeedback
+        loading
+        title="Loading videos"
+        description="Preparing your media library…"
+      />
+    );
+  }
+
+  if (error) {
+    return (
+      <PlayerFeedback
+        illustration={errorPlayer}
+        title="Could not load videos"
+        description="Check the MediaGo server and try again."
+        onRetry={() => void mutate()}
+      />
+    );
+  }
+
+  if (!hasVideos) {
+    return (
+      <PlayerFeedback
+        illustration={emptyPlayer}
+        title="No videos available"
+        description="Completed video downloads will appear here for playback."
+        onRetry={() => void mutate()}
+      />
+    );
+  }
 
   return (
     <div className="group relative flex h-full w-full flex-col dark:bg-[#141415] md:flex-row">

@@ -1,21 +1,29 @@
-import { Radar } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import emptyResources from "@/assets/images/empty-resources.png";
+import { Button } from "@/components/ui/button";
 
-export function EmptyState() {
+interface EmptyStateProps {
+  actionLabel: string;
+  onAction: () => void;
+}
+
+export function EmptyState({ actionLabel, onAction }: EmptyStateProps) {
   const { t } = useTranslation();
   return (
-    <div className="flex flex-col items-center justify-center gap-3 px-6 py-14 text-center">
-      <div className="relative">
-        <div className="absolute inset-0 animate-ping rounded-full bg-timeline-read/20" />
-        <div className="relative flex h-12 w-12 items-center justify-center rounded-full bg-surface-300">
-          <Radar className="size-5 text-muted-foreground" />
-        </div>
+    <div className="flex flex-col items-center justify-center gap-3 px-6 py-8 text-center">
+      <img
+        src={emptyResources}
+        alt=""
+        aria-hidden="true"
+        className="h-24 w-28 object-contain"
+      />
+      <div className="font-serif text-[13px] leading-relaxed text-muted-foreground">
+        <p>{t("empty.title")}</p>
+        <p className="text-foreground/45">{t("empty.hint")}</p>
       </div>
-      <p className="font-serif text-[13px] leading-relaxed text-muted-foreground">
-        {t("empty.title")}
-        <br />
-        <span className="text-foreground/45">{t("empty.hint")}</span>
-      </p>
+      <Button type="button" size="sm" variant="outline" onClick={onAction}>
+        {actionLabel}
+      </Button>
     </div>
   );
 }

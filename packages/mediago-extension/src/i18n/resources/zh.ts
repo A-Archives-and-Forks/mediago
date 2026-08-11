@@ -17,6 +17,8 @@ const resource = {
   empty: {
     title: "当前页面暂未检测到可下载资源。",
     hint: "浏览网页过程中命中规则时会自动出现在这里。",
+    reloadPage: "刷新当前页面",
+    openSettings: "打开设置",
   },
   source: {
     unnamed: "(未命名)",

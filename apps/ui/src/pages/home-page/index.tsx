@@ -32,8 +32,16 @@ const HomePage: FC<Props> = ({ filter = DownloadFilter.list }) => {
   const appStore = useAppStore(useShallow(appStoreSelector));
   const { t } = useTranslation();
   const openNew = useDownloadDialogStore((state) => state.openNew);
-  const { data, isLoading, pagination, total, mutate, setPage, setPageSize } =
-    useTasks(filter);
+  const {
+    data,
+    error,
+    isLoading,
+    pagination,
+    total,
+    mutate,
+    setPage,
+    setPageSize,
+  } = useTasks(filter);
   const { envPath } = useEnvPath();
 
   const handleOpenForm = useMemoizedFn(() => {
@@ -88,6 +96,7 @@ const HomePage: FC<Props> = ({ filter = DownloadFilter.list }) => {
         key={filter + ":" + pagination.page + ":" + pagination.pageSize}
         filter={filter}
         data={data}
+        error={error}
         isLoading={isLoading}
         mutate={mutate}
       />

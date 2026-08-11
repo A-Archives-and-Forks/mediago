@@ -180,6 +180,46 @@ body,
   * {
     @apply border-border outline-ring/50;
   }
+
+  button:not(:disabled),
+  a[href],
+  label[for],
+  summary,
+  select:not(:disabled),
+  input:is(
+      [type="button"],
+      [type="checkbox"],
+      [type="file"],
+      [type="radio"],
+      [type="reset"],
+      [type="submit"]
+    ):not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="menuitem"]:not([data-disabled]),
+  [role="option"]:not([data-disabled]) {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  select:disabled,
+  input:disabled,
+  [aria-disabled="true"],
+  [data-disabled] {
+    cursor: not-allowed;
+  }
+
+  [draggable="true"] {
+    cursor: grab;
+  }
+
+  [draggable="true"]:active {
+    cursor: grabbing;
+  }
+
+  [aria-busy="true"] {
+    cursor: progress;
+  }
+
   body {
     @apply bg-background text-foreground;
   }

@@ -19,6 +19,8 @@ const resource: ExtensionResources = {
   empty: {
     title: "No downloadable resources detected on this page yet.",
     hint: "Matching sources show up here automatically as you browse.",
+    reloadPage: "Reload current page",
+    openSettings: "Open settings",
   },
   source: {
     unnamed: "(untitled)",
