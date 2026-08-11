@@ -2,6 +2,8 @@ export const en = {
   downloadList: "Downloads",
   downloadComplete: "Download complete",
   materialExtraction: "Extraction",
+  filterSources: "Filter sources",
+  noMatchingSources: "No matching sources",
   setting: "Settings",
   refresh: "Refresh",
   newDownload: "New download",
@@ -274,6 +276,7 @@ export const en = {
   forgetPasswordDescription: `If you've forgotten the admin password, you can reset it:\n1. Find the MediaGo storage directory.\n2. Open the ".store" folder and edit "config.json".\n3. Clear the value of the apiKey field.`,
   signin: "Sign in",
   signinMediaGoServer: "Sign in to MediaGo Server",
+
   initializeMediaGoServer: "Set up MediaGo Server",
   settingUpAdminPassword: "Create an admin password",
   repeatPassword: "Confirm password",

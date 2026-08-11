@@ -2,6 +2,8 @@ export const zh = {
   downloadList: "下载列表",
   downloadComplete: "下载完成",
   materialExtraction: "素材提取",
+  filterSources: "过滤素材",
+  noMatchingSources: "未找到匹配的素材",
   setting: "软件设置",
   refresh: "刷新",
   newDownload: "新建下载",
@@ -269,7 +271,9 @@ export const zh = {
 3. 删除 apiKey 字段中的值。`,
   signin: "登录",
   signinMediaGoServer: "登录 MediaGo 服务器",
+
   initializeMediaGoServer: "初始化 MediaGo 服务器",
+
   settingUpAdminPassword: "设置管理员密码",
   repeatPassword: "重复密码",
   pleaseEnterPassword: "请输入密码",

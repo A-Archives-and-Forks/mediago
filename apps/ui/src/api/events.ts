@@ -1,5 +1,5 @@
 // DOWNLOAD_EVENT_NAME is used as the channel name for dispatching download events
-import { http } from "@/utils";
+import { http, isWeb } from "@/utils";
 import { useDownloadStore } from "@/store/download";
 import { useAppStore } from "@/store/app";
 
@@ -18,29 +18,49 @@ let pollingGeneration = 0;
 let pollingEnabled = false;
 let pollingRequestInFlight = false;
 
+function stopEventStream() {
+  if (!es) return;
+  es.close();
+  es = null;
+}
+
+function canConnectToGoEvents(apiKey: string) {
+  return !isWeb || apiKey.length > 0;
+}
+
+function watchApiKey() {
+  if (stopWatchingApiKey) return;
+
+  stopWatchingApiKey = useAppStore.subscribe((state, previousState) => {
+    if (state.apiKey === previousState.apiKey) return;
+    if (!currentCoreUrl || state.apiKey === connectedApiKey) return;
+    initGoEvents(currentCoreUrl);
+  });
+}
+
 /**
  * Initialize Go Core SSE event stream.
  * Called once from App.tsx after discovering the core URL.
  */
 export function initGoEvents(coreUrl: string) {
   currentCoreUrl = coreUrl;
-  if (es) {
-    es.close();
-  }
+  stopEventStream();
 
   const apiKey = useAppStore.getState().apiKey;
   connectedApiKey = apiKey;
+  watchApiKey();
+
+  // Web API endpoints require authentication. Keep both SSE and progress
+  // polling dormant on the sign-in page, then reconnect automatically when
+  // the API key changes after a successful sign-in.
+  if (!canConnectToGoEvents(apiKey)) {
+    stopPolling();
+    return;
+  }
+
   const eventsUrl = new URL("/api/events", coreUrl);
   if (apiKey) eventsUrl.searchParams.set("token", apiKey);
   es = new EventSource(eventsUrl);
-
-  if (!stopWatchingApiKey) {
-    stopWatchingApiKey = useAppStore.subscribe((state, previousState) => {
-      if (state.apiKey === previousState.apiKey) return;
-      if (!currentCoreUrl || state.apiKey === connectedApiKey) return;
-      initGoEvents(currentCoreUrl);
-    });
-  }
 
   // Task creation is broadcast from Go Core's download.Create handler.
   // Driving the sidebar badge from SSE (instead of the local `increase()`
@@ -164,6 +184,10 @@ function scheduleProgressPoll(delayMs: number) {
 
 async function pollProgress() {
   if (!pollingEnabled || pollingRequestInFlight) return;
+  if (!canConnectToGoEvents(useAppStore.getState().apiKey)) {
+    stopPolling();
+    return;
+  }
   pollingRequestInFlight = true;
   const requestGeneration = pollingGeneration;
 
@@ -218,6 +242,11 @@ function stopPolling() {
 }
 
 async function stopProgressPollingIfIdle() {
+  if (!canConnectToGoEvents(useAppStore.getState().apiKey)) {
+    stopPolling();
+    return;
+  }
+
   const requestGeneration = pollingGeneration;
   try {
     const result = await http.get<

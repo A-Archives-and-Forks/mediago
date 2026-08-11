@@ -37,6 +37,10 @@ function isAppStoreKey(key: string): key is keyof AppStore {
   return key !== "setAppStore" && key in useAppStore.getState();
 }
 
+function canLoadProtectedConfig() {
+  return !isWeb || useAppStore.getState().apiKey.length > 0;
+}
+
 let adapterCoreUrl = "";
 let adapterInitialization: Promise<AppStore | null> | null = null;
 
@@ -72,6 +76,11 @@ function initializeAdapter(): Promise<AppStore | null> {
         initGoEvents(coreUrl);
       }
 
+      // The sign-in page still needs the Core base URL for /api/auth/status,
+      // but /api/config is protected in web mode. Wait until sign-in stores
+      // an API key before loading the protected application configuration.
+      if (!canLoadProtectedConfig()) return null;
+
       try {
         return await getConfig({ timeoutMs: 5000 });
       } catch {
@@ -102,6 +111,7 @@ const App: FC = () => {
   );
   const setUploadChecking = useSessionStore((state) => state.setUploadChecking);
   const setAppStore = useAppStore((state) => state.setAppStore);
+  const apiKey = useAppStore((state) => state.apiKey);
   const appTheme = useAppStore((state) => state.theme);
   const setBrowserStore = useBrowserStore((state) => state.setBrowserStore);
   const theme = useSessionStore((state) => state.theme);
@@ -132,6 +142,7 @@ const App: FC = () => {
   });
 
   const scheduleConfigReconcile = useMemoizedFn(() => {
+    if (!canLoadProtectedConfig()) return;
     if (configReconcilePromise.current) return;
     if (configReconcileRetry.current) {
       clearTimeout(configReconcileRetry.current);
@@ -158,6 +169,10 @@ const App: FC = () => {
 
       configReconcileNeeded.current = false;
       await settingConfigWriter.flush();
+      if (!canLoadProtectedConfig()) {
+        configReconcileNeeded.current = true;
+        return;
+      }
 
       const changesBeforeGet = configChangesToReconcile.current.splice(0);
       configChangesToReconcile.current.push(
@@ -202,7 +217,11 @@ const App: FC = () => {
       })
       .finally(() => {
         configReconcilePromise.current = null;
-        if (!configReconcileNeeded.current || configReconcileRetry.current) {
+        if (
+          !configReconcileNeeded.current ||
+          configReconcileRetry.current ||
+          !canLoadProtectedConfig()
+        ) {
           return;
         }
         configReconcileRetry.current = setTimeout(() => {
@@ -298,6 +317,7 @@ const App: FC = () => {
         setAdapterReady(true);
 
         if (!config) {
+          if (!canLoadProtectedConfig()) return;
           retryTimer = setTimeout(initialize, 1000);
           return;
         }
@@ -340,7 +360,7 @@ const App: FC = () => {
       active = false;
       if (retryTimer) clearTimeout(retryTimer);
     };
-  }, []);
+  }, [apiKey]);
 
   useEffect(
     () => () => {

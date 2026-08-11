@@ -2,6 +2,8 @@ export const it = {
   downloadList: "Download",
   downloadComplete: "Download completato",
   materialExtraction: "Estrazione",
+  filterSources: "Filtra fonti",
+  noMatchingSources: "Nessuna fonte corrispondente",
   setting: "Impostazioni",
   refresh: "Aggiorna",
   newDownload: "Nuovo download",

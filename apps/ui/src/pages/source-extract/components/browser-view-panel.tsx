@@ -1,10 +1,11 @@
 import { useMemoizedFn } from "ahooks";
-import { Container, Pencil, Trash2 } from "lucide-react";
-import { memo } from "react";
+import { Container, Pencil, Search, Trash2 } from "lucide-react";
+import { memo, useDeferredValue, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { useShallow } from "zustand/react/shallow";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { appStoreSelector, useAppStore } from "@/store/app";
 import {
   browserSourcesSelector,
@@ -15,6 +16,7 @@ import {
 import { usePlatform } from "@/hooks/use-platform";
 import { createDownloadTasks } from "@/api/download-task";
 import { DownloadTask } from "@mediago/shared-common";
+import { filterSources } from "./source-filter";
 
 interface SourceItemProps {
   item: SourceData;
@@ -101,6 +103,12 @@ export function BrowserViewPanel() {
   );
   const { t } = useTranslation();
   const { browser } = usePlatform();
+  const [filterQuery, setFilterQuery] = useState("");
+  const deferredFilterQuery = useDeferredValue(filterQuery);
+  const filteredSources = useMemo(
+    () => filterSources(sources, deferredFilterQuery),
+    [deferredFilterQuery, sources],
+  );
 
   const handleClear = useMemoizedFn(() => {
     clearSources();
@@ -128,8 +136,22 @@ export function BrowserViewPanel() {
   });
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto p-3">
-      <div className="border-b pb-2">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      <div className="mx-3 flex shrink-0 items-center gap-2 border-b py-3">
+        <div className="relative min-w-0 flex-1">
+          <Search
+            className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+            aria-hidden="true"
+          />
+          <Input
+            type="search"
+            value={filterQuery}
+            className="pl-8"
+            placeholder={t("filterSources")}
+            aria-label={t("filterSources")}
+            onChange={(event) => setFilterQuery(event.target.value)}
+          />
+        </div>
         <Button
           type="button"
           size="sm"
@@ -139,16 +161,27 @@ export function BrowserViewPanel() {
           {t("clear")}
         </Button>
       </div>
-      {sources.map((item) => (
-        <SourceItem
-          key={item.id}
-          item={item}
-          enableDocker={enableDocker}
-          onDelete={deleteSource}
-          onEdit={handleEdit}
-          onDownload={handleDownloadNow}
-        />
-      ))}
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
+        {filteredSources.length > 0 ? (
+          filteredSources.map((item) => (
+            <SourceItem
+              key={item.id}
+              item={item}
+              enableDocker={enableDocker}
+              onDelete={deleteSource}
+              onEdit={handleEdit}
+              onDownload={handleDownloadNow}
+            />
+          ))
+        ) : (
+          <p
+            className="flex min-h-24 items-center justify-center px-4 text-center text-sm text-muted-foreground"
+            role="status"
+          >
+            {t("noMatchingSources")}
+          </p>
+        )}
+      </div>
     </div>
   );
 }
