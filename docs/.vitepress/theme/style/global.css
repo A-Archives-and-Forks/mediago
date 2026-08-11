@@ -1,20 +1,5 @@
 @import "tailwindcss";
 
-/* Reserve space for the global MediaGo Drama announcement. */
-:root {
-  --vp-layout-top-height: 56px;
-}
-
-:root.drama-banner-hidden {
-  --vp-layout-top-height: 0px;
-}
-
-@media (max-width: 640px) {
-  :root {
-    --vp-layout-top-height: 64px;
-  }
-}
-
 /* Keep blog tables inside the article column. */
 .vp-doc[class*="_blog_"] table {
   display: block;

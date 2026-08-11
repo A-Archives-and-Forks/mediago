@@ -3,7 +3,6 @@ import DefaultTheme from "vitepress/theme";
 import { useData, inBrowser, useRoute } from "vitepress";
 import { computed, watchEffect } from "vue";
 import Comments from "./components/Comments.vue";
-import DramaBanner from "./components/DramaBanner.vue";
 import Footer from "./components/Footer.vue";
 import { useI18n } from "vue-i18n";
 
@@ -65,9 +64,6 @@ const { Layout } = DefaultTheme;
 
 <template>
   <Layout>
-    <template #layout-top>
-      <DramaBanner />
-    </template>
     <template #doc-before>
       <div
         v-if="blogTranslationLink"

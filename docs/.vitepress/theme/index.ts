@@ -15,14 +15,6 @@ const i18n = createI18n({
       help: "Help",
       blog: "Blog",
       privacy: "Privacy Policy",
-      banner: {
-        label: "MediaGo Drama announcement",
-        badge: "Open source",
-        title: "Create viral comic dramas in one click",
-        action: "Start creating",
-        actionLabel: "Explore MediaGo Drama in a new tab",
-        close: "Close MediaGo Drama announcement",
-      },
     },
     jp: {
       slogan: "使いやすく、ダウンロードも速い",
@@ -30,14 +22,6 @@ const i18n = createI18n({
       help: "ヘルプ",
       blog: "ブログ",
       privacy: "プライバシーポリシー",
-      banner: {
-        label: "MediaGo Drama のお知らせ",
-        badge: "オープンソース",
-        title: "ワンクリックで話題のマンガ動画を制作",
-        action: "今すぐ制作",
-        actionLabel: "MediaGo Drama を新しいタブで見る",
-        close: "MediaGo Drama のお知らせを閉じる",
-      },
     },
     zh: {
       slogan: "简单易用，快速下载",
@@ -45,14 +29,6 @@ const i18n = createI18n({
       help: "帮助",
       blog: "博客",
       privacy: "隐私政策",
-      banner: {
-        label: "MediaGo Drama 产品公告",
-        badge: "开源漫剧 Agent",
-        title: "一键产出爆款",
-        action: "立即创作",
-        actionLabel: "在新标签页了解 MediaGo Drama",
-        close: "关闭 MediaGo Drama 公告",
-      },
     },
     it: {
       slogan: "Facile da usare, download veloce",
@@ -60,14 +36,6 @@ const i18n = createI18n({
       help: "Aiuto",
       blog: "Blog",
       privacy: "Informativa sulla privacy",
-      banner: {
-        label: "Annuncio MediaGo Drama",
-        badge: "Open source",
-        title: "Crea comic drama virali con un clic",
-        action: "Inizia a creare",
-        actionLabel: "Scopri MediaGo Drama in una nuova scheda",
-        close: "Chiudi l'annuncio di MediaGo Drama",
-      },
     },
   },
 });
