@@ -53,13 +53,14 @@ func DefaultSchemas() SchemaList {
 			{
 				Type: "m3u8",
 				Args: map[string]ArgSpec{
-					"url":            {ArgsName: []string{}},
-					"localDir":       {ArgsName: []string{"--tmp-dir", "--save-dir"}},
-					"name":           {ArgsName: []string{"--save-name"}},
-					"headers":        {ArgsName: []string{"--header"}},
-					"deleteSegments": {ArgsName: []string{"--del-after-done"}},
-					"proxy":          {ArgsName: []string{"--custom-proxy"}},
-					"__common__":     {ArgsName: []string{"--no-log", "--auto-select", "--ui-language", "zh-CN", "--live-real-time-merge", "--check-segments-count", "false"}},
+					"url":              {ArgsName: []string{}},
+					"localDir":         {ArgsName: []string{"--tmp-dir", "--save-dir"}},
+					"name":             {ArgsName: []string{"--save-name"}},
+					"headers":          {ArgsName: []string{"--header"}},
+					"deleteSegments":   {ArgsName: []string{"--del-after-done"}},
+					"proxy":            {ArgsName: []string{"--custom-proxy"}},
+					"ffmpegBinaryPath": {ArgsName: []string{"--ffmpeg-binary-path"}},
+					"__common__":       {ArgsName: []string{"--no-log", "--auto-select", "--ui-language", "zh-CN", "--live-real-time-merge", "--use-ffmpeg-concat-demuxer", "--check-segments-count", "false"}},
 				},
 				ConsoleReg: ConsoleReg{
 					Percent: `([\d.]+)%`,

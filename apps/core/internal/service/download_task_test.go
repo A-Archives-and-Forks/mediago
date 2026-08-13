@@ -6,10 +6,11 @@ import (
 )
 
 func TestParseStoredHeadersMultiline(t *testing.T) {
-	raw := "Referer:https://www.bilibili.com/video/BV1xx\r\nCookie:SESSDATA=secret\r\n\r\n"
+	raw := "Referer:https://example.com/watch/video\r\nOrigin:https://example.com\r\nUser-Agent:Mozilla/5.0\r\n\r\n"
 	want := []string{
-		"Referer:https://www.bilibili.com/video/BV1xx",
-		"Cookie:SESSDATA=secret",
+		"Referer:https://example.com/watch/video",
+		"Origin:https://example.com",
+		"User-Agent:Mozilla/5.0",
 	}
 
 	if got := parseStoredHeaders(raw); !slices.Equal(got, want) {

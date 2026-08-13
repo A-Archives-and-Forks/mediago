@@ -16,8 +16,38 @@ import (
 )
 
 var (
-	ErrUnsupportedType = errors.New("unsupported download type")
+	ErrUnsupportedType   = errors.New("unsupported download type")
+	ErrM3U8OutputMissing = errors.New("m3u8 download finished without a merged media file")
 )
+
+var completedMediaExtensions = map[string]struct{}{
+	".3g2":  {},
+	".3gp":  {},
+	".aac":  {},
+	".avi":  {},
+	".f4a":  {},
+	".f4b":  {},
+	".f4p":  {},
+	".f4v":  {},
+	".flv":  {},
+	".m4a":  {},
+	".m4v":  {},
+	".mkv":  {},
+	".mov":  {},
+	".mp3":  {},
+	".mp4":  {},
+	".mpeg": {},
+	".mpg":  {},
+	".rmvb": {},
+	".ts":   {},
+	".webm": {},
+	".wmv":  {},
+}
+
+type outputFileState struct {
+	size    int64
+	modTime int64
+}
 
 // DownloaderSvc is the downloader service
 type DownloaderSvc struct {
@@ -117,6 +147,15 @@ func (d *DownloaderSvc) buildArgs(p DownloadParams, s schema.Schema) []string {
 				}
 			}
 
+		case "ffmpegBinaryPath":
+			if m3u8Binary := d.binMap[TypeM3U8]; m3u8Binary != "" {
+				ffmpegName := FFmpegBinaryName
+				if strings.EqualFold(filepath.Ext(m3u8Binary), ".exe") {
+					ffmpegName += ".exe"
+				}
+				pushKV(spec.ArgsName, filepath.Join(filepath.Dir(m3u8Binary), ffmpegName))
+			}
+
 		case "__common__":
 			// common arguments: expand directly
 			out = append(out, spec.ArgsName...)
@@ -149,6 +188,62 @@ func redactSensitiveArgs(args []string) []string {
 		}
 	}
 	return redacted
+}
+
+func (d *DownloaderSvc) outputDirectory(p DownloadParams) string {
+	dir := d.cfg.(interface{ GetLocalDir() string }).GetLocalDir()
+	if p.Folder != "" {
+		dir = filepath.Join(dir, p.Folder)
+	}
+	return dir
+}
+
+func captureOutputFiles(dir, downloadName string) (map[string]outputFileState, error) {
+	result := make(map[string]outputFileState)
+	entries, err := os.ReadDir(dir)
+	if errors.Is(err, os.ErrNotExist) {
+		return result, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	name := SanitizeFilename(downloadName)
+	for _, entry := range entries {
+		if entry.IsDir() || !isOutputFilename(entry.Name(), name) {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return nil, err
+		}
+		if !info.Mode().IsRegular() || info.Size() == 0 {
+			continue
+		}
+		result[entry.Name()] = outputFileState{
+			size:    info.Size(),
+			modTime: info.ModTime().UnixNano(),
+		}
+	}
+	return result, nil
+}
+
+func isOutputFilename(filename, downloadName string) bool {
+	ext := strings.ToLower(filepath.Ext(filename))
+	if _, ok := completedMediaExtensions[ext]; !ok {
+		return false
+	}
+	base := strings.TrimSuffix(filename, filepath.Ext(filename))
+	return base == downloadName || strings.HasPrefix(base, downloadName+".")
+}
+
+func hasNewOutput(before, after map[string]outputFileState) bool {
+	for name, state := range after {
+		if previous, ok := before[name]; !ok || previous != state {
+			return true
+		}
+	}
+	return false
 }
 
 // SanitizeFilename strips or replaces characters that filesystems — chiefly
@@ -251,6 +346,17 @@ func (d *DownloaderSvc) Download(ctx context.Context, p DownloadParams, cb Callb
 		zap.String("id", string(p.ID)),
 		zap.String("binary", bin))
 
+	var outputBefore map[string]outputFileState
+	var outputDir string
+	if p.Type == TypeM3U8 {
+		outputDir = d.outputDirectory(p)
+		var inspectErr error
+		outputBefore, inspectErr = captureOutputFiles(outputDir, p.Name)
+		if inspectErr != nil {
+			return fmt.Errorf("inspect m3u8 output directory before download: %w", inspectErr)
+		}
+	}
+
 	// create a console line parser
 	lp, err := parser.NewLineParser(schema.ConsoleReg)
 	if err != nil {
@@ -334,6 +440,20 @@ func (d *DownloaderSvc) Download(ctx context.Context, p DownloadParams, cb Callb
 			zap.String("id", string(p.ID)),
 			zap.Error(err))
 		return err
+	}
+
+	if p.Type == TypeM3U8 {
+		outputAfter, inspectErr := captureOutputFiles(outputDir, p.Name)
+		if inspectErr != nil {
+			return fmt.Errorf("inspect m3u8 output directory after download: %w", inspectErr)
+		}
+		if !hasNewOutput(outputBefore, outputAfter) {
+			logger.Error("M3U8 downloader exited without creating a merged media file",
+				zap.String("id", string(p.ID)),
+				zap.String("directory", outputDir),
+				zap.String("name", p.Name))
+			return fmt.Errorf("%w: %s", ErrM3U8OutputMissing, filepath.Join(outputDir, SanitizeFilename(p.Name)))
+		}
 	}
 
 	logger.Info("Download completed successfully",
