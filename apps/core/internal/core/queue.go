@@ -19,10 +19,11 @@ type TaskQueue struct {
 	downloader Downloader // downloader instance
 	maxRunner  int        // maximum concurrency
 
-	mu     sync.RWMutex                  // read-write lock
-	queue  []DownloadParams              // pending task queue
-	active map[TaskID]context.CancelFunc // active tasks (task ID -> cancel function)
-	tasks  map[TaskID]*TaskInfo          // task info table (task ID -> task info)
+	mu        sync.RWMutex                  // read-write lock
+	queue     []DownloadParams              // pending task queue
+	active    map[TaskID]context.CancelFunc // active tasks (task ID -> cancel function)
+	tasks     map[TaskID]*TaskInfo          // task info table (task ID -> task info)
+	discarded map[TaskID]struct{}           // deleted active tasks whose callbacks should be ignored
 
 	// event callback functions
 	onStart    func(TaskID)
@@ -35,11 +36,16 @@ type TaskQueue struct {
 
 // NewTaskQueue creates a new task queue instance
 func NewTaskQueue(d Downloader, maxRunner int) *TaskQueue {
+	if maxRunner < 1 {
+		maxRunner = 1
+	}
+
 	return &TaskQueue{
 		downloader: d,
 		maxRunner:  maxRunner,
 		active:     make(map[TaskID]context.CancelFunc),
 		tasks:      make(map[TaskID]*TaskInfo),
+		discarded:  make(map[TaskID]struct{}),
 	}
 }
 
@@ -53,19 +59,37 @@ func (q *TaskQueue) Downloader() Downloader {
 	return q.downloader
 }
 
-// SetMaxRunner sets the maximum concurrency
+// SetMaxRunner sets the maximum concurrency.
 func (q *TaskQueue) SetMaxRunner(n int) {
+	if n < 1 {
+		n = 1
+	}
+
 	q.mu.Lock()
 	q.maxRunner = n
 	q.mu.Unlock()
 	q.tryRun()
 }
 
-// Enqueue adds a task to the queue
+// Enqueue adds a task to the queue. Repeated requests for the same active or
+// pending task are idempotent and return the existing status.
 func (q *TaskQueue) Enqueue(p DownloadParams) TaskStatus {
 	q.mu.Lock()
 
-	// initialize task info
+	if _, ok := q.active[p.ID]; ok {
+		q.mu.Unlock()
+		logger.Info("Ignored duplicate active task", zap.String("id", string(p.ID)))
+		return StatusDownloading
+	}
+
+	for _, pending := range q.queue {
+		if pending.ID == p.ID {
+			q.mu.Unlock()
+			logger.Info("Ignored duplicate pending task", zap.String("id", string(p.ID)))
+			return StatusPending
+		}
+	}
+
 	q.tasks[p.ID] = &TaskInfo{
 		ID:      p.ID,
 		Type:    p.Type,
@@ -86,141 +110,204 @@ func (q *TaskQueue) Enqueue(p DownloadParams) TaskStatus {
 		logger.Info("Task started immediately", zap.String("id", string(p.ID)))
 		go q.execute(p, ctx)
 		return StatusDownloading
-	} else {
-		q.queue = append(q.queue, p)
-		queueLen := len(q.queue)
-		q.mu.Unlock()
-
-		logger.Info("Task enqueued",
-			zap.String("id", string(p.ID)),
-			zap.Int("queueLength", queueLen))
-		return StatusPending
 	}
-}
 
-// Stop stops the specified task
-func (q *TaskQueue) Stop(id TaskID) error {
-	q.mu.Lock()
-	cancel, ok := q.active[id]
+	q.queue = append(q.queue, p)
+	queueLen := len(q.queue)
 	q.mu.Unlock()
 
-	if !ok {
-		logger.Warn("Attempted to stop non-existent task", zap.String("id", string(id)))
-		return ErrTaskNotFound
-	}
-
-	logger.Info("Stopping task", zap.String("id", string(id)))
-	// invoke the cancel function
-	cancel()
-	return nil
+	logger.Info("Task enqueued",
+		zap.String("id", string(p.ID)),
+		zap.Int("queueLength", queueLen))
+	return StatusPending
 }
 
-// tryRun attempts to run tasks from the queue
-func (q *TaskQueue) tryRun() {
+// Stop stops an active task or removes a pending task from the queue.
+func (q *TaskQueue) Stop(id TaskID) error {
 	q.mu.Lock()
-	defer q.mu.Unlock()
+	if cancel, ok := q.active[id]; ok {
+		q.mu.Unlock()
+		logger.Info("Stopping active task", zap.String("id", string(id)))
+		cancel()
+		return nil
+	}
 
-	if len(q.active) < q.maxRunner && len(q.queue) > 0 {
+	for i, pending := range q.queue {
+		if pending.ID != id {
+			continue
+		}
+
+		q.queue = append(q.queue[:i], q.queue[i+1:]...)
+		if task, ok := q.tasks[id]; ok {
+			task.Status = StatusStopped
+		}
+		q.mu.Unlock()
+
+		logger.Info("Removed pending task from queue", zap.String("id", string(id)))
+		if q.onStopped != nil {
+			q.onStopped(id)
+		}
+		return nil
+	}
+	q.mu.Unlock()
+
+	logger.Warn("Attempted to stop non-existent task", zap.String("id", string(id)))
+	return ErrTaskNotFound
+}
+
+// Remove cancels an active task or removes a pending task without emitting a
+// stopped event. It is used when the persisted task itself is being deleted.
+func (q *TaskQueue) Remove(id TaskID) {
+	q.mu.Lock()
+	if cancel, ok := q.active[id]; ok {
+		q.discarded[id] = struct{}{}
+		delete(q.tasks, id)
+		q.mu.Unlock()
+
+		logger.Info("Cancelling deleted active task", zap.String("id", string(id)))
+		cancel()
+		return
+	}
+
+	for i, pending := range q.queue {
+		if pending.ID == id {
+			q.queue = append(q.queue[:i], q.queue[i+1:]...)
+			break
+		}
+	}
+	delete(q.tasks, id)
+	q.mu.Unlock()
+}
+
+// tryRun fills all available runner slots with pending tasks.
+func (q *TaskQueue) tryRun() {
+	type runnable struct {
+		params DownloadParams
+		ctx    context.Context
+	}
+
+	q.mu.Lock()
+	runnables := make([]runnable, 0)
+	for len(q.active) < q.maxRunner && len(q.queue) > 0 {
 		task := q.queue[0]
 		q.queue = q.queue[1:]
 
-		q.tasks[task.ID].Status = StatusDownloading
+		info, ok := q.tasks[task.ID]
+		if !ok {
+			continue
+		}
+
+		info.Status = StatusDownloading
 		ctx, cancel := context.WithCancel(context.Background())
 		q.active[task.ID] = cancel
+		runnables = append(runnables, runnable{params: task, ctx: ctx})
+	}
+	q.mu.Unlock()
 
-		go q.execute(task, ctx)
+	for _, task := range runnables {
+		logger.Info("Starting queued task", zap.String("id", string(task.params.ID)))
+		go q.execute(task.params, task.ctx)
 	}
 }
 
-// execute runs a single download task
+// execute runs a single download task.
 func (q *TaskQueue) execute(p DownloadParams, ctx context.Context) {
 	logger.Info("Executing task",
 		zap.String("id", string(p.ID)),
 		zap.String("type", string(p.Type)))
 
-	// update task status to downloading
-	q.mu.Lock()
-	if task, ok := q.tasks[p.ID]; ok {
-		task.Status = StatusDownloading
-	}
-	q.mu.Unlock()
-
-	// emit start event
-	if q.onStart != nil {
+	q.mu.RLock()
+	_, exists := q.tasks[p.ID]
+	q.mu.RUnlock()
+	if exists && q.onStart != nil {
 		q.onStart(p.ID)
 	}
 
-	// execute the download
 	err := q.downloader.Download(ctx, p, Callbacks{
 		OnProgress: func(e ProgressEvent) {
-			// update task progress info
 			q.mu.Lock()
-			if task, ok := q.tasks[p.ID]; ok {
+			task, exists := q.tasks[p.ID]
+			if exists {
 				task.Percent = e.Percent
 				task.Speed = e.Speed
 				task.IsLive = e.IsLive
 			}
 			q.mu.Unlock()
 
-			if q.onProgress != nil {
+			if exists && q.onProgress != nil {
 				q.onProgress(e)
 			}
 		},
 		OnMessage: func(m MessageEvent) {
-			if q.onMessage != nil {
+			q.mu.RLock()
+			_, exists := q.tasks[p.ID]
+			q.mu.RUnlock()
+			if exists && q.onMessage != nil {
 				q.onMessage(m)
 			}
 		},
 	})
 
-	// remove from the active task map
 	q.mu.Lock()
-	delete(q.active, p.ID)
-	q.mu.Unlock()
+	if _, discarded := q.discarded[p.ID]; discarded {
+		delete(q.discarded, p.ID)
+		delete(q.active, p.ID)
+		delete(q.tasks, p.ID)
+		q.mu.Unlock()
+		q.tryRun()
+		return
+	}
 
-	// dispatch the appropriate event and update task status based on error type
+	task := q.tasks[p.ID]
 	switch {
 	case err == nil:
-		// completed successfully
-		logger.Info("Task completed successfully", zap.String("id", string(p.ID)))
-		q.mu.Lock()
-		if task, ok := q.tasks[p.ID]; ok {
+		if task != nil {
 			task.Status = StatusSuccess
 			task.Percent = 100
 		}
-		q.mu.Unlock()
+	case errors.Is(err, context.Canceled):
+		if task != nil {
+			task.Status = StatusStopped
+		}
+	default:
+		if task != nil {
+			task.Status = StatusFailed
+			task.Error = err.Error()
+		}
+	}
+	q.mu.Unlock()
+
+	switch {
+	case err == nil:
+		logger.Info("Task completed successfully", zap.String("id", string(p.ID)))
 		if q.onSuccess != nil {
 			q.onSuccess(p.ID)
 		}
 	case errors.Is(err, context.Canceled):
-		// cancelled
 		logger.Info("Task was stopped", zap.String("id", string(p.ID)))
-		q.mu.Lock()
-		if task, ok := q.tasks[p.ID]; ok {
-			task.Status = StatusStopped
-		}
-		q.mu.Unlock()
 		if q.onStopped != nil {
 			q.onStopped(p.ID)
 		}
 	default:
-		// failed
 		logger.Error("Task failed",
 			zap.String("id", string(p.ID)),
 			zap.Error(err))
-		q.mu.Lock()
-		if task, ok := q.tasks[p.ID]; ok {
-			task.Status = StatusFailed
-			task.Error = err.Error()
+		if q.onFailed != nil {
+			q.onFailed(p.ID, err)
 		}
-		q.mu.Unlock()
-					if q.onFailed != nil {
-						q.onFailed(p.ID, err)
-					}
-			}
-		
-			q.tryRun()
-		}
+	}
+
+	q.mu.Lock()
+	if _, discarded := q.discarded[p.ID]; discarded {
+		delete(q.discarded, p.ID)
+		delete(q.tasks, p.ID)
+	}
+	delete(q.active, p.ID)
+	q.mu.Unlock()
+
+	q.tryRun()
+}
+
 // Event hook registration methods (for use by the API layer)
 
 func (q *TaskQueue) OnStart(fn func(TaskID)) {
@@ -247,7 +334,7 @@ func (q *TaskQueue) OnMessage(fn func(MessageEvent)) {
 	q.onMessage = fn
 }
 
-// GetTask retrieves information about the specified task
+// GetTask retrieves information about the specified task.
 func (q *TaskQueue) GetTask(id TaskID) (*TaskInfo, bool) {
 	q.mu.RLock()
 	defer q.mu.RUnlock()
@@ -255,12 +342,12 @@ func (q *TaskQueue) GetTask(id TaskID) (*TaskInfo, bool) {
 	if !ok {
 		return nil, false
 	}
-	// return a copy to prevent external modification
+	// Return a copy to prevent external modification.
 	taskCopy := *task
 	return &taskCopy, true
 }
 
-// GetAllTasks retrieves information about all tasks
+// GetAllTasks retrieves information about all tasks.
 func (q *TaskQueue) GetAllTasks() []TaskInfo {
 	q.mu.RLock()
 	defer q.mu.RUnlock()

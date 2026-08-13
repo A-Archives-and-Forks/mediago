@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 
@@ -46,6 +47,10 @@ func (h *DownloadHandler) Create(c *gin.Context) {
 
 	videos, err := h.svc.AddDownloadTasks(inputs)
 	if err != nil {
+		if errors.Is(err, service.ErrDownloadURLAlreadyExists) {
+			c.JSON(http.StatusConflict, dto.ErrorResponse{Success: false, Code: http.StatusConflict, Message: i18n.T(c, i18n.MsgURLAlreadyExists)})
+			return
+		}
 		logger.Error("Failed to add download tasks", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Success: false, Code: http.StatusInternalServerError, Message: err.Error()})
 		return
@@ -146,6 +151,10 @@ func (h *DownloadHandler) Edit(c *gin.Context) {
 
 	video, err := h.svc.EditDownloadTask(id, data)
 	if err != nil {
+		if errors.Is(err, service.ErrDownloadURLAlreadyExists) {
+			c.JSON(http.StatusConflict, dto.ErrorResponse{Success: false, Code: http.StatusConflict, Message: i18n.T(c, i18n.MsgURLAlreadyExists)})
+			return
+		}
 		logger.Error("Failed to edit download task", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Success: false, Code: http.StatusInternalServerError, Message: err.Error()})
 		return

@@ -2,10 +2,12 @@ package service
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"caorushizi.cn/mediago/internal/core"
 	"caorushizi.cn/mediago/internal/db"
@@ -13,11 +15,14 @@ import (
 	"caorushizi.cn/mediago/internal/tasklog"
 )
 
+var ErrDownloadURLAlreadyExists = errors.New("download URL already exists")
+
 // DownloadTaskService is the business logic layer for download tasks.
 type DownloadTaskService struct {
-	repo  *repo.VideoRepository
-	queue *core.TaskQueue
-	logs  *tasklog.Manager
+	repo     *repo.VideoRepository
+	queue    *core.TaskQueue
+	logs     *tasklog.Manager
+	createMu sync.Mutex
 }
 
 // NewDownloadTaskService creates a DownloadTaskService.
@@ -49,6 +54,17 @@ type PaginatedResult struct {
 
 // AddDownloadTask adds a single download task (with automatic title generation and name uniqueness check).
 func (s *DownloadTaskService) AddDownloadTask(input *AddDownloadTaskInput) (*db.Video, error) {
+	s.createMu.Lock()
+	defer s.createMu.Unlock()
+
+	existingURL, err := s.repo.FindByURL(input.URL)
+	if err != nil {
+		return nil, err
+	}
+	if existingURL != nil {
+		return nil, ErrDownloadURLAlreadyExists
+	}
+
 	title := input.Name
 
 	if title == "" && input.Type == "bilibili" {
@@ -87,8 +103,24 @@ func (s *DownloadTaskService) AddDownloadTask(input *AddDownloadTaskInput) (*db.
 
 // AddDownloadTasks adds multiple download tasks in bulk.
 func (s *DownloadTaskService) AddDownloadTasks(inputs []*AddDownloadTaskInput) ([]*db.Video, error) {
+	s.createMu.Lock()
+	defer s.createMu.Unlock()
+
 	videos := make([]*db.Video, 0, len(inputs))
+	seenURLs := make(map[string]struct{}, len(inputs))
 	for _, input := range inputs {
+		if _, exists := seenURLs[input.URL]; exists {
+			return nil, ErrDownloadURLAlreadyExists
+		}
+		existingURL, err := s.repo.FindByURL(input.URL)
+		if err != nil {
+			return nil, err
+		}
+		if existingURL != nil {
+			return nil, ErrDownloadURLAlreadyExists
+		}
+		seenURLs[input.URL] = struct{}{}
+
 		title := input.Name
 
 		if title == "" && input.Type == "bilibili" {
@@ -124,6 +156,19 @@ func (s *DownloadTaskService) AddDownloadTasks(inputs []*AddDownloadTaskInput) (
 
 // EditDownloadTask edits a download task.
 func (s *DownloadTaskService) EditDownloadTask(id int64, data map[string]interface{}) (*db.Video, error) {
+	s.createMu.Lock()
+	defer s.createMu.Unlock()
+
+	if url, ok := data["url"].(string); ok {
+		existingURL, err := s.repo.FindByURL(url)
+		if err != nil {
+			return nil, err
+		}
+		if existingURL != nil && existingURL.ID != id {
+			return nil, ErrDownloadURLAlreadyExists
+		}
+	}
+
 	return s.repo.Update(id, data)
 }
 
@@ -224,6 +269,7 @@ func (s *DownloadTaskService) StopDownload(id int64) error {
 
 // DeleteDownloadTask removes a download task.
 func (s *DownloadTaskService) DeleteDownloadTask(id int64) error {
+	s.queue.Remove(core.TaskID(strconv.FormatInt(id, 10)))
 	return s.repo.Delete(id)
 }
 

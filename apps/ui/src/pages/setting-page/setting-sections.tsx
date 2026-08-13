@@ -162,8 +162,8 @@ export const BrowserSettingsCard = memo(function BrowserSettingsCard() {
 
   const showTextMenu = () =>
     contextMenu.show([
-      { key: "copy", label: t("copy") },
-      { key: "paste", label: t("paste") },
+      { key: "copy", label: t("copy"), role: "copy" },
+      { key: "paste", label: t("paste"), role: "paste" },
     ]);
 
   const clearCache = async () => {
@@ -285,8 +285,8 @@ export const DownloadSettingsCard = memo(function DownloadSettingsCard() {
           placeholder={t("pleaseEnterProxy")}
           onContextMenu={() =>
             contextMenu.show([
-              { key: "copy", label: t("copy") },
-              { key: "paste", label: t("paste") },
+              { key: "copy", label: t("copy"), role: "copy" },
+              { key: "paste", label: t("paste"), role: "paste" },
             ])
           }
         />
@@ -317,8 +317,8 @@ export const DockerSettingsCard = memo(function DockerSettingsCard() {
   const { contextMenu } = usePlatform();
   const showTextMenu = () =>
     contextMenu.show([
-      { key: "copy", label: t("copy") },
-      { key: "paste", label: t("paste") },
+      { key: "copy", label: t("copy"), role: "copy" },
+      { key: "paste", label: t("paste"), role: "paste" },
     ]);
 
   return (

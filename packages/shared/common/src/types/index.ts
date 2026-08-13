@@ -407,6 +407,7 @@ export interface ContextMenuItem {
   key: string;
   label: string;
   type?: "separator";
+  role?: "copy" | "cut" | "paste" | "redo" | "selectAll" | "undo";
 }
 
 export type UpdateStatus =

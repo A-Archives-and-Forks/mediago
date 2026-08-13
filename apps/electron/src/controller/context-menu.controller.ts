@@ -30,6 +30,12 @@ export default class ContextMenuController implements Controller {
           if (item.type === "separator") {
             return { type: "separator" as const };
           }
+          if (item.role) {
+            return {
+              label: item.label,
+              role: item.role,
+            };
+          }
           return {
             label: item.label,
             click: () => {

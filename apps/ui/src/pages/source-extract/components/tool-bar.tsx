@@ -91,8 +91,8 @@ export function ToolBar({ page }: Props) {
 
   const onInputContextMenu = useMemoizedFn(() => {
     contextMenu.show([
-      { key: "copy", label: t("copy") },
-      { key: "paste", label: t("paste") },
+      { key: "copy", label: t("copy"), role: "copy" },
+      { key: "paste", label: t("paste"), role: "paste" },
     ]);
   });
 
