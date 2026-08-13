@@ -169,6 +169,7 @@ function getReleaseConfig(): Configuration {
         "${productName}-portable-${platform}-${arch}-${buildVersion}.${ext}",
     },
     dmg: {
+      background: "../assets/dmg-background.png",
       contents: [
         {
           x: 410,
