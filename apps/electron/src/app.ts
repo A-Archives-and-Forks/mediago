@@ -12,7 +12,7 @@ import {
 } from "electron";
 import { inject, injectable } from "inversify";
 import TrayIcon from "../assets/icon.ico";
-import TrayPng from "../assets/icon.png";
+import TrayTemplate from "../assets/trayTemplate.png";
 import ProtocolService from "./core/protocol";
 import ElectronRouter from "./core/router";
 import { db, isMac, logDir } from "./constants";
@@ -188,9 +188,22 @@ export default class ElectronApp {
   initTray() {
     let trayIcon = nativeImage.createFromPath(resolve(__dirname, TrayIcon));
     if (isMac) {
-      trayIcon = nativeImage
-        .createFromPath(resolve(__dirname, TrayPng))
-        .resize({ width: 18, height: 18 });
+      const templateSource = nativeImage.createFromPath(
+        resolve(__dirname, TrayTemplate),
+      );
+      trayIcon = nativeImage.createEmpty();
+
+      for (const scaleFactor of [1, 2]) {
+        const size = 16 * scaleFactor;
+        trayIcon.addRepresentation({
+          scaleFactor,
+          dataURL: templateSource
+            .resize({ width: size, height: size })
+            .toDataURL(),
+        });
+      }
+
+      trayIcon.setTemplateImage(true);
     }
 
     const tray = new Tray(trayIcon);
