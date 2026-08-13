@@ -89,18 +89,33 @@ export default class HomeController implements Controller {
   drainShareIntents() {
     return this.shareIntentService.drain();
   }
+  @handle(IPC.update.getState)
+  getUpdateState() {
+    return this.updater.getState();
+  }
+
   @handle(IPC.update.check)
-  async checkUpdate() {
-    this.updater.manualUpdate();
+  checkUpdate() {
+    return this.updater.manualUpdate();
   }
 
   @handle(IPC.update.startDownload)
-  async startUpdate() {
-    this.updater.startDownload();
+  startUpdate() {
+    return this.updater.startDownload();
   }
 
   @handle(IPC.update.install)
-  async installUpdate() {
-    this.updater.install();
+  installUpdate() {
+    return this.updater.install();
+  }
+
+  @handle(IPC.update.openLogDirectory)
+  openUpdateLogDirectory() {
+    return this.updater.openLogDirectory();
+  }
+
+  @handle(IPC.update.getDiagnosticInfo)
+  getUpdateDiagnosticInfo() {
+    return this.updater.getDiagnosticInfo();
   }
 }

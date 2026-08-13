@@ -1,3 +1,4 @@
+import type { UpdateState } from "@mediago/shared-common";
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 
@@ -7,17 +8,24 @@ const initialTheme =
     ? "dark"
     : "light";
 
+const initialUpdateState: UpdateState = {
+  status: "idle",
+  currentVersion: "",
+  progress: 0,
+  autoDownload: true,
+  portable: false,
+};
+
 type State = {
+  updateState: UpdateState;
   updateAvailable: boolean;
-  updateChecking: boolean;
 
   // theme
   theme: "light" | "dark";
 };
 
 type Actions = {
-  setUpdateAvailable: (available: boolean) => void;
-  setUploadChecking: (loading: boolean) => void;
+  setUpdateState: (updateState: UpdateState) => void;
 
   // theme
   setTheme: (theme: "light" | "dark") => void;
@@ -25,17 +33,17 @@ type Actions = {
 
 export const useSessionStore = create<State & Actions>()(
   immer((set) => ({
+    updateState: initialUpdateState,
     updateAvailable: false,
-    updateChecking: true,
     theme: initialTheme,
-    setUpdateAvailable: (available) => {
+    setUpdateState: (updateState) => {
       set((state) => {
-        state.updateAvailable = available;
-      });
-    },
-    setUploadChecking: (loading) => {
-      set((state) => {
-        state.updateChecking = loading;
+        state.updateState = updateState;
+        state.updateAvailable = [
+          "available",
+          "downloading",
+          "downloaded",
+        ].includes(updateState.status);
       });
     },
     setTheme: (theme) => {
@@ -49,11 +57,4 @@ export const useSessionStore = create<State & Actions>()(
 export const themeSelector = (s: State & Actions) => ({
   theme: s.theme,
   setTheme: s.setTheme,
-});
-
-export const updateSelector = (s: State & Actions) => ({
-  updateAvailable: s.updateAvailable,
-  updateChecking: s.updateChecking,
-  setUpdateAvailable: s.setUpdateAvailable,
-  setUploadChecking: s.setUploadChecking,
 });

@@ -389,6 +389,44 @@ export interface ContextMenuItem {
   type?: "separator";
 }
 
+export type UpdateStatus =
+  | "idle"
+  | "checking"
+  | "available"
+  | "downloading"
+  | "downloaded"
+  | "not-available"
+  | "error";
+
+export type UpdateErrorPhase = "check" | "download" | "install" | "unknown";
+
+export interface UpdateErrorInfo {
+  code: string;
+  message: string;
+  phase: UpdateErrorPhase;
+}
+
+export interface UpdateState {
+  status: UpdateStatus;
+  currentVersion: string;
+  targetVersion?: string;
+  progress: number;
+  error?: UpdateErrorInfo;
+  autoDownload: boolean;
+  portable: boolean;
+}
+
+export interface UpdateCheckResult {
+  mode: "external" | "in-app";
+  state: UpdateState;
+  externalUrl?: string;
+}
+
+export interface OpenUpdateLogsResult {
+  opened: boolean;
+  error?: string;
+}
+
 // ============================================================
 // PlatformApi — namespaced, routed to Electron IPC in desktop
 // mode, no-op stubs in web/server mode.
@@ -440,9 +478,12 @@ export interface PlatformApi {
     install(options: CLIInstallOptions): Promise<CLIInstallStatus>;
   };
   update: {
-    check(): Promise<void>;
-    startDownload(): Promise<void>;
-    install(): Promise<void>;
+    getState(): Promise<UpdateState>;
+    check(): Promise<UpdateCheckResult>;
+    startDownload(): Promise<UpdateState>;
+    install(): Promise<UpdateState>;
+    openLogDirectory(): Promise<OpenUpdateLogsResult>;
+    getDiagnosticInfo(): Promise<string>;
   };
   on(channel: string, listener: (...args: unknown[]) => void): void;
   off(channel: string, listener: (...args: unknown[]) => void): void;

@@ -41,9 +41,12 @@ export const IPC = {
     install: "cli.install",
   },
   update: {
+    getState: "update.getState",
     check: "update.check",
     startDownload: "update.startDownload",
     install: "update.install",
+    openLogDirectory: "update.openLogDirectory",
+    getDiagnosticInfo: "update.getDiagnosticInfo",
   },
 } as const;
 
@@ -64,6 +67,7 @@ export const IpcEvent = {
     privacyChanged: "browser:privacyChanged",
   },
   update: {
+    stateChanged: "update:stateChanged",
     checking: "update:checking",
     available: "update:available",
     notAvailable: "update:notAvailable",

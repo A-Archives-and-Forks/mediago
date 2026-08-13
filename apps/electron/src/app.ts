@@ -96,7 +96,6 @@ export default class ElectronApp {
   }
 
   private async vendorInit() {
-    this.updater.init();
     this.devTools.init();
   }
 
@@ -117,6 +116,7 @@ export default class ElectronApp {
     this.initTray();
 
     // 2. Start Go download service in the background; errors are non-fatal
+    let updaterConfig = { allowBeta: false, autoUpgrade: true };
     try {
       await this.downloaderServer.start({
         logDir: logDir,
@@ -127,6 +127,10 @@ export default class ElectronApp {
       const client = this.downloaderServer.getClient();
       const { data: config } = await client.getConfig();
       this.configCache.seed(config as any);
+      updaterConfig = {
+        allowBeta: Boolean(config.allowBeta),
+        autoUpgrade: config.autoUpgrade !== false,
+      };
 
       // 4. Apply initial config
       nativeTheme.themeSource = (config.theme || "system") as AppTheme;
@@ -134,6 +138,8 @@ export default class ElectronApp {
     } catch (err) {
       this.logger.error("[ElectronApp] Failed to start Go core service:", err);
     }
+
+    this.updater.init(updaterConfig);
 
     // 5. Listen for Go config changes → update cache + platform side effects + IPC to UI
     this.downloaderServer.on(
@@ -172,6 +178,9 @@ export default class ElectronApp {
           },
           allowBeta: (v) => {
             this.updater.changeAllowBeta(v);
+          },
+          autoUpgrade: (v) => {
+            this.updater.changeAutoUpgrade(v);
           },
           audioMuted: (v) => {
             this.webviewService.setAudioMuted(v);

@@ -112,14 +112,23 @@ const electronApi: PlatformApi = {
     },
   },
   update: {
-    check(): Promise<void> {
+    getState() {
+      return ipcRenderer.invoke(IPC.update.getState);
+    },
+    check() {
       return ipcRenderer.invoke(IPC.update.check);
     },
-    startDownload(): Promise<void> {
+    startDownload() {
       return ipcRenderer.invoke(IPC.update.startDownload);
     },
-    install(): Promise<void> {
+    install() {
       return ipcRenderer.invoke(IPC.update.install);
+    },
+    openLogDirectory() {
+      return ipcRenderer.invoke(IPC.update.openLogDirectory);
+    },
+    getDiagnosticInfo() {
+      return ipcRenderer.invoke(IPC.update.getDiagnosticInfo);
     },
   },
   on(channel: string, listener: (...args: unknown[]) => void): void {

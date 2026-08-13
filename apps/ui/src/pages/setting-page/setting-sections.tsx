@@ -239,22 +239,35 @@ export const BrowserSettingsCard = memo(function BrowserSettingsCard() {
         label={t("privacy")}
         tooltip={t("privacyTooltip")}
       />
-      <SettingRow label={t("moreAction")}>
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" onClick={clearCache}>
-            <Eraser className="size-4" />
-            {t("clearCache")}
-          </Button>
-          <Button type="button" variant="outline" onClick={exportFavorites}>
-            <Download className="size-4" />
-            {t("exportFavorite")}
-          </Button>
-          <Button type="button" variant="outline" onClick={importFavoriteFile}>
-            <Upload className="size-4" />
-            {t("importFavorite")}
-          </Button>
-        </div>
-      </SettingRow>
+      <div className="grid grid-cols-1 gap-2 py-4 @sm/settings:grid-cols-3">
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          onClick={clearCache}
+        >
+          <Eraser className="size-4" />
+          {t("clearCache")}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          onClick={exportFavorites}
+        >
+          <Download className="size-4" />
+          {t("exportFavorite")}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          onClick={importFavoriteFile}
+        >
+          <Upload className="size-4" />
+          {t("importFavorite")}
+        </Button>
+      </div>
     </SettingCard>
   );
 });
@@ -644,29 +657,29 @@ export const BrowserExtensionCard = memo(function BrowserExtensionCard() {
 
   return (
     <SettingCard title={t("browserExtension")}>
-      <SettingRow label={t("moreAction")}>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={async () => {
-              const dir = await app.getExtensionDir();
-              if (dir) shell.open(dir);
-            }}
-          >
-            <FolderOpen className="size-4" />
-            {t("extensionDir")}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => shell.open(EXTENSION_GUIDE_URL)}
-          >
-            <Chrome className="size-4" />
-            {t("extensionGuide")}
-          </Button>
-        </div>
-      </SettingRow>
+      <div className="grid grid-cols-1 gap-2 py-4 @sm/settings:grid-cols-2">
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          onClick={async () => {
+            const dir = await app.getExtensionDir();
+            if (dir) shell.open(dir);
+          }}
+        >
+          <FolderOpen className="size-4" />
+          {t("extensionDir")}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          onClick={() => shell.open(EXTENSION_GUIDE_URL)}
+        >
+          <Chrome className="size-4" />
+          {t("extensionGuide")}
+        </Button>
+      </div>
     </SettingCard>
   );
 });
@@ -716,6 +729,15 @@ export const MoreSettingsCard = memo(function MoreSettingsCard({
   const local = useAppStore((state) => state.local);
   const apiKey = useAppStore((state) => state.apiKey);
   const updateAvailable = useSessionStore((state) => state.updateAvailable);
+  const updateState = useSessionStore((state) => state.updateState);
+  const updateBusy = ["checking", "downloading"].includes(updateState.status);
+  const updateActionLabel = updateState.portable
+    ? t("viewReleases")
+    : updateState.status === "checking"
+      ? t("checkingForUpdates")
+      : updateState.status === "downloading"
+        ? t("downloadingUpdate")
+        : t("checkUpdate");
 
   return (
     <SettingCard title={t("moreSettings")}>
@@ -729,52 +751,68 @@ export const MoreSettingsCard = memo(function MoreSettingsCard({
           />
         </SettingRow>
       ) : (
-        <SettingRow label={t("moreAction")}>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() =>
-                envPath?.configDir && shell.open(envPath.configDir)
-              }
-            >
-              <FolderOpen className="size-4" />
-              {t("configDir")}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => envPath?.binDir && shell.open(envPath.binDir)}
-            >
-              <FolderOpen className="size-4" />
-              {t("binPath")}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => local && shell.open(local)}
-            >
-              <FolderOpen className="size-4" />
-              {t("localDir")}
-            </Button>
-          </div>
-        </SettingRow>
-      )}
-      <SettingRow label={t("currentVersion")}>
-        <div className="flex items-center gap-4">
-          <span>{version}</span>
-          {!isWeb ? (
-            <span className="relative">
-              <Button type="button" variant="ghost" onClick={onCheckUpdate}>
-                {t("checkUpdate")}
-              </Button>
-              {updateAvailable ? (
-                <span className="absolute right-0 top-0 size-2 rounded-full bg-destructive" />
-              ) : null}
-            </span>
-          ) : null}
+        <div className="grid grid-cols-1 gap-2 py-4 @sm/settings:grid-cols-3">
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            onClick={() => envPath?.configDir && shell.open(envPath.configDir)}
+          >
+            <FolderOpen className="size-4" />
+            {t("configDir")}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            onClick={() => envPath?.binDir && shell.open(envPath.binDir)}
+          >
+            <FolderOpen className="size-4" />
+            {t("binPath")}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            onClick={() => local && shell.open(local)}
+          >
+            <FolderOpen className="size-4" />
+            {t("localDir")}
+          </Button>
         </div>
-      </SettingRow>
+      )}
+      <div className="mb-4 flex flex-col gap-3 p-4 @sm/settings:flex-row @sm/settings:items-center @sm/settings:justify-between">
+        <div className="min-w-0">
+          <p className="text-xs text-muted-foreground">{t("currentVersion")}</p>
+          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+            <span className="text-xl font-semibold tabular-nums tracking-tight">
+              {version}
+            </span>
+            {updateAvailable ? (
+              <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive">
+                {t("updateAvailable")}
+              </span>
+            ) : null}
+          </div>
+        </div>
+        {!isWeb ? (
+          <Button
+            type="button"
+            size="lg"
+            variant={updateAvailable ? "default" : "outline"}
+            className="w-full shrink-0 @sm/settings:w-auto"
+            onClick={onCheckUpdate}
+            disabled={updateBusy}
+          >
+            <RefreshCw
+              className={
+                updateState.status === "checking" ? "animate-spin" : undefined
+              }
+            />
+            {updateActionLabel}
+          </Button>
+        ) : null}
+      </div>
     </SettingCard>
   );
 });

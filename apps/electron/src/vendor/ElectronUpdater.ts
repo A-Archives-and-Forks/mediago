@@ -1,95 +1,297 @@
 import { provide } from "@inversifyjs/binding-decorators";
-import { i18n } from "../core/i18n";
+import {
+  IpcEvent,
+  type OpenUpdateLogsResult,
+  type UpdateCheckResult,
+  type UpdateErrorPhase,
+  type UpdateState,
+} from "@mediago/shared-common";
+import { app, shell } from "electron";
 import isDev from "electron-is-dev";
-import { autoUpdater } from "electron-updater";
+import {
+  autoUpdater,
+  type ProgressInfo,
+  type UpdateInfo,
+} from "electron-updater";
 import { inject, injectable } from "inversify";
-import GoConfigCache from "../services/go-config-cache";
+import { i18n } from "../core/i18n";
+import { logDir } from "../constants";
 import MainWindow from "../windows/main.window";
 import ElectronLogger from "./ElectronLogger";
+
+const GITHUB_RELEASES_URL = "https://github.com/mediago-dev/mediago/releases";
+
+type UpdateInitialization = {
+  allowBeta: boolean;
+  autoUpgrade: boolean;
+};
+
+function clampProgress(percent: number): number {
+  if (!Number.isFinite(percent)) return 0;
+  return Math.min(100, Math.max(0, percent));
+}
+
+function errorDetails(error: unknown): { code: string; message: string } {
+  if (error instanceof Error) {
+    const code =
+      "code" in error && typeof error.code === "string"
+        ? error.code
+        : "UPDATE_FAILED";
+    return { code, message: error.message };
+  }
+  return { code: "UPDATE_FAILED", message: String(error) };
+}
 
 @injectable()
 @provide()
 export default class UpdateService {
+  private initialized = false;
+  private phase: UpdateErrorPhase = "unknown";
+  private state: UpdateState = {
+    status: "idle",
+    currentVersion: app.getVersion(),
+    progress: 0,
+    autoDownload: true,
+    portable: Boolean(process.env.PORTABLE_EXECUTABLE_FILE),
+  };
+
   constructor(
     @inject(ElectronLogger)
     private readonly logger: ElectronLogger,
-    @inject(GoConfigCache)
-    private readonly configCache: GoConfigCache,
     @inject(MainWindow)
     private readonly mainWindow: MainWindow,
   ) {}
 
-  async init() {
-    const { autoUpgrade, allowBeta } = this.configCache.store;
+  init({ allowBeta, autoUpgrade }: UpdateInitialization): void {
+    if (this.initialized) return;
+    this.initialized = true;
+
     autoUpdater.disableWebInstaller = true;
     autoUpdater.logger = this.logger.logger;
     autoUpdater.allowPrerelease = allowBeta;
-    if (isDev) {
-      autoUpdater.forceDevUpdateConfig = true;
-    }
+    autoUpdater.autoDownload = autoUpgrade;
+    if (isDev) autoUpdater.forceDevUpdateConfig = true;
+
+    this.patchState({ autoDownload: autoUpgrade });
+    this.registerListeners();
+
+    if (this.state.portable) return;
     if (autoUpgrade) {
-      autoUpdater.autoDownload = true;
-      this.autoUpdate();
+      void this.autoUpdate();
     } else {
-      autoUpdater.autoDownload = false;
-      this.checkForUpdates();
+      this.scheduleInitialCheck();
     }
+  }
+
+  getState(): UpdateState {
+    return structuredClone(this.state);
+  }
+
+  async manualUpdate(): Promise<UpdateCheckResult> {
+    if (this.state.portable) {
+      try {
+        await shell.openExternal(GITHUB_RELEASES_URL);
+        return {
+          mode: "external",
+          externalUrl: GITHUB_RELEASES_URL,
+          state: this.getState(),
+        };
+      } catch (error) {
+        this.setError("check", error);
+        return { mode: "external", state: this.getState() };
+      }
+    }
+    if (["checking", "downloading"].includes(this.state.status)) {
+      return { mode: "in-app", state: this.getState() };
+    }
+
+    this.phase = "check";
+    this.patchState({
+      status: "checking",
+      targetVersion: undefined,
+      progress: 0,
+      error: undefined,
+    });
+    try {
+      await autoUpdater.checkForUpdates();
+    } catch (error) {
+      if (this.getState().status !== "error") this.setError("check", error);
+    }
+    return { mode: "in-app", state: this.getState() };
+  }
+
+  async startDownload(): Promise<UpdateState> {
+    if (this.state.portable) {
+      try {
+        await shell.openExternal(GITHUB_RELEASES_URL);
+      } catch (error) {
+        this.setError("download", error);
+      }
+      return this.getState();
+    }
+    if (this.state.status === "downloading") return this.getState();
+    if (this.state.status !== "available") {
+      this.setError("download", new Error("Please check update first"));
+      return this.getState();
+    }
+
+    this.phase = "download";
+    this.patchState({ status: "downloading", progress: 0, error: undefined });
+    try {
+      await autoUpdater.downloadUpdate();
+    } catch (error) {
+      if (this.getState().status !== "error") this.setError("download", error);
+    }
+    return this.getState();
+  }
+
+  async install(): Promise<UpdateState> {
+    if (this.state.status !== "downloaded") {
+      this.setError("install", new Error("Update has not been downloaded"));
+      return this.getState();
+    }
+
+    this.phase = "install";
+    try {
+      autoUpdater.quitAndInstall();
+    } catch (error) {
+      this.setError("install", error);
+    }
+    return this.getState();
+  }
+
+  changeAllowBeta(allowBeta: boolean): void {
+    autoUpdater.allowPrerelease = allowBeta;
+  }
+
+  changeAutoUpgrade(autoUpgrade: boolean): void {
+    autoUpdater.autoDownload = autoUpgrade;
+    this.patchState({ autoDownload: autoUpgrade });
+    if (autoUpgrade && this.state.status === "available") {
+      void this.startDownload();
+    }
+  }
+
+  async openLogDirectory(): Promise<OpenUpdateLogsResult> {
+    const error = await shell.openPath(logDir);
+    return error ? { opened: false, error } : { opened: true };
+  }
+
+  getDiagnosticInfo(): string {
+    const error = this.state.error;
+    return [
+      "MediaGo update diagnostics",
+      `Generated: ${new Date().toISOString()}`,
+      `Current version: ${this.state.currentVersion}`,
+      `Target version: ${this.state.targetVersion ?? "unknown"}`,
+      `Status: ${this.state.status}`,
+      `Progress: ${this.state.progress.toFixed(1)}%`,
+      `Platform: ${process.platform}`,
+      `Architecture: ${process.arch}`,
+      `Portable: ${String(this.state.portable)}`,
+      `Auto download: ${String(this.state.autoDownload)}`,
+      `Packaged: ${String(app.isPackaged)}`,
+      `Error phase: ${error?.phase ?? "none"}`,
+      `Error code: ${error?.code ?? "none"}`,
+      `Error message: ${error?.message ?? "none"}`,
+      `Log directory: ${logDir}`,
+    ].join("\n");
+  }
+
+  private registerListeners(): void {
     autoUpdater.on("checking-for-update", () => {
-      this.mainWindow.send("update:checking");
+      this.phase = "check";
+      this.patchState({
+        status: "checking",
+        targetVersion: undefined,
+        progress: 0,
+        error: undefined,
+      });
+      this.mainWindow.send(IpcEvent.update.checking);
     });
-    autoUpdater.on("update-available", () => {
-      this.mainWindow.send("update:available");
+    autoUpdater.on("update-available", (info: UpdateInfo) => {
+      const nextStatus = autoUpdater.autoDownload ? "downloading" : "available";
+      this.phase = autoUpdater.autoDownload ? "download" : "unknown";
+      this.patchState({
+        status: nextStatus,
+        targetVersion: info.version,
+        progress: 0,
+        error: undefined,
+        autoDownload: autoUpdater.autoDownload,
+      });
+      this.mainWindow.send(IpcEvent.update.available);
     });
-    autoUpdater.on("update-not-available", () => {
-      this.mainWindow.send("update:notAvailable");
+    autoUpdater.on("update-not-available", (info: UpdateInfo) => {
+      this.phase = "unknown";
+      this.patchState({
+        status: "not-available",
+        targetVersion: info.version,
+        progress: 0,
+        error: undefined,
+      });
+      this.mainWindow.send(IpcEvent.update.notAvailable);
     });
-    autoUpdater.on("download-progress", (progress) => {
-      this.logger.info(`progress: ${progress.percent}`);
-      this.mainWindow.send("update:downloadProgress", progress);
+    autoUpdater.on("download-progress", (progress: ProgressInfo) => {
+      this.phase = "download";
+      const percent = clampProgress(progress.percent);
+      this.logger.info(`Update download progress: ${percent}`);
+      this.patchState({ status: "downloading", progress: percent });
+      this.mainWindow.send(IpcEvent.update.downloadProgress, progress);
     });
-    autoUpdater.on("update-downloaded", () => {
-      this.mainWindow.send("update:downloaded");
+    autoUpdater.on("update-downloaded", (info: UpdateInfo) => {
+      this.phase = "unknown";
+      this.patchState({
+        status: "downloaded",
+        targetVersion: info.version,
+        progress: 100,
+        error: undefined,
+      });
+      this.mainWindow.send(IpcEvent.update.downloaded);
+    });
+    autoUpdater.on("error", (error: Error) => {
+      this.setError(this.phase, error);
     });
   }
 
-  async checkForUpdates() {
-    setTimeout(async () => {
-      try {
-        await autoUpdater.checkForUpdates();
-      } catch (e) {
-        this.logger.error("Check for updates failed", e);
-      }
+  private scheduleInitialCheck(): void {
+    setTimeout(() => {
+      void this.backgroundCheck();
     }, 60_000);
   }
 
-  async autoUpdate() {
+  private async backgroundCheck(): Promise<void> {
+    this.phase = "check";
+    try {
+      await autoUpdater.checkForUpdates();
+    } catch (error) {
+      if (this.getState().status !== "error") this.setError("check", error);
+    }
+  }
+
+  private async autoUpdate(): Promise<void> {
+    this.phase = "check";
     try {
       await autoUpdater.checkForUpdatesAndNotify({
         title: i18n.t("autoUpdateSuccess"),
         body: i18n.t("nextTimeWillAutoInstall"),
       });
-    } catch (e) {
-      this.logger.error("update error", e);
+    } catch (error) {
+      if (this.getState().status !== "error") this.setError(this.phase, error);
     }
   }
 
-  async changeAllowBeta(allowBeta: boolean) {
-    autoUpdater.allowPrerelease = allowBeta;
+  private patchState(patch: Partial<UpdateState>): void {
+    this.state = { ...this.state, ...patch };
+    this.mainWindow.send(IpcEvent.update.stateChanged, this.getState());
   }
 
-  async manualUpdate() {
-    try {
-      await autoUpdater.checkForUpdates();
-    } catch (e) {
-      this.logger.error("Manual update check failed", e);
-    }
-  }
-
-  async startDownload() {
-    autoUpdater.downloadUpdate();
-  }
-
-  async install() {
-    autoUpdater.quitAndInstall();
+  private setError(phase: UpdateErrorPhase, error: unknown): void {
+    const details = errorDetails(error);
+    this.logger.error(`Update ${phase} failed [${details.code}]`, error);
+    this.phase = "unknown";
+    this.patchState({
+      status: "error",
+      error: { ...details, phase },
+    });
   }
 }

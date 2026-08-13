@@ -1,6 +1,9 @@
 import { useMemoizedFn } from "ahooks";
+import type { UpdateErrorPhase } from "@mediago/shared-common";
+import { Copy, FolderOpen } from "lucide-react";
 import { memo, startTransition, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -104,50 +107,126 @@ const SettingsContent = memo(function SettingsContent({
 });
 
 const SettingPage = () => {
-  const { update, on, off } = usePlatform();
+  const { update } = usePlatform();
   const { t } = useTranslation();
-  const updateAvailable = useSessionStore((state) => state.updateAvailable);
-  const updateChecking = useSessionStore((state) => state.updateChecking);
+  const updateState = useSessionStore((state) => state.updateState);
+  const setUpdateState = useSessionStore((state) => state.setUpdateState);
   const [openUpdateModal, setOpenUpdateModal] = useState(false);
-  const [downloadProgress, setDownloadProgress] = useState(0);
-  const [updateDownloaded, setUpdateDownloaded] = useState(false);
+
+  const showUnexpectedUpdateError = useMemoizedFn(
+    (phase: UpdateErrorPhase, error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      const currentState = useSessionStore.getState().updateState;
+      setUpdateState({
+        ...currentState,
+        status: "error",
+        error: { code: "UPDATE_IPC_FAILED", message, phase },
+      });
+      setOpenUpdateModal(true);
+    },
+  );
 
   const handleCheckUpdate = useMemoizedFn(async () => {
     tdApp.onEvent(CHECK_UPDATE);
-    setOpenUpdateModal(true);
-    await update.check();
+    const currentState = useSessionStore.getState().updateState;
+    if (!currentState.portable) {
+      setUpdateState({
+        ...currentState,
+        status: "checking",
+        targetVersion: undefined,
+        progress: 0,
+        error: undefined,
+      });
+      setOpenUpdateModal(true);
+    }
+
+    try {
+      const result = await update.check();
+      setUpdateState(result.state);
+      if (result.mode === "external" && result.state.status === "error") {
+        setOpenUpdateModal(true);
+      }
+    } catch (error) {
+      showUnexpectedUpdateError("check", error);
+    }
   });
 
   const handleHiddenUpdateModal = useMemoizedFn(() => {
     setOpenUpdateModal(false);
   });
 
-  const handleUpdate = useMemoizedFn(() => {
-    update.startDownload();
+  const handleUpdate = useMemoizedFn(async () => {
+    setUpdateState({
+      ...useSessionStore.getState().updateState,
+      status: "downloading",
+      progress: 0,
+      error: undefined,
+    });
+    try {
+      const state = await update.startDownload();
+      setUpdateState(state);
+    } catch (error) {
+      showUnexpectedUpdateError("download", error);
+    }
   });
 
-  const handleInstallUpdate = useMemoizedFn(() => {
-    update.install();
+  const handleInstallUpdate = useMemoizedFn(async () => {
+    try {
+      const state = await update.install();
+      setUpdateState(state);
+    } catch (error) {
+      showUnexpectedUpdateError("install", error);
+    }
   });
 
-  useEffect(() => {
-    const onDownloadProgress = (...args: unknown[]) => {
-      const progress = args[1] as { percent: number };
-      setDownloadProgress(progress.percent);
-    };
-    const onDownloaded = () => {
-      setUpdateDownloaded(true);
-    };
-    on("update:downloadProgress", onDownloadProgress);
-    on("update:downloaded", onDownloaded);
+  const handleOpenLogs = useMemoizedFn(async () => {
+    try {
+      const result = await update.openLogDirectory();
+      if (!result.opened) {
+        toast.error(result.error || t("openUpdateLogsFailed"));
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error));
+    }
+  });
 
-    return () => {
-      off("update:downloadProgress", onDownloadProgress);
-      off("update:downloaded", onDownloaded);
-    };
-  }, [off, on]);
+  const handleCopyDiagnosticInfo = useMemoizedFn(async () => {
+    try {
+      const diagnosticInfo = await update.getDiagnosticInfo();
+      await navigator.clipboard.writeText(diagnosticInfo);
+      toast.success(t("updateDiagnosticsCopied"));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error));
+    }
+  });
 
-  const displayedDownloadProgress = updateDownloaded ? 100 : downloadProgress;
+  const statusMessage = (() => {
+    switch (updateState.status) {
+      case "checking":
+        return t("checkingForUpdates");
+      case "available":
+        return t("updateAvailable");
+      case "downloading":
+        return t("downloadingUpdate");
+      case "downloaded":
+        return t("updateDownloaded");
+      case "error":
+        if (updateState.error?.phase === "download") {
+          return t("updateDownloadFailed");
+        }
+        if (updateState.error?.phase === "install") {
+          return t("updateInstallFailed");
+        }
+        return t("updateCheckFailed");
+      case "idle":
+      case "not-available":
+        return t("updateNotAvailable");
+    }
+  })();
+
+  const showProgress = ["downloading", "downloaded"].includes(
+    updateState.status,
+  );
 
   return (
     <div className="h-full min-h-0 overflow-hidden">
@@ -159,23 +238,60 @@ const SettingPage = () => {
             <DialogTitle>{t("updateModal")}</DialogTitle>
           </DialogHeader>
           <div className="flex min-h-28 flex-col justify-center gap-3">
-            <DialogDescription>
-              {updateChecking
-                ? t("checkingForUpdates")
-                : updateAvailable
-                  ? t("updateAvailable")
-                  : t("updateNotAvailable")}
-            </DialogDescription>
-            {!updateChecking && updateAvailable ? (
+            <DialogDescription>{statusMessage}</DialogDescription>
+            {updateState.targetVersion &&
+            ["available", "downloading", "downloaded"].includes(
+              updateState.status,
+            ) ? (
+              <p className="text-sm text-muted-foreground">
+                {t("updateVersionDescription", {
+                  current: updateState.currentVersion,
+                  target: updateState.targetVersion,
+                })}
+              </p>
+            ) : null}
+            {showProgress ? (
               <div className="flex items-center gap-3">
                 <Progress
-                  value={displayedDownloadProgress}
+                  value={updateState.progress}
                   aria-label={t("updateAvailable")}
                   className="flex-1"
                 />
                 <span className="w-12 text-right text-sm tabular-nums">
-                  {Math.round(displayedDownloadProgress)}%
+                  {Math.round(updateState.progress)}%
                 </span>
+              </div>
+            ) : null}
+            {updateState.status === "error" ? (
+              <div className="space-y-3 rounded-md border border-destructive/30 bg-destructive/5 p-3">
+                <p className="break-words text-sm text-destructive">
+                  {updateState.error?.message || t("unknownError")}
+                </p>
+                {updateState.error?.code ? (
+                  <p className="font-mono text-xs text-muted-foreground">
+                    {updateState.error.code}
+                  </p>
+                ) : null}
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={handleOpenLogs}
+                  >
+                    <FolderOpen className="size-4" />
+                    {t("openUpdateLogs")}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={handleCopyDiagnosticInfo}
+                  >
+                    <Copy className="size-4" />
+                    {t("copyUpdateDiagnostics")}
+                  </Button>
+                </div>
               </div>
             ) : null}
           </div>
@@ -187,16 +303,20 @@ const SettingPage = () => {
             >
               {t("close")}
             </Button>
-            {updateAvailable ? (
-              updateDownloaded ? (
-                <Button type="button" onClick={handleInstallUpdate}>
-                  {t("install")}
-                </Button>
-              ) : (
-                <Button type="button" onClick={handleUpdate}>
-                  {t("update")}
-                </Button>
-              )
+            {updateState.status === "available" ? (
+              <Button type="button" onClick={handleUpdate}>
+                {t("downloadUpdate")}
+              </Button>
+            ) : null}
+            {updateState.status === "downloaded" ? (
+              <Button type="button" onClick={handleInstallUpdate}>
+                {t("installAndRestart")}
+              </Button>
+            ) : null}
+            {updateState.status === "error" ? (
+              <Button type="button" onClick={handleCheckUpdate}>
+                {t("retryUpdateCheck")}
+              </Button>
             ) : null}
           </DialogFooter>
         </DialogContent>
