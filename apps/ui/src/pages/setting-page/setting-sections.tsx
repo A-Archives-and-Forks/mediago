@@ -4,8 +4,10 @@ import {
   Download,
   Eraser,
   FolderOpen,
+  Github,
   RefreshCw,
   Server,
+  Star,
   Terminal,
   Upload,
 } from "lucide-react";
@@ -46,6 +48,8 @@ import {
 
 const version = import.meta.env.APP_VERSION;
 const EXTENSION_GUIDE_URL = "https://downloader.caorushizi.cn/extension.html";
+const GITHUB_REPOSITORY_URL = "https://github.com/mediago-dev/mediago";
+const GITHUB_REPOSITORY_NAME = "mediago-dev/mediago";
 
 const actionButtonClass = "h-8 shrink-0";
 
@@ -66,17 +70,11 @@ export const BasicSettingsCard = memo(function BasicSettingsCard() {
 
   return (
     <SettingCard title={t("basicSetting")}>
-      <SettingRow label={t("localDir")} htmlFor="setting-local">
-        <div className="flex w-full min-w-0 gap-2">
-          <Input
-            id="setting-local"
-            value={String(localField.value ?? "")}
-            readOnly
-            aria-readonly="true"
-            placeholder={t("pleaseSelectDownloadDir")}
-            className="h-8"
-          />
-          {!isWeb ? (
+      <SettingRow
+        label={
+          isWeb ? (
+            t("localDir")
+          ) : (
             <Button
               type="button"
               variant="outline"
@@ -86,8 +84,19 @@ export const BasicSettingsCard = memo(function BasicSettingsCard() {
               <FolderOpen className="size-4" />
               {t("selectFolder")}
             </Button>
-          ) : null}
-        </div>
+          )
+        }
+        htmlFor={isWeb ? "setting-local" : undefined}
+      >
+        <Input
+          id="setting-local"
+          value={String(localField.value ?? "")}
+          readOnly
+          aria-readonly="true"
+          aria-label={!isWeb ? t("localDir") : undefined}
+          placeholder={t("pleaseSelectDownloadDir")}
+          className="h-8"
+        />
       </SettingRow>
 
       {!isWeb ? (
@@ -658,6 +667,40 @@ export const BrowserExtensionCard = memo(function BrowserExtensionCard() {
           </Button>
         </div>
       </SettingRow>
+    </SettingCard>
+  );
+});
+
+export const OpenSourceCard = memo(function OpenSourceCard() {
+  const { t } = useTranslation();
+  const { shell } = usePlatform();
+
+  return (
+    <SettingCard title={t("openSourceProject")}>
+      <div className="flex flex-col gap-4 py-5">
+        <div className="flex items-start gap-3">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-secondary text-foreground">
+            <Github className="size-5" />
+          </div>
+          <div className="min-w-0 space-y-1">
+            <p className="truncate text-sm font-medium">
+              {GITHUB_REPOSITORY_NAME}
+            </p>
+            <p className="text-sm leading-5 text-muted-foreground">
+              {t("openSourceDescription")}
+            </p>
+          </div>
+        </div>
+        <Button
+          type="button"
+          size="lg"
+          className="w-full"
+          onClick={() => shell.open(GITHUB_REPOSITORY_URL)}
+        >
+          <Star className="fill-current" />
+          {t("viewAndStarOnGithub")}
+        </Button>
+      </div>
     </SettingCard>
   );
 });

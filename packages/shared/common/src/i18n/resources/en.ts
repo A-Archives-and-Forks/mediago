@@ -84,6 +84,10 @@ export const en = {
   skillsCopy: "Copy",
   skillsCopied: "Copied to clipboard",
   moreSettings: "Advanced",
+  openSourceProject: "Open source",
+  openSourceDescription:
+    "MediaGo is built in the open on GitHub. If it helps you, consider giving the project a Star.",
+  viewAndStarOnGithub: "View and Star on GitHub",
   deleteSegments: "Delete segments after download",
   moreAction: "More actions",
   configDir: "Config directory",

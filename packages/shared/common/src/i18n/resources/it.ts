@@ -84,6 +84,10 @@ export const it = {
   skillsCopy: "Copia",
   skillsCopied: "Copiato negli appunti",
   moreSettings: "Avanzate",
+  openSourceProject: "Open source",
+  openSourceDescription:
+    "MediaGo viene sviluppato pubblicamente su GitHub. Se ti è utile, considera di assegnare una Star al progetto.",
+  viewAndStarOnGithub: "Visualizza e assegna una Star su GitHub",
   deleteSegments: "Dopo il download elimina segmenti",
   moreAction: "Altre azioni",
   configDir: "Cartella impostazioni",

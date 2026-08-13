@@ -339,13 +339,13 @@ export function SettingRow({
         className,
       )}
     >
-      <div className="flex w-full items-center gap-2">
+      <div className="flex w-full self-center items-center gap-2">
         {htmlFor ? (
-          <FieldLabel htmlFor={htmlFor} className="w-full font-normal">
+          <FieldLabel htmlFor={htmlFor} className="font-normal">
             {label}
           </FieldLabel>
         ) : (
-          <FieldTitle id={resolvedLabelId} className="w-full font-normal">
+          <FieldTitle id={resolvedLabelId} className="font-normal">
             {label}
           </FieldTitle>
         )}

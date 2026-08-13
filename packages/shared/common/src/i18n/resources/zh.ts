@@ -78,6 +78,10 @@ export const zh = {
   skillsCopy: "复制",
   skillsCopied: "已复制到剪贴板",
   moreSettings: "更多设置",
+  openSourceProject: "开源项目",
+  openSourceDescription:
+    "MediaGo 的源代码托管在 GitHub。如果这个项目对你有帮助，欢迎点亮一颗 Star。",
+  viewAndStarOnGithub: "在 GitHub 查看并 Star",
   deleteSegments: "下载完成删除分片",
   moreAction: "更多操作",
   configDir: "配置文件目录",

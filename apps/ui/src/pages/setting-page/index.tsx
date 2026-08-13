@@ -25,6 +25,7 @@ import {
   DownloadSettingsCard,
   MCPSettingsCard,
   MoreSettingsCard,
+  OpenSourceCard,
   SkillsSettingsCard,
 } from "./setting-sections";
 
@@ -37,6 +38,7 @@ const StableMCPSettingsCard = memo(MCPSettingsCard);
 const StableSkillsSettingsCard = memo(SkillsSettingsCard);
 const StableBrowserExtensionCard = memo(BrowserExtensionCard);
 const StableMoreSettingsCard = memo(MoreSettingsCard);
+const StableOpenSourceCard = memo(OpenSourceCard);
 const SETTINGS_REVEAL_STEPS = isWeb ? 2 : 5;
 
 const SettingsCards = memo(function SettingsCards({
@@ -45,6 +47,7 @@ const SettingsCards = memo(function SettingsCards({
   onCheckUpdate: () => void;
 }) {
   const [visibleStep, setVisibleStep] = useState(1);
+  const allSettingsVisible = visibleStep >= (isWeb ? 2 : 5);
 
   useEffect(() => {
     let nextStep = 2;
@@ -67,6 +70,7 @@ const SettingsCards = memo(function SettingsCards({
         <StableBasicSettingsCard />
         {!isWeb && visibleStep >= 2 ? <StableBrowserSettingsCard /> : null}
         {visibleStep >= (isWeb ? 2 : 3) ? <StableDownloadSettingsCard /> : null}
+        {!isWeb && allSettingsVisible ? <StableOpenSourceCard /> : null}
       </div>
       <div className="flex min-w-0 flex-col gap-4">
         {!isWeb ? <StableDockerSettingsCard /> : <StableSkillsSettingsCard />}
@@ -74,8 +78,11 @@ const SettingsCards = memo(function SettingsCards({
         {!isWeb && visibleStep >= 3 ? <StableCLISettingsCard /> : null}
         {!isWeb && visibleStep >= 3 ? <StableMCPSettingsCard /> : null}
         {!isWeb && visibleStep >= 4 ? <StableBrowserExtensionCard /> : null}
-        {visibleStep >= (isWeb ? 2 : 5) ? (
-          <StableMoreSettingsCard onCheckUpdate={onCheckUpdate} />
+        {allSettingsVisible ? (
+          <>
+            <StableMoreSettingsCard onCheckUpdate={onCheckUpdate} />
+            {isWeb ? <StableOpenSourceCard /> : null}
+          </>
         ) : null}
       </div>
     </div>
