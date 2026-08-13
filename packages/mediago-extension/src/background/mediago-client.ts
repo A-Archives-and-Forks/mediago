@@ -5,6 +5,11 @@ import type {
   LocalizedMessage,
   ServerStatus,
 } from "@/shared/types";
+import type {
+  HLSMediaInfo,
+  HLSPlaylistType,
+  HLSVariantInfo,
+} from "@mediago/shared-common";
 
 /* --------------------------- helpers --------------------------- */
 
@@ -49,6 +54,104 @@ interface ImportResult {
 interface HttpConfig {
   serverUrl: string;
   apiKey?: string;
+}
+
+interface InspectSourceResponse {
+  id: string;
+  url: string;
+  playlistType: HLSPlaylistType;
+  maxQuality?: string;
+  variants: HLSVariantInfo[];
+  error?: string;
+}
+
+function storedHeadersToArray(headers?: string): string[] {
+  if (!headers) return [];
+  try {
+    const parsed = JSON.parse(headers) as unknown;
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return Object.entries(parsed as Record<string, unknown>).map(
+        ([name, value]) => `${name}:${String(value)}`,
+      );
+    }
+  } catch {
+    // Current sources use newline-separated headers.
+  }
+  return headers
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((header) => header.trim())
+    .filter(Boolean);
+}
+
+function inspectedMediaInfo(result?: InspectSourceResponse): HLSMediaInfo {
+  if (!result || result.error) {
+    return { status: "failed", playlistType: "unknown", variants: [] };
+  }
+  return {
+    status: "ready",
+    playlistType: result.playlistType,
+    maxQuality: result.maxQuality,
+    variants: result.variants,
+  };
+}
+
+/** Inspect sniffed HLS sources through the configured Desktop/Docker Core. */
+export async function inspectSources(
+  settings: ExtensionSettings,
+  sources: DetectedSource[],
+): Promise<DetectedSource[]> {
+  const config = httpConfigFor(settings);
+  if (!config || sources.length === 0) {
+    return sources.map((source) => ({
+      ...source,
+      mediaInfo: inspectedMediaInfo(),
+    }));
+  }
+
+  try {
+    const requests: Promise<InspectSourceResponse[]>[] = [];
+    for (let index = 0; index < sources.length; index += 20) {
+      const chunk = sources.slice(index, index + 20);
+      requests.push(
+        fetch(joinUrl(config.serverUrl, "/api/sources/inspect"), {
+          method: "POST",
+          headers: withApiKey(
+            {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+            config.apiKey,
+          ),
+          body: JSON.stringify({
+            sources: chunk.map((source) => ({
+              id: source.id,
+              url: source.url,
+              headers: storedHeadersToArray(source.headers),
+            })),
+          }),
+          signal: AbortSignal.timeout(6_000),
+        }).then(async (res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const body = (await res.json()) as {
+            data?: { sources?: InspectSourceResponse[] };
+          };
+          return body.data?.sources ?? [];
+        }),
+      );
+    }
+    const results = (await Promise.all(requests)).flat();
+    const inspections = new Map(results.map((result) => [result.id, result]));
+    return sources.map((source) => ({
+      ...source,
+      mediaInfo: inspectedMediaInfo(inspections.get(source.id)),
+    }));
+  } catch {
+    return sources.map((source) => ({
+      ...source,
+      mediaInfo: inspectedMediaInfo(),
+    }));
+  }
 }
 
 /**

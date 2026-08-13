@@ -23,6 +23,9 @@ const resource = {
   source: {
     unnamed: "(未命名)",
     import: "导入",
+    inspecting: "正在识别",
+    autoBest: "自动最佳",
+    qualityUnknown: "清晰度未知",
   },
   options: {
     pageTitle: "MediaGo 扩展设置",

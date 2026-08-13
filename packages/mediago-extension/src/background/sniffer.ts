@@ -1,26 +1,32 @@
-import { matchPageUrl, matchRequestUrl } from "@mediago/shared-common";
+import {
+  DownloadType,
+  matchPageUrl,
+  matchRequestUrl,
+  mergeSniffedSource,
+} from "@mediago/shared-common";
 import type { DetectedSource } from "@/shared/types";
-import { clearTabSources, loadTabSources, saveTabSources } from "./storage";
+import { inspectSources } from "./mediago-client";
+import {
+  clearTabSources,
+  loadSettings,
+  loadTabSources,
+  saveTabSources,
+} from "./storage";
 
 /**
- * Turn `chrome.webRequest.HttpHeader[]` into the JSON string format
- * the MediaGo downloader expects (a JSON object of header → value).
+ * Turn `chrome.webRequest.HttpHeader[]` into the newline format accepted by
+ * MediaGo Core and the desktop download form.
  */
 function formatHeaders(
   headers: chrome.webRequest.HttpHeader[] | undefined,
 ): string | undefined {
   if (!headers || headers.length === 0) return undefined;
-  const parts: Record<string, string> = {};
+  const parts: string[] = [];
   for (const h of headers) {
     if (!h.name) continue;
-    parts[h.name] = h.value ?? "";
+    parts.push(`${h.name}:${h.value ?? ""}`);
   }
-  return JSON.stringify(parts);
-}
-
-/** Dedup by URL — same link captured twice in one page view is one source. */
-function dedupKey(url: string): string {
-  return url;
+  return parts.join("\n");
 }
 
 async function updateBadge(tabId: number, count: number): Promise<void> {
@@ -38,13 +44,83 @@ async function updateBadge(tabId: number, count: number): Promise<void> {
   }
 }
 
+const tabStorageQueues = new Map<number, Promise<void>>();
+
+async function enqueueTabStorageUpdate(
+  tabId: number,
+  update: () => Promise<void>,
+): Promise<void> {
+  const previous = tabStorageQueues.get(tabId) ?? Promise.resolve();
+  const current = previous.catch(() => undefined).then(update);
+  tabStorageQueues.set(tabId, current);
+  try {
+    await current;
+  } finally {
+    if (tabStorageQueues.get(tabId) === current) {
+      tabStorageQueues.delete(tabId);
+    }
+  }
+}
+
 async function addSource(tabId: number, source: DetectedSource): Promise<void> {
-  const existing = await loadTabSources(tabId);
-  const key = dedupKey(source.url);
-  if (existing.some((s) => dedupKey(s.url) === key)) return;
-  const next = [...existing, source];
-  await saveTabSources(tabId, next);
-  await updateBadge(tabId, next.length);
+  return addSources(tabId, [source]);
+}
+
+async function addSources(
+  tabId: number,
+  sources: DetectedSource[],
+): Promise<void> {
+  await enqueueTabStorageUpdate(tabId, async () => {
+    const existing = await loadTabSources(tabId);
+    const next = sources.reduce(mergeSniffedSource, existing);
+    await saveTabSources(tabId, next);
+    await updateBadge(tabId, next.length);
+  });
+}
+
+async function clearSources(tabId: number): Promise<void> {
+  await enqueueTabStorageUpdate(tabId, async () => {
+    await clearTabSources(tabId);
+    await updateBadge(tabId, 0);
+  });
+}
+
+const pendingInspections = new Map<number, Map<string, DetectedSource>>();
+const inspectionTimers = new Map<number, ReturnType<typeof setTimeout>>();
+const tabGenerations = new Map<number, number>();
+
+function resetPendingInspections(tabId: number): void {
+  tabGenerations.set(tabId, (tabGenerations.get(tabId) ?? 0) + 1);
+  pendingInspections.delete(tabId);
+  const timer = inspectionTimers.get(tabId);
+  if (timer) clearTimeout(timer);
+  inspectionTimers.delete(tabId);
+}
+
+function queueInspection(tabId: number, source: DetectedSource): void {
+  const pending = pendingInspections.get(tabId) ?? new Map();
+  pending.set(source.url, source);
+  pendingInspections.set(tabId, pending);
+  if (inspectionTimers.has(tabId)) return;
+  inspectionTimers.set(
+    tabId,
+    setTimeout(() => {
+      inspectionTimers.delete(tabId);
+      void flushInspections(tabId);
+    }, 150),
+  );
+}
+
+async function flushInspections(tabId: number): Promise<void> {
+  const pending = [...(pendingInspections.get(tabId)?.values() ?? [])];
+  pendingInspections.delete(tabId);
+  if (pending.length === 0) return;
+
+  const generation = tabGenerations.get(tabId) ?? 0;
+  const settings = await loadSettings();
+  const inspected = await inspectSources(settings, pending);
+  if ((tabGenerations.get(tabId) ?? 0) !== generation) return;
+  await addSources(tabId, inspected);
 }
 
 /* --------------------- request-level (m3u8 / mp4) --------------------- */
@@ -66,6 +142,7 @@ async function handleRequest(
 
   const filter = matchRequestUrl(details.url);
   if (!filter) return;
+  const generation = tabGenerations.get(details.tabId) ?? 0;
 
   let documentURL = details.initiator ?? "";
   let pageTitle = "";
@@ -76,8 +153,9 @@ async function handleRequest(
   } catch {
     /* tab might have closed between event and lookup; best-effort */
   }
+  if ((tabGenerations.get(details.tabId) ?? 0) !== generation) return;
 
-  await addSource(details.tabId, {
+  const source: DetectedSource = {
     id: `${details.requestId}-${Date.now()}`,
     url: details.url,
     documentURL,
@@ -85,7 +163,19 @@ async function handleRequest(
     type: filter.type,
     headers: formatHeaders(details.requestHeaders),
     detectedAt: Date.now(),
-  });
+    mediaInfo:
+      filter.type === DownloadType.m3u8
+        ? {
+            status: "inspecting",
+            playlistType: "unknown",
+            variants: [],
+          }
+        : undefined,
+  };
+  await addSource(details.tabId, source);
+  if (filter.type === DownloadType.m3u8) {
+    queueInspection(details.tabId, source);
+  }
 }
 
 /* --------------------- page-level (bilibili / youtube) --------------------- */
@@ -133,7 +223,7 @@ export function registerSniffer(): void {
       void handleRequest(details);
     },
     { urls: ["<all_urls>"] },
-    ["requestHeaders"],
+    ["requestHeaders", "extraHeaders"],
   );
 
   chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
@@ -141,8 +231,8 @@ export function registerSniffer(): void {
     // sites with client-side routing (YouTube SPA navigation!) don't
     // leak detections from the previous video into the next one.
     if (changeInfo.url) {
-      await clearTabSources(tabId);
-      await updateBadge(tabId, 0);
+      resetPendingInspections(tabId);
+      await clearSources(tabId);
     }
     // Emit the page-level detection when the title is known — waiting
     // for `status === "complete"` avoids capturing the empty title
@@ -154,6 +244,7 @@ export function registerSniffer(): void {
 
   // Tab closed → drop its entry so we don't accumulate stale data.
   chrome.tabs.onRemoved.addListener(async (tabId) => {
-    await clearTabSources(tabId);
+    resetPendingInspections(tabId);
+    await clearSources(tabId);
   });
 }

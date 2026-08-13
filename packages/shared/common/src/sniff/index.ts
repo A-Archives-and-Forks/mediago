@@ -4,3 +4,4 @@ export {
   matchRequestUrl,
   type SniffFilter,
 } from "./filter-rules";
+export * from "./source-grouping";

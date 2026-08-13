@@ -70,6 +70,26 @@ export enum DownloadType {
   mediago = "mediago",
   youtube = "youtube",
 }
+
+export type HLSInspectionStatus = "inspecting" | "ready" | "failed";
+
+export type HLSPlaylistType = "master" | "media" | "unknown";
+
+export interface HLSVariantInfo {
+  url: string;
+  quality?: string;
+  width?: number;
+  height?: number;
+  bandwidth?: number;
+  codecs?: string;
+}
+
+export interface HLSMediaInfo {
+  status: HLSInspectionStatus;
+  playlistType: HLSPlaylistType;
+  maxQuality?: string;
+  variants: HLSVariantInfo[];
+}
 export type ShareIntentSource = "web" | "pwa" | "electron" | "legacy-electron";
 
 export type ShareIntentWarning = "legacy-auto-action-disabled";

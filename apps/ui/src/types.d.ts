@@ -18,6 +18,7 @@ declare interface BrowserStore {
   errCode?: number;
   errMsg?: string;
   sources: SourceData[];
+  sourcePanelCollapsed: boolean;
 }
 
 interface ObjectConstructor {

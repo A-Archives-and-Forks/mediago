@@ -1,7 +1,6 @@
 import type { Conversion, ConversionResponse } from "@mediago/shared-common";
 import {
   CircleAlert,
-  CircleDashed,
   FolderOpen,
   Play,
   RefreshCw,
@@ -9,6 +8,8 @@ import {
   Trash2,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import emptyConversions from "@/assets/images/empty-states/empty-conversions.png";
+import { AppEmptyState } from "@/components/app-empty-state";
 import { DownloadTag } from "@/components/download-tag";
 import Loading from "@/components/loading";
 import { Button } from "@/components/ui/button";
@@ -266,15 +267,12 @@ export function ConversionTaskList({
           ) : null}
 
           {!isLoading && !error && tasks.length === 0 ? (
-            <div className="flex h-full min-h-44 flex-col items-center justify-center px-6 text-center text-muted-foreground">
-              <CircleDashed className="mb-2 size-7 stroke-[1.5]" />
-              <div className="text-sm font-medium text-foreground">
-                {t("emptyConversionsTitle")}
-              </div>
-              <div className="mt-1 text-xs">
-                {t("emptyConversionsDescription")}
-              </div>
-            </div>
+            <AppEmptyState
+              className="h-full min-h-44"
+              illustration={emptyConversions}
+              title={t("emptyConversionsTitle")}
+              description={t("emptyConversionsDescription")}
+            />
           ) : null}
 
           {!isLoading && tasks.length > 0 ? (

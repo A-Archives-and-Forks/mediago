@@ -32,6 +32,7 @@ type Server struct {
 	healthHandler *handler.HealthHandler
 	authHandler   *handler.AuthHandler
 	utilHandler   *handler.UtilHandler
+	sourceHandler *handler.SourceHandler
 
 	// Database persistence handlers (available when database is non-nil)
 	downloadHandler   *handler.DownloadHandler
@@ -83,6 +84,7 @@ func New(queue *core.TaskQueue, logs *tasklog.Manager, database *db.Database, co
 	}
 
 	hub := sse.New()
+	sourceInspector := service.NewM3U8Inspector(confStore)
 
 	srv := &Server{
 		queue:         queue,
@@ -95,6 +97,7 @@ func New(queue *core.TaskQueue, logs *tasklog.Manager, database *db.Database, co
 		healthHandler: handler.NewHealthHandler(),
 		authHandler:   handler.NewAuthHandler(confStore),
 		utilHandler:   handler.NewUtilHandler(opt.EnvPaths),
+		sourceHandler: handler.NewSourceHandler(sourceInspector),
 	}
 
 	// Initialize persistence-related components when a database is provided

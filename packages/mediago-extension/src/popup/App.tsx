@@ -20,6 +20,9 @@ export function App() {
 
   const { sources, tab, settings, serverStatus, importing } = data;
   const hasSources = sources.length > 0;
+  const inspectingSources = sources.some(
+    (source) => source.mediaInfo?.status === "inspecting",
+  );
   const needsSetup =
     settings?.mode === "docker-http" && !settings.serverUrl.trim();
 
@@ -109,7 +112,7 @@ export function App() {
           className="flex-1"
           size="sm"
           variant="dark"
-          disabled={!hasSources || importing}
+          disabled={!hasSources || importing || inspectingSources}
           onClick={data.importAll}
         >
           <DownloadCloud className="size-3.5" />

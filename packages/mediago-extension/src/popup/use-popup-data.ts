@@ -8,6 +8,7 @@ import type {
   LocalizedMessage,
   ServerStatus,
 } from "@/shared/types";
+import { storageKeyTab } from "@/shared/constants";
 
 async function sendMessage<T extends ExtensionResponse>(
   msg: ExtensionMessage,
@@ -95,6 +96,22 @@ export function usePopupData(
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (!tab?.id) return;
+    const key = storageKeyTab(tab.id);
+    const onStorageChanged = (
+      changes: Record<string, chrome.storage.StorageChange>,
+      areaName: string,
+    ) => {
+      if (areaName !== "session") return;
+      if (!changes[key]) return;
+      const nextSources = changes[key].newValue as DetectedSource[] | undefined;
+      setSources(nextSources ?? []);
+    };
+    chrome.storage.onChanged.addListener(onStorageChanged);
+    return () => chrome.storage.onChanged.removeListener(onStorageChanged);
+  }, [tab?.id]);
 
   const clear = useCallback(async () => {
     if (!tab?.id) return;

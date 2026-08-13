@@ -18,6 +18,8 @@ import type {
   EnvPaths,
   FavoriteItem,
   HealthResponse,
+  InspectSourcesParams,
+  InspectSourcesResponse,
   MCPServerStatus,
   PaginatedResponse,
   StartDownloadParams,
@@ -394,6 +396,15 @@ export class MediaGoClient {
    */
   async getEnvPaths(): Promise<ApiResponse<EnvPaths>> {
     return this.api.get("/api/env");
+  }
+
+  /**
+   * Inspects ephemeral sniffed HLS sources without creating download tasks.
+   */
+  async inspectSources(
+    params: InspectSourcesParams,
+  ): Promise<ApiResponse<InspectSourcesResponse>> {
+    return this.api.post("/api/sources/inspect", params);
   }
 
   // #endregion

@@ -1,4 +1,4 @@
-import type { DownloadType } from "@mediago/shared-common";
+import type { DownloadType, HLSMediaInfo } from "@mediago/shared-common";
 
 /**
  * UI language choice persisted in extension settings.
@@ -42,8 +42,10 @@ export interface DetectedSource {
   name: string;
   /** Which MediaGo downloader should handle this source. */
   type: DownloadType;
-  /** Serialised request headers (JSON) for replay by the downloader. */
+  /** Newline-separated request headers for replay by the downloader. */
   headers?: string;
+  /** Ephemeral HLS inspection metadata used to group and label sources. */
+  mediaInfo?: HLSMediaInfo;
   /** Wall-clock time of detection (ms since epoch). */
   detectedAt: number;
 }

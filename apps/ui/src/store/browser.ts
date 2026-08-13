@@ -1,6 +1,10 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
-import { DownloadType } from "@mediago/shared-common";
+import {
+  DownloadType,
+  type HLSMediaInfo,
+  mergeSniffedSource,
+} from "@mediago/shared-common";
 import { subscribeWithSelector } from "zustand/middleware";
 
 export enum PageMode {
@@ -22,6 +26,7 @@ export interface SourceData {
   name: string;
   type: DownloadType;
   headers?: string;
+  mediaInfo?: HLSMediaInfo;
 }
 
 const initialState: BrowserStore = {
@@ -32,6 +37,7 @@ const initialState: BrowserStore = {
   errMsg: "",
   errCode: 0,
   sources: [],
+  sourcePanelCollapsed: false,
 };
 
 type Actions = {
@@ -66,12 +72,21 @@ export const useBrowserStore = create<BrowserStore & Actions>()(
         }),
       addSource: (source) =>
         set((state) => {
-          if (!state.sources.some((s: SourceData) => s.url === source.url)) {
-            state.sources.push({
-              ...source,
-              id: state.sources.length + 1,
-            });
+          const existing = state.sources.find(
+            (item: SourceData) => item.url === source.url,
+          );
+          let nextId = 1;
+          for (const item of state.sources) {
+            nextId = Math.max(nextId, item.id + 1);
           }
+          const normalized = {
+            ...source,
+            id: existing?.id ?? nextId,
+          };
+          state.sources = mergeSniffedSource(
+            state.sources as SourceData[],
+            normalized,
+          );
         }),
       deleteSource: (url) =>
         set((state) => {
@@ -115,6 +130,13 @@ export const browserNavSelector = (state: BrowserStore & Actions) => ({
 /** Sources-only selector */
 export const browserSourcesSelector = (state: BrowserStore & Actions) => ({
   sources: state.sources,
+});
+
+/** Source-panel summary — avoids subscribing layout controls to source details. */
+export const browserSourcePanelSelector = (state: BrowserStore & Actions) => ({
+  hasSources: state.sources.length > 0,
+  sourceCount: state.sources.length,
+  sourcePanelCollapsed: state.sourcePanelCollapsed,
 });
 
 /** Error-only selector */

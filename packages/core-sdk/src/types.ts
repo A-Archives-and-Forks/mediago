@@ -82,6 +82,38 @@ export interface TaskLogResponse {
   log: string;
 }
 
+export interface InspectSourceInput {
+  id: string;
+  url: string;
+  headers?: string[];
+}
+
+export interface HLSVariantInspection {
+  url: string;
+  quality?: string;
+  width?: number;
+  height?: number;
+  bandwidth?: number;
+  codecs?: string;
+}
+
+export interface SourceInspection {
+  id: string;
+  url: string;
+  playlistType: "master" | "media" | "unknown";
+  maxQuality?: string;
+  variants: HLSVariantInspection[];
+  error?: string;
+}
+
+export interface InspectSourcesParams {
+  sources: InspectSourceInput[];
+}
+
+export interface InspectSourcesResponse {
+  sources: SourceInspection[];
+}
+
 /**
  * Parameters for updating the server configuration.
  * All fields are optional.

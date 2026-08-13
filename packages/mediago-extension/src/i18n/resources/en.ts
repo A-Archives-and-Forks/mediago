@@ -25,6 +25,9 @@ const resource: ExtensionResources = {
   source: {
     unnamed: "(untitled)",
     import: "Import",
+    inspecting: "Inspecting",
+    autoBest: "Auto best",
+    qualityUnknown: "Quality unknown",
   },
   options: {
     pageTitle: "MediaGo Extension Settings",

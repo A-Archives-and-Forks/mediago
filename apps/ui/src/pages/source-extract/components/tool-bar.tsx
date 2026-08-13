@@ -1,12 +1,13 @@
 import { useMemoizedFn } from "ahooks";
 import {
   ArrowLeft,
+  ArrowRight,
   Combine,
   EyeOff,
   House,
   Monitor,
+  PanelRightOpen,
   RefreshCw,
-  Send,
   Smartphone,
   Star,
   X,
@@ -14,6 +15,7 @@ import {
 import { type KeyboardEvent, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -30,6 +32,7 @@ import {
 import {
   BrowserStatus,
   browserNavSelector,
+  browserSourcePanelSelector,
   PageMode,
   setBrowserSelector,
   useBrowserStore,
@@ -48,6 +51,9 @@ export function ToolBar({ page }: Props) {
   const { browser, app, contextMenu } = usePlatform();
   const { goto, goHome } = useBrowserActions();
   const store = useBrowserStore(useShallow(browserNavSelector));
+  const { sourceCount, sourcePanelCollapsed } = useBrowserStore(
+    useShallow(browserSourcePanelSelector),
+  );
   const { setBrowserStore } = useBrowserStore(useShallow(setBrowserSelector));
   const appStore = useAppStore(useShallow(appStoreSelector));
   const { setAppStore } = useAppStore(useShallow(setAppStoreSelector));
@@ -114,6 +120,14 @@ export function ToolBar({ page }: Props) {
       sourceList: [],
     });
   });
+
+  const onExpandSourcePanel = useMemoizedFn(() => {
+    setBrowserStore({ sourcePanelCollapsed: false });
+  });
+
+  const expandSourcePanelLabel = `${t("expand")} · ${t("sniffedResourceCount", {
+    count: sourceCount,
+  })}`;
 
   return (
     <div className="flex h-14 shrink-0 flex-row items-center gap-2 border-b bg-surface px-3">
@@ -230,8 +244,27 @@ export function ToolBar({ page }: Props) {
         onClick={onClickEnter}
         disabled={!store.url}
       >
-        <Send />
+        <ArrowRight />
       </Button>
+      {sourcePanelCollapsed && sourceCount > 0 ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="relative overflow-visible text-muted-foreground hover:text-foreground"
+          title={expandSourcePanelLabel}
+          aria-label={expandSourcePanelLabel}
+          onClick={onExpandSourcePanel}
+        >
+          <PanelRightOpen />
+          <Badge
+            variant="destructive"
+            className="pointer-events-none absolute -right-1 -top-1 h-4 min-w-4 px-1 text-[10px] leading-none tabular-nums shadow-sm"
+          >
+            {sourceCount > 99 ? "99+" : sourceCount}
+          </Badge>
+        </Button>
+      ) : null}
       {page ? (
         <Button
           type="button"

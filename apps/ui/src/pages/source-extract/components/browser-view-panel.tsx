@@ -1,10 +1,18 @@
 import { useMemoizedFn } from "ahooks";
-import { Container, Pencil, Search, Trash2 } from "lucide-react";
+import {
+  Container,
+  LoaderCircle,
+  PanelRightClose,
+  Pencil,
+  Search,
+  Trash2,
+} from "lucide-react";
 import { memo, useDeferredValue, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { useShallow } from "zustand/react/shallow";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { appStoreSelector, useAppStore } from "@/store/app";
 import {
@@ -15,7 +23,7 @@ import {
 } from "@/store/browser";
 import { usePlatform } from "@/hooks/use-platform";
 import { createDownloadTasks } from "@/api/download-task";
-import { DownloadTask } from "@mediago/shared-common";
+import { DownloadType, type DownloadTask } from "@mediago/shared-common";
 import { filterSources } from "./source-filter";
 
 interface SourceItemProps {
@@ -34,21 +42,45 @@ const SourceItem = memo(function SourceItem({
   onDownload,
 }: SourceItemProps) {
   const { t } = useTranslation();
+  const inspecting = item.mediaInfo?.status === "inspecting";
 
   return (
     <div className="flex flex-col gap-2 border-b px-1 py-3 last:border-b-0">
       <span
-        className="line-clamp-2 cursor-default break-words text-sm text-foreground"
+        className="block w-full truncate cursor-default text-sm text-foreground"
         title={item.name}
       >
         {item.name}
       </span>
-      <span
-        className="line-clamp-2 cursor-default break-words text-xs text-muted-foreground"
-        title={item.url}
-      >
-        {item.url}
-      </span>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <Badge variant="outline">
+          {item.type === DownloadType.m3u8 ? "HLS" : item.type}
+        </Badge>
+        {item.mediaInfo?.status === "inspecting" ? (
+          <Badge variant="secondary">
+            <LoaderCircle className="animate-spin" />
+            {t("hlsInspecting")}
+          </Badge>
+        ) : null}
+        {item.mediaInfo?.status !== "inspecting" &&
+        item.mediaInfo?.playlistType === "master" ? (
+          <Badge variant="secondary">{t("hlsAutoBest")}</Badge>
+        ) : null}
+        {item.mediaInfo?.status !== "inspecting" && item.mediaInfo ? (
+          <Badge
+            variant="outline"
+            title={
+              item.mediaInfo.maxQuality
+                ? t("hlsHighestAvailable", {
+                    quality: item.mediaInfo.maxQuality,
+                  })
+                : t("hlsQualityUnknown")
+            }
+          >
+            {item.mediaInfo.maxQuality || t("hlsQualityUnknown")}
+          </Badge>
+        ) : null}
+      </div>
       <div className="flex flex-row items-center justify-between gap-3">
         <div className="flex flex-row items-center gap-2">
           <Button
@@ -87,7 +119,12 @@ const SourceItem = memo(function SourceItem({
             </Button>
           ) : null}
         </div>
-        <Button type="button" size="sm" onClick={() => onDownload(item)}>
+        <Button
+          type="button"
+          size="sm"
+          disabled={inspecting}
+          onClick={() => onDownload(item)}
+        >
           {t("downloadNow")}
         </Button>
       </div>
@@ -98,7 +135,7 @@ const SourceItem = memo(function SourceItem({
 export function BrowserViewPanel() {
   const { sources } = useBrowserStore(useShallow(browserSourcesSelector));
   const { enableDocker } = useAppStore(useShallow(appStoreSelector));
-  const { deleteSource, clearSources } = useBrowserStore(
+  const { setBrowserStore, deleteSource, clearSources } = useBrowserStore(
     useShallow(setBrowserSelector),
   );
   const { t } = useTranslation();
@@ -112,6 +149,10 @@ export function BrowserViewPanel() {
 
   const handleClear = useMemoizedFn(() => {
     clearSources();
+  });
+
+  const handleCollapse = useMemoizedFn(() => {
+    setBrowserStore({ sourcePanelCollapsed: true });
   });
 
   const handleEdit = useMemoizedFn((items: SourceData[]) => {
@@ -159,6 +200,17 @@ export function BrowserViewPanel() {
           onClick={handleClear}
         >
           {t("clear")}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          className="size-6 p-0 text-muted-foreground hover:text-foreground"
+          title={t("collapse")}
+          aria-label={t("collapse")}
+          onClick={handleCollapse}
+        >
+          <PanelRightClose />
         </Button>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3">

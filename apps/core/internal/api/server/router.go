@@ -37,6 +37,7 @@ func (s *Server) registerRoutes() {
 		// Utility
 		api.GET("/url/title", s.utilHandler.GetPageTitle)
 		api.GET("/env", s.utilHandler.GetEnvPaths)
+		api.POST("/sources/inspect", s.sourceHandler.Inspect)
 	}
 
 	// Database persistence routes (only registered when database is available)

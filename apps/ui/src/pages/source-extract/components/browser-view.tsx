@@ -23,7 +23,7 @@ import { usePlatform } from "@/hooks/use-platform";
 import {
   BrowserStatus,
   browserErrorSelector,
-  browserSourcesSelector,
+  browserSourcePanelSelector,
   setBrowserSelector,
   type SourceData,
   useBrowserStore,
@@ -36,7 +36,9 @@ export function BrowserView() {
   const { status, errMsg, errCode } = useBrowserStore(
     useShallow(browserErrorSelector),
   );
-  const { sources } = useBrowserStore(useShallow(browserSourcesSelector));
+  const { hasSources, sourcePanelCollapsed } = useBrowserStore(
+    useShallow(browserSourcePanelSelector),
+  );
   const url = useBrowserStore((s) => s.url);
   const { addSource } = useBrowserStore(useShallow(setBrowserSelector));
   const { t } = useTranslation();
@@ -102,15 +104,19 @@ export function BrowserView() {
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      {!sources.length ? (
+      {!hasSources ? (
         renderContent()
       ) : (
         <ResizablePanelGroup orientation="horizontal" className="h-full flex-1">
           <ResizablePanel className="min-w-0">{renderContent()}</ResizablePanel>
-          <ResizableHandle withHandle className="mx-1" />
-          <ResizablePanel minSize="20%" maxSize="70%" defaultSize={240}>
-            <BrowserViewPanel />
-          </ResizablePanel>
+          {!sourcePanelCollapsed ? (
+            <>
+              <ResizableHandle withHandle className="mx-1" />
+              <ResizablePanel minSize="20%" maxSize="70%" defaultSize={240}>
+                <BrowserViewPanel />
+              </ResizablePanel>
+            </>
+          ) : null}
         </ResizablePanelGroup>
       )}
     </div>
