@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { EventEmitter } from "node:events";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
 import {
   afterAll,
@@ -10,13 +10,10 @@ import {
   beforeEach,
   describe,
   expect,
+  onTestFinished,
   test,
   vi,
 } from "vitest";
-
-const mockPortfinder = {
-  getPortPromise: vi.fn<(options?: { port?: number }) => Promise<number>>(),
-};
 
 const spawnMock =
   vi.fn<
@@ -36,9 +33,9 @@ const killMock =
     ) => void
   >();
 
-vi.mock("portfinder", () => ({
-  default: mockPortfinder,
-}));
+const signalOwnedProcessTreeMock =
+  vi.fn<(pid: number, signal: NodeJS.Signals) => Promise<void>>();
+const ownedProcessTreeIsAliveMock = vi.fn<(pid: number) => boolean>();
 
 vi.mock("node:child_process", () => ({
   spawn: (...args: Parameters<typeof spawnMock>) => spawnMock(...args),
@@ -47,6 +44,37 @@ vi.mock("node:child_process", () => ({
 vi.mock("tree-kill", () => ({
   default: (...args: Parameters<typeof killMock>) => killMock(...args),
 }));
+
+async function loadServiceRunnerWithAvailablePort() {
+  const { ServiceRunner } = await import("../src/index");
+  const original = Reflect.get(ServiceRunner, "isPortFree");
+  const originalSignal = Reflect.get(ServiceRunner, "signalOwnedProcessTree");
+  const originalLiveness = Reflect.get(
+    ServiceRunner,
+    "ownedProcessTreeIsAlive",
+  );
+  Reflect.set(
+    ServiceRunner,
+    "isPortFree",
+    vi.fn(async () => true),
+  );
+  Reflect.set(
+    ServiceRunner,
+    "signalOwnedProcessTree",
+    signalOwnedProcessTreeMock,
+  );
+  Reflect.set(
+    ServiceRunner,
+    "ownedProcessTreeIsAlive",
+    ownedProcessTreeIsAliveMock,
+  );
+  onTestFinished(() => {
+    Reflect.set(ServiceRunner, "isPortFree", original);
+    Reflect.set(ServiceRunner, "signalOwnedProcessTree", originalSignal);
+    Reflect.set(ServiceRunner, "ownedProcessTreeIsAlive", originalLiveness);
+  });
+  return ServiceRunner;
+}
 
 const fetchMock =
   vi.fn<
@@ -93,16 +121,34 @@ async function createExecutableFixture() {
   return { dir, name: baseName };
 }
 
-const executableFixturePromise = createExecutableFixture();
+let executableFixture:
+  | Awaited<ReturnType<typeof createExecutableFixture>>
+  | undefined;
+
+beforeAll(async () => {
+  executableFixture = await createExecutableFixture();
+});
+
+afterAll(async () => {
+  if (executableFixture) {
+    await rm(executableFixture.dir, { recursive: true, force: true });
+  }
+});
+
+function getExecutableFixture() {
+  if (!executableFixture) {
+    throw new Error("Executable fixture setup did not complete");
+  }
+
+  return executableFixture;
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
   lastSpawnedChild = null;
   nextPid = 4_000;
-
-  mockPortfinder.getPortPromise.mockImplementation(async (options) => {
-    return (options?.port ?? 0) || 5_000;
-  });
+  signalOwnedProcessTreeMock.mockResolvedValue(undefined);
+  ownedProcessTreeIsAliveMock.mockReturnValue(false);
 
   spawnMock.mockImplementation(() => {
     const child = new MockChildProcess(nextPid++);
@@ -132,31 +178,31 @@ afterEach(() => {
 
 describe("ServiceRunner", () => {
   test("starts service, waits for healthy state, and stops gracefully", async () => {
-    const { ServiceRunner } = await import("../src/index");
-    const fixture = await executableFixturePromise;
-
-    mockPortfinder.getPortPromise.mockResolvedValueOnce(6_789);
+    const ServiceRunner = await loadServiceRunnerWithAvailablePort();
+    const fixture = getExecutableFixture();
 
     const runner = new ServiceRunner({
       executableDir: fixture.dir,
       executableName: fixture.name,
       preferredPort: 4_321,
     });
+    onTestFinished(() => runner.stop().catch(() => undefined));
 
     const initialState = await runner.start();
 
     expect(spawnMock).toHaveBeenCalledTimes(1);
     const [, , spawnOptions] = spawnMock.mock.calls[0];
     expect(spawnOptions?.env).toMatchObject({
-      PORT: "6789",
+      PORT: "4321",
       HOST: "127.0.0.1",
     });
+    expect(spawnOptions?.detached).toBe(process.platform !== "win32");
 
     expect(fetchMock).toHaveBeenCalled();
     const requestURL = fetchMock.mock.calls[0][0];
-    expect(String(requestURL)).toBe("http://127.0.0.1:6789/healthy");
+    expect(String(requestURL)).toBe("http://127.0.0.1:4321/healthy");
 
-    expect(initialState.port).toBe(6_789);
+    expect(initialState.port).toBe(4_321);
     expect(initialState.host).toBe("127.0.0.1");
     expect(initialState.started).toBe(true);
     expect(runner.isRunning()).toBe(true);
@@ -166,7 +212,6 @@ describe("ServiceRunner", () => {
     expect(spawnMock).toHaveBeenCalledTimes(1);
     expect(secondStartState.port).toBe(initialState.port);
 
-    mockPortfinder.getPortPromise.mockResolvedValueOnce(9_001);
     const restartedState = await runner.restart({
       preferredPort: 9_000,
       extraEnv: { CUSTOM_FLAG: "1" },
@@ -175,23 +220,23 @@ describe("ServiceRunner", () => {
     expect(spawnMock).toHaveBeenCalledTimes(2);
     const [, , secondSpawnOptions] = spawnMock.mock.calls[1];
     expect(secondSpawnOptions?.env).toMatchObject({
-      PORT: "9001",
+      PORT: "9000",
       HOST: "127.0.0.1",
       CUSTOM_FLAG: "1",
     });
-    expect(restartedState.port).toBe(9_001);
+    expect(restartedState.port).toBe(9_000);
     expect(restartedState.started).toBe(true);
-    expect(killMock).toHaveBeenCalledTimes(1);
+    expect(signalOwnedProcessTreeMock).toHaveBeenCalledTimes(1);
     expect(runner.isRunning()).toBe(true);
 
     await runner.stop();
-    expect(killMock).toHaveBeenCalledTimes(2);
+    expect(signalOwnedProcessTreeMock).toHaveBeenCalledTimes(2);
     expect(runner.isRunning()).toBe(false);
   });
 
   test("resolves host from LAN when internal flag is false", async () => {
-    const { ServiceRunner } = await import("../src/index");
-    const fixture = await executableFixturePromise;
+    const ServiceRunner = await loadServiceRunnerWithAvailablePort();
+    const fixture = getExecutableFixture();
 
     const originalFinder = Reflect.get(
       ServiceRunner as object,
@@ -204,12 +249,11 @@ describe("ServiceRunner", () => {
       vi.fn(() => "10.0.0.42"),
     );
 
-    mockPortfinder.getPortPromise.mockResolvedValueOnce(5_555);
-
     const runner = new ServiceRunner({
       executableDir: fixture.dir,
       executableName: fixture.name,
       internal: false,
+      preferredPort: 5_555,
     });
 
     try {
@@ -221,43 +265,182 @@ describe("ServiceRunner", () => {
       expect(String(requestURL)).toBe("http://10.0.0.42:5555/healthy");
     } finally {
       await runner.stop();
-      if (originalFinder) {
-        Reflect.set(
-          ServiceRunner as object,
-          "findLanIPv4Address",
-          originalFinder,
-        );
-      }
+      Reflect.set(ServiceRunner, "findLanIPv4Address", originalFinder);
     }
   });
 
   test("rejects when health checks do not pass within timeout", async () => {
-    const { ServiceRunner } = await import("../src/index");
-    const fixture = await executableFixturePromise;
+    const ServiceRunner = await loadServiceRunnerWithAvailablePort();
+    const fixture = getExecutableFixture();
 
-    mockPortfinder.getPortPromise.mockResolvedValueOnce(7_001);
     fetchMock.mockResolvedValue({
       ok: false,
       status: 503,
     });
 
+    vi.useFakeTimers();
+    onTestFinished(() => vi.useRealTimers());
+    const originalDelay = Reflect.get(ServiceRunner, "delay");
+    Reflect.set(
+      ServiceRunner,
+      "delay",
+      vi.fn(async (milliseconds: number) => {
+        await vi.advanceTimersByTimeAsync(milliseconds);
+      }),
+    );
+    onTestFinished(() => {
+      Reflect.set(ServiceRunner, "delay", originalDelay);
+    });
+
     const runner = new ServiceRunner({
       executableDir: fixture.dir,
       executableName: fixture.name,
-      healthCheckTimeoutMs: 100,
-      healthCheckIntervalMs: 10,
-      healthRequestTimeoutMs: 10,
+      healthCheckTimeoutMs: 30,
+      healthCheckIntervalMs: 5,
+      healthRequestTimeoutMs: 5,
     });
+    onTestFinished(() => runner.stop().catch(() => undefined));
 
-    vi.useFakeTimers();
-    const startPromise = runner.start();
-
-    await vi.runAllTimersAsync();
-
-    await expect(startPromise).rejects.toThrow(/failed health check/i);
+    await expect(runner.start()).rejects.toThrow(/failed health check/i);
     expect(runner.isRunning()).toBe(false);
+  });
 
-    await runner.stop().catch(() => undefined);
-    vi.useRealTimers();
+  test("force kills a service that does not exit after SIGTERM", async () => {
+    const ServiceRunner = await loadServiceRunnerWithAvailablePort();
+    const fixture = getExecutableFixture();
+    vi.useFakeTimers();
+
+    try {
+      let treeAlive = true;
+      ownedProcessTreeIsAliveMock.mockImplementation(() => treeAlive);
+      signalOwnedProcessTreeMock.mockImplementation(async (_pid, signal) => {
+        if (signal === "SIGKILL") treeAlive = false;
+      });
+      const runner = new ServiceRunner({
+        executableDir: fixture.dir,
+        executableName: fixture.name,
+        shutdownTimeoutMs: 20,
+      });
+      await runner.start();
+
+      const stop = runner.stop();
+      lastSpawnedChild?.emit("exit", null, "SIGTERM");
+      expect(signalOwnedProcessTreeMock).toHaveBeenNthCalledWith(
+        1,
+        lastSpawnedChild?.pid,
+        "SIGTERM",
+      );
+
+      await vi.advanceTimersByTimeAsync(19);
+      expect(signalOwnedProcessTreeMock).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(1);
+      expect(signalOwnedProcessTreeMock).toHaveBeenNthCalledWith(
+        2,
+        lastSpawnedChild?.pid,
+        "SIGKILL",
+      );
+
+      await stop;
+      expect(runner.isRunning()).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("does not force kill a service that exits after SIGTERM", async () => {
+    const ServiceRunner = await loadServiceRunnerWithAvailablePort();
+    const fixture = getExecutableFixture();
+    vi.useFakeTimers();
+
+    try {
+      let treeAlive = true;
+      ownedProcessTreeIsAliveMock.mockImplementation(() => treeAlive);
+      const runner = new ServiceRunner({
+        executableDir: fixture.dir,
+        executableName: fixture.name,
+        shutdownTimeoutMs: 20,
+      });
+      await runner.start();
+
+      const stop = runner.stop();
+      lastSpawnedChild?.emit("exit", null, "SIGTERM");
+      treeAlive = false;
+      await stop;
+      await vi.advanceTimersByTimeAsync(20);
+
+      expect(signalOwnedProcessTreeMock).toHaveBeenCalledTimes(1);
+      expect(signalOwnedProcessTreeMock).toHaveBeenNthCalledWith(
+        1,
+        lastSpawnedChild?.pid,
+        "SIGTERM",
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("rejects if a force kill fails for a running service", async () => {
+    const ServiceRunner = await loadServiceRunnerWithAvailablePort();
+    const fixture = getExecutableFixture();
+    vi.useFakeTimers();
+
+    try {
+      ownedProcessTreeIsAliveMock.mockReturnValue(true);
+      signalOwnedProcessTreeMock.mockImplementation(async (_pid, signal) => {
+        if (signal === "SIGKILL") {
+          throw Object.assign(new Error("force kill failed"), {
+            code: "EPERM",
+          });
+        }
+      });
+      const runner = new ServiceRunner({
+        executableDir: fixture.dir,
+        executableName: fixture.name,
+        shutdownTimeoutMs: 20,
+      });
+      await runner.start();
+
+      const stop = runner.stop();
+      const expectStop = expect(stop).rejects.toThrow("force kill failed");
+      await vi.advanceTimersByTimeAsync(20);
+
+      await expectStop;
+      expect(lastSpawnedChild?.listenerCount("exit")).toBe(1);
+      await vi.advanceTimersByTimeAsync(20);
+      expect(signalOwnedProcessTreeMock).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("rejects if the owned process tree survives SIGKILL", async () => {
+    const ServiceRunner = await loadServiceRunnerWithAvailablePort();
+    const fixture = getExecutableFixture();
+    vi.useFakeTimers();
+
+    try {
+      ownedProcessTreeIsAliveMock.mockReturnValue(true);
+      const runner = new ServiceRunner({
+        executableDir: fixture.dir,
+        executableName: fixture.name,
+        shutdownTimeoutMs: 20,
+      });
+      await runner.start();
+
+      const stop = runner.stop();
+      const expectStop = expect(stop).rejects.toThrow(
+        "Process tree 4000 did not exit within 40 ms",
+      );
+      await vi.advanceTimersByTimeAsync(40);
+
+      await expectStop;
+      expect(signalOwnedProcessTreeMock.mock.calls).toEqual([
+        [lastSpawnedChild?.pid, "SIGTERM"],
+        [lastSpawnedChild?.pid, "SIGKILL"],
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

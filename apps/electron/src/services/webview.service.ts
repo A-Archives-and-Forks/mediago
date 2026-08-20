@@ -5,6 +5,7 @@ import { provide } from "@inversifyjs/binding-decorators";
 import { DownloadType } from "@mediago/shared-common";
 import { i18n } from "../core/i18n";
 import {
+  app,
   type Event,
   type HandlerDetails,
   session,
@@ -24,17 +25,27 @@ import ElectronLogger from "../vendor/ElectronLogger";
 import GoConfigCache from "./go-config-cache";
 import BrowserWindow from "../windows/browser.window";
 import MainWindow from "../windows/main.window";
+import { AdBlockerLoader } from "./ad-blocker-loader";
+import {
+  type AdBlockerCacheValue,
+  createAdBlockerCache,
+  getAdBlockerCachePath,
+} from "./ad-blocker-cache";
 import { SniffingHelper, type SourceParams } from "./sniffing-helper.service";
+import { enableSessionProxy } from "./webview-proxy";
 
 const require = createRequire(import.meta.url);
 
 const preload = require.resolve("@mediago/electron-preload");
-
 @injectable()
 @provide()
 export default class WebviewService {
   private view: WebContentsView | null = null;
   private blocker?: ElectronBlocker;
+  private blockerExpiresAt = Number.POSITIVE_INFINITY;
+  private readonly blockerLoader: AdBlockerLoader<ElectronBlocker>;
+  private blockingRequested: boolean;
+  private blockingSession?: Electron.Session;
   private defaultSession: string;
   private viewShow = false;
 
@@ -50,8 +61,24 @@ export default class WebviewService {
     @inject(SniffingHelper)
     private readonly sniffingHelper: SniffingHelper,
   ) {
-    // Initialize the blocker
-    this.initBlocker();
+    this.blockingRequested = Boolean(this.configCache.get("blockAds"));
+    const blockerCache = createAdBlockerCache(
+      getAdBlockerCachePath(app.getPath("userData")),
+      () => this.logger.error("[AdBlocker] list load failed"),
+    );
+    this.blockerLoader = new AdBlockerLoader(
+      async () => {
+        const result = await blockerCache.load();
+        this.blockerExpiresAt = result.refresh
+          ? Number.POSITIVE_INFINITY
+          : result.expiresAt;
+        if (result.refresh) {
+          this.observeBlockerRefresh(result.refresh);
+        }
+        return result.blocker;
+      },
+      () => this.logger.error("[AdBlocker] list load failed"),
+    );
 
     const { useProxy, proxy, privacy } = this.configCache.store;
 
@@ -139,7 +166,7 @@ export default class WebviewService {
   };
 
   onOpenNewWindow = ({ url }: HandlerDetails) => {
-    this.loadURL(url);
+    void this.loadURL(url);
 
     return { action: "deny" } as { action: "deny" };
   };
@@ -212,18 +239,23 @@ export default class WebviewService {
     this.viewShow = false;
   }
 
-  loadURL(url: string) {
+  async loadURL(url: string): Promise<void> {
     // Start loading url
     if (!this.view) {
-      this.init();
+      await this.init();
     }
     if (!this.view) return;
+
+    this.blockingRequested = Boolean(this.configCache.get("blockAds"));
+    if (this.blockingRequested) {
+      this.startBlocking();
+    }
 
     // 1. Stop current navigation
     this.view.webContents.stop();
 
     // 2. Load a new url
-    this.view.webContents.loadURL(url);
+    await this.view.webContents.loadURL(url);
   }
 
   async goBack() {
@@ -269,19 +301,7 @@ export default class WebviewService {
   }
 
   private enableProxy(proxy: string) {
-    if (!proxy) {
-      this.logger.error(`[Proxy] proxy address is empty`);
-      return;
-    }
-
-    // Process the validity of the proxy address
-    // Support http/https/socks5 proxies; default to http if no scheme provided
-    if (!/^(https?|socks5):\/\//i.test(proxy)) {
-      proxy = `http://${proxy}`;
-    }
-
-    this.session.setProxy({ proxyRules: proxy });
-    this.logger.info(`[Proxy] enable proxy: ${proxy}`);
+    enableSessionProxy(this.session, this.logger, proxy);
   }
 
   private disableProxy() {
@@ -298,43 +318,97 @@ export default class WebviewService {
   }
 
   setBlocking(enableBlocking: boolean): void {
+    this.blockingRequested = enableBlocking;
     if (enableBlocking) {
-      this.enableBlocking();
+      this.startBlocking();
     } else {
       this.disableBlocking();
     }
   }
 
-  async initBlocker() {
-    this.blocker = await ElectronBlocker.fromLists(fetch, [
-      "https://easylist.to/easylist/easylist.txt",
-    ]);
-
-    const enableBlocking = this.configCache.get("blockAds");
-    this.setBlocking(enableBlocking);
+  private startBlocking(): void {
+    void this.enableBlocking().catch(() => {
+      this.logger.error("[AdBlocker] enable failed");
+    });
   }
 
-  private enableBlocking() {
-    if (!this.blocker) {
-      this.logger.error(`[AdBlocker] enable failed(not initialized)`);
+  private async enableBlocking(): Promise<void> {
+    if (Date.now() >= this.blockerExpiresAt) {
+      this.blockerExpiresAt = Number.POSITIVE_INFINITY;
+      this.blockerLoader.invalidate();
+    }
+
+    const blocker = await this.blockerLoader.load();
+    if (!blocker) {
       return;
     }
-    if (this.blocker.isBlockingEnabled(this.session)) {
+    if (!this.blockingRequested) return;
+
+    const blockingSession = this.session;
+    if (this.blocker && this.blocker !== blocker && this.blockingSession) {
+      this.blocker.disableBlockingInSession(this.blockingSession);
+      this.blockingSession = undefined;
+      this.logger.info(`[AdBlocker] disable`);
+    }
+    this.blocker = blocker;
+    if (this.blockingSession === blockingSession) {
       return;
     }
-    this.blocker.enableBlockingInSession(this.session);
-    this.logger.info(`[AdBlocker] enable`);
+
+    if (this.blockingSession) {
+      this.blocker.disableBlockingInSession(this.blockingSession);
+      this.blockingSession = undefined;
+      this.logger.info(`[AdBlocker] disable`);
+    }
+
+    if (this.blocker.isBlockingEnabled(blockingSession)) {
+      this.blockingSession = blockingSession;
+      return;
+    }
+
+    try {
+      this.blocker.enableBlockingInSession(blockingSession);
+      this.blockingSession = blockingSession;
+      this.logger.info(`[AdBlocker] enable`);
+    } catch {
+      this.logger.error("[AdBlocker] enable failed");
+    }
+  }
+
+  private observeBlockerRefresh(
+    refresh: Promise<AdBlockerCacheValue | undefined>,
+  ): void {
+    void refresh
+      .then((result) => {
+        if (!result) {
+          this.blockerExpiresAt = 0;
+          this.blockerLoader.invalidate();
+          return;
+        }
+
+        this.blockerExpiresAt = result.expiresAt;
+        this.blockerLoader.replace(result.blocker);
+        if (this.blockingRequested) {
+          this.startBlocking();
+        }
+      })
+      .catch(() => {
+        this.blockerExpiresAt = 0;
+        this.blockerLoader.invalidate();
+        this.logger.error("[AdBlocker] list load failed");
+      });
   }
 
   private disableBlocking() {
-    if (!this.blocker) {
-      this.logger.error(`[AdBlocker] disable failed(not initialized)`);
+    if (!this.blocker || !this.blockingSession) {
       return;
     }
-    if (!this.blocker.isBlockingEnabled(this.session)) {
+    if (!this.blocker.isBlockingEnabled(this.blockingSession)) {
+      this.blockingSession = undefined;
       return;
     }
-    this.blocker.disableBlockingInSession(this.session);
+    this.blocker.disableBlockingInSession(this.blockingSession);
+    this.blockingSession = undefined;
     this.logger.info(`[AdBlocker] disable`);
   }
 

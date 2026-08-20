@@ -3,35 +3,31 @@ import os from "node:os";
 import path, { dirname } from "node:path";
 import fs from "node:fs";
 import { ServiceRunner } from "@mediago/service-runner";
+import { loadProfileEnv } from "../../../scripts/load-profile-env.ts";
 import { resolveCoreBinaries, resolveDepsBinaries } from "./binaryResolver";
-import dotenvFlow from "dotenv-flow";
+import { resolveServerPaths } from "./server-paths";
 import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const projectRoot = path.resolve(__dirname, "../../..");
-dotenvFlow.config({
-  path: projectRoot,
-});
+const CORE_SHUTDOWN_TIMEOUT_MS = 1_000;
+loadProfileEnv(projectRoot);
 
 if (!process.env.APP_NAME) {
   throw new Error("APP_NAME is not defined in environment variables");
 }
 
-// All persistent data under one root: ~/.mediago-server/
-//   data/       — database + config
-//   logs/       — runtime & task logs
-//   downloads/  — downloaded files (also video-root for player)
-const ROOT_DIR = path.resolve(os.homedir(), `.${process.env.APP_NAME}-server`);
-const DATA_DIR = path.resolve(ROOT_DIR, "data");
-const LOG_DIR = path.resolve(ROOT_DIR, "logs");
-const DOWNLOAD_DIR = path.resolve(ROOT_DIR, "downloads");
-const DB_PATH = path.resolve(DATA_DIR, "mediago.db");
+const serverPaths = resolveServerPaths({
+  appName: process.env.APP_NAME,
+  homeDir: os.homedir(),
+  rootOverride: process.env.MEDIAGO_SERVER_ROOT,
+});
 
 // Ensure directories exist
-fs.mkdirSync(DATA_DIR, { recursive: true });
-fs.mkdirSync(LOG_DIR, { recursive: true });
-fs.mkdirSync(DOWNLOAD_DIR, { recursive: true });
+fs.mkdirSync(serverPaths.data, { recursive: true });
+fs.mkdirSync(serverPaths.logs, { recursive: true });
+fs.mkdirSync(serverPaths.downloads, { recursive: true });
 
 const core = resolveCoreBinaries();
 const deps = resolveDepsBinaries();
@@ -41,15 +37,16 @@ const runner = new ServiceRunner({
   executableDir: path.dirname(core.coreBin),
   preferredPort: 9900,
   internal: true,
+  shutdownTimeoutMs: CORE_SHUTDOWN_TIMEOUT_MS,
   extraArgs: [
     `--enable-auth`,
     `--log-level=debug`,
-    `--log-dir=${LOG_DIR}`,
-    `--local-dir=${DOWNLOAD_DIR}`,
+    `--log-dir=${serverPaths.logs}`,
+    `--local-dir=${serverPaths.downloads}`,
     `--schema-path=${core.coreConfig}`,
     `--deps-dir=${deps.depsDir}`,
-    `--db-path=${DB_PATH}`,
-    `--config-dir=${DATA_DIR}`,
+    `--db-path=${serverPaths.database}`,
+    `--config-dir=${serverPaths.data}`,
   ],
 });
 
@@ -65,16 +62,25 @@ runner.on("exit", (code, signal) => {
   console.log(`Go Core exited with code=${code}, signal=${signal}`);
 });
 
+// Handle graceful shutdown
+let shutdownPromise: Promise<void> | null = null;
+const shutdown = (): Promise<void> => {
+  if (shutdownPromise) return shutdownPromise;
+
+  console.log("Shutting down...");
+  shutdownPromise = runner.stop().then(
+    () => process.exit(0),
+    (error) => {
+      process.stderr.write(`Failed to stop Go Core: ${String(error)}\n`);
+      process.exit(1);
+    },
+  );
+  return shutdownPromise;
+};
+
+process.on("SIGINT", () => void shutdown());
+process.on("SIGTERM", () => void shutdown());
+
 const state = await runner.start();
 console.log(`Go Core started at ${state.url} (pid: ${state.pid})`);
 console.log(`Player UI available at ${state.url}/player/`);
-
-// Handle graceful shutdown
-const shutdown = async () => {
-  console.log("Shutting down...");
-  await runner.stop();
-  process.exit(0);
-};
-
-process.on("SIGINT", shutdown);
-process.on("SIGTERM", shutdown);

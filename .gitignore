@@ -6,9 +6,13 @@ node_modules
 .DS_Store
 log
 .turbo
+.task/
 .claude
 .store
 release
+coverage/
+playwright-report/
+test-results/
 go.work.sum
 apps/core/bin/
 apps/electron/bin/
