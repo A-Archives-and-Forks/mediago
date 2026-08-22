@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   assertMacOSSigningEnvironment,
+  hasHardenedRuntimeFlag,
   MACOS_SIGNING_ENVIRONMENT_VARIABLES,
   resolveMacOSSigningSettings,
 } from "./macos-signing.ts";
@@ -62,5 +63,23 @@ describe("assertMacOSSigningEnvironment", () => {
     ).toThrow(
       "macOS distribution requires: CSC_KEY_PASSWORD, APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID",
     );
+  });
+});
+
+describe("hasHardenedRuntimeFlag", () => {
+  it("recognizes the runtime flag inside a CodeDirectory line", () => {
+    expect(
+      hasHardenedRuntimeFlag(
+        "CodeDirectory v=20500 size=769 flags=0x10000(runtime) hashes=13+7 location=embedded",
+      ),
+    ).toBe(true);
+  });
+
+  it("rejects a signature without the runtime flag", () => {
+    expect(
+      hasHardenedRuntimeFlag(
+        "CodeDirectory v=20500 size=769 flags=0x0(none) hashes=13+7 location=embedded",
+      ),
+    ).toBe(false);
   });
 });

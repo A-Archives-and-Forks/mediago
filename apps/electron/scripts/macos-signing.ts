@@ -55,6 +55,10 @@ export function assertMacOSSigningEnvironment(
   }
 }
 
+export function hasHardenedRuntimeFlag(signature: string): boolean {
+  return /(?:^|\s)flags=[^\r\n]*\bruntime\b/m.test(signature);
+}
+
 export function verifyMacOSDistributionArtifacts(options: {
   releaseDirectory: string;
   artifacts: readonly string[];
@@ -116,7 +120,7 @@ function verifyAppBundle(appBundle: string, verifyBundledTools: boolean): void {
   if (!teamIdentifier || teamIdentifier === "not set") {
     throw new Error(`${appBundle} does not contain a Team Identifier`);
   }
-  if (!/^flags=.*\bruntime\b/m.test(signature)) {
+  if (!hasHardenedRuntimeFlag(signature)) {
     throw new Error(`${appBundle} does not enable Hardened Runtime`);
   }
 
