@@ -21,6 +21,7 @@ func AuthMiddleware(confStore handler.ConfigStore) gin.HandlerFunc {
 		"/api/auth/setup":        true,
 		"/api/auth/signin":       true,
 		"/api/auth/status":       true,
+		"/mcp":                   true,
 		"/manifest.json":         true,
 		"/service-worker.js":     true,
 		"/apple-touch-icon.png":  true,

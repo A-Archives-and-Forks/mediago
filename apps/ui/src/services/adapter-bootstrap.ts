@@ -8,6 +8,10 @@ import { setupHttp } from "../utils/http";
 let adapterCoreUrl = "";
 let adapterInitialization: Promise<AppStore | null> | null = null;
 
+export function getAdapterCoreUrl() {
+  return adapterCoreUrl;
+}
+
 export function canLoadProtectedConfig() {
   return !isWeb || useAppStore.getState().apiKey.length > 0;
 }

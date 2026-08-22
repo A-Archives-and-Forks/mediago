@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -8,10 +9,73 @@ import (
 	"testing"
 
 	"caorushizi.cn/mediago/internal/logger"
+	"caorushizi.cn/mediago/pkg/conf"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
 )
+
+func TestMigrateLegacyAppStoreDeletesMCPPort(t *testing.T) {
+	store, err := conf.New(conf.Options[AppStore]{
+		CWD:      t.TempDir(),
+		Defaults: DefaultAppStore(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Set("mcpPort", 39720); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Set("proxy", "http://127.0.0.1:7890"); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := migrateLegacyAppStore(store); err != nil {
+		t.Fatal(err)
+	}
+	if value := store.Get("mcpPort"); value != nil {
+		t.Fatalf("mcpPort = %#v, want nil", value)
+	}
+	if value := store.Get("proxy"); value != "http://127.0.0.1:7890" {
+		t.Fatalf("proxy = %#v, want preserved value", value)
+	}
+
+	data, err := os.ReadFile(store.Path())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var persisted map[string]any
+	if err := json.Unmarshal(data, &persisted); err != nil {
+		t.Fatal(err)
+	}
+	if _, exists := persisted["mcpPort"]; exists {
+		t.Fatal("persisted config still contains mcpPort")
+	}
+}
+
+func TestMigrateLegacyAppStoreReportsWriteFailure(t *testing.T) {
+	store, err := conf.New(conf.Options[AppStore]{
+		CWD:      t.TempDir(),
+		Defaults: DefaultAppStore(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Set("mcpPort", 39720); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(store.Path()+".tmp", 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	err = migrateLegacyAppStore(store)
+	if err == nil || !strings.Contains(err.Error(), "remove legacy mcpPort config") {
+		t.Fatalf("migration error = %v, want legacy cleanup failure", err)
+	}
+	if value := store.Get("mcpPort"); value == nil {
+		t.Fatal("failed migration did not restore the in-memory legacy value")
+	}
+}
 
 func TestRuntimeLogsDoNotExposeProxyValues(t *testing.T) {
 	observedCore, observedLogs := observer.New(zapcore.DebugLevel)

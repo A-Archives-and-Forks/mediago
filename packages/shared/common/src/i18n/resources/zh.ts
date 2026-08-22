@@ -373,8 +373,7 @@ export const zh = {
   mcpSetting: "MCP 服务",
   mcpEnable: "启用 MCP",
   mcpEnableTooltip:
-    "仅监听本机地址，供 Agent 通过 Streamable HTTP 调用 MediaGo。",
-  mcpPort: "MCP 端口",
+    "与 MediaGo 后端使用相同地址，供 Agent 通过 Streamable HTTP 调用。",
   mcpStatus: "运行状态",
   mcpApplying: "应用中",
   mcpRunning: "运行中",
@@ -383,7 +382,7 @@ export const zh = {
   mcpRegenerateToken: "重新生成令牌",
   mcpConfigCopied: "MCP 配置已复制",
   mcpTokenRegenerated: "MCP 令牌已更新",
-  mcpRunningHint: "MediaGo 需要保持运行；最小化到托盘时 MCP 仍可使用。",
+  mcpRunningHint: "MCP 与 MediaGo 后端使用相同地址，后端运行时即可使用。",
   confirm: "确认",
   shareIntentInvalid: "未找到可下载的有效链接",
   shareIntentLegacyAutomaticActionDisabled:

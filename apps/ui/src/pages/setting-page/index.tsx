@@ -79,7 +79,7 @@ const SettingsCards = memo(function SettingsCards({
         {!isWeb ? <StableDockerSettingsCard /> : <StableSkillsSettingsCard />}
         {!isWeb && visibleStep >= 2 ? <StableSkillsSettingsCard /> : null}
         {!isWeb && visibleStep >= 3 ? <StableCLISettingsCard /> : null}
-        {!isWeb && visibleStep >= 3 ? <StableMCPSettingsCard /> : null}
+        {visibleStep >= (isWeb ? 2 : 3) ? <StableMCPSettingsCard /> : null}
         {!isWeb && visibleStep >= 4 ? <StableBrowserExtensionCard /> : null}
         {allSettingsVisible ? (
           <>

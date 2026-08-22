@@ -52,3 +52,21 @@ func TestPwaRootAssetsBypassApiKeyAuthentication(t *testing.T) {
 		})
 	}
 }
+
+func TestMCPPathBypassesApiKeyAuthentication(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	engine.Use(AuthMiddleware(pwaAuthConfigStore{}))
+	engine.Any("/mcp", func(c *gin.Context) {
+		c.Status(http.StatusNoContent)
+	})
+
+	request := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+	request.Header.Set("Authorization", "Bearer mcp-token")
+	response := httptest.NewRecorder()
+	engine.ServeHTTP(response, request)
+
+	if response.Code != http.StatusNoContent {
+		t.Fatalf("MCP route status = %d, want %d", response.Code, http.StatusNoContent)
+	}
+}

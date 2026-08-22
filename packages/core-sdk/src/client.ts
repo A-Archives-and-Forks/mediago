@@ -419,7 +419,7 @@ export class MediaGoClient {
   }
 
   /**
-   * Gets the built-in MCP listener's actual runtime status.
+   * Gets the built-in MCP route's current runtime status.
    */
   async getMCPStatus(): Promise<ApiResponse<MCPServerStatus>> {
     return this.api.get("/api/mcp/status");

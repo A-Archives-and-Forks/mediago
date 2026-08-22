@@ -123,26 +123,21 @@ func runServer(rt *app.Runtime) error {
 	mcpManager := mcpserver.NewManager(server.DownloadService(), cfg)
 	applyMCPSettings := func() {
 		current := rt.AppStore.Store()
-		if err := mcpManager.Apply(mcpserver.Settings{
+		mcpManager.Apply(mcpserver.Settings{
 			Enabled: current.EnableMCP,
-			Port:    current.MCPPort,
 			Token:   current.MCPToken,
-		}); err != nil {
-			logger.Errorf("Failed to apply MCP settings: %v", err)
-		}
+		})
 	}
 	unsubscribers := []func(){
 		rt.AppStore.OnDidChange("enableMcp", func(_, _ any) { applyMCPSettings() }),
-		rt.AppStore.OnDidChange("mcpPort", func(_, _ any) { applyMCPSettings() }),
 		rt.AppStore.OnDidChange("mcpToken", func(_, _ any) { applyMCPSettings() }),
 	}
 	defer func() {
 		for _, unsubscribe := range unsubscribers {
 			unsubscribe()
 		}
-		_ = mcpManager.Close()
 	}()
-	server.RegisterMCPStatusRoute(func() any { return mcpManager.Status() })
+	server.RegisterMCPRoutes(mcpManager.Handler(), func() any { return mcpManager.Status() })
 	applyMCPSettings()
 
 	addr := cfg.Host + ":" + cfg.Port

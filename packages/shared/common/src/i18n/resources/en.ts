@@ -386,8 +386,7 @@ export const en = {
   mcpSetting: "MCP server",
   mcpEnable: "Enable MCP",
   mcpEnableTooltip:
-    "Listen on localhost for Agents to control MediaGo over Streamable HTTP.",
-  mcpPort: "MCP port",
+    "Use the MediaGo backend address for Agent access over Streamable HTTP.",
   mcpStatus: "Status",
   mcpApplying: "Applying",
   mcpRunning: "Running",
@@ -397,7 +396,7 @@ export const en = {
   mcpConfigCopied: "MCP configuration copied",
   mcpTokenRegenerated: "MCP token updated",
   mcpRunningHint:
-    "MediaGo must be running; MCP remains available while minimized to the tray.",
+    "MCP uses the MediaGo backend address and is available while the backend is running.",
   confirm: "Confirm",
   shareIntentInvalid: "No valid downloadable link was found",
   shareIntentLegacyAutomaticActionDisabled:

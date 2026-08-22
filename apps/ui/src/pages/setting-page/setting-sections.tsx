@@ -28,6 +28,8 @@ import { useEnvPath } from "@/hooks/use-config";
 import { usePlatform } from "@/hooks/use-platform";
 import { useAppStore } from "@/store/app";
 import { useSessionStore } from "@/store/session";
+import { getAdapterCoreUrl } from "@/services/adapter-bootstrap";
+import { buildMCPAgentConfig, buildMCPEndpoint } from "@/services/mcp-config";
 import { isWeb } from "@/utils";
 import {
   SettingBooleanRadioField,
@@ -540,27 +542,15 @@ export const MCPSettingsCard = memo(function MCPSettingsCard() {
   const { t } = useTranslation();
   const persistSetting = usePersistSetting();
   const enabled = useAppStore((state) => state.enableMcp);
-  const port = useAppStore((state) => state.mcpPort);
   const token = useAppStore((state) => state.mcpToken);
   const { data: status, mutate } = useSWR(getMCPStatusKey, getMCPStatus, {
     dedupingInterval: 250,
     refreshInterval: 1500,
   });
   const isStatusPending = status === undefined || status.enabled !== enabled;
-  const endpoint = `http://127.0.0.1:${port || 39720}/mcp`;
-  const agentConfig = JSON.stringify(
-    {
-      mcpServers: {
-        mediago: {
-          type: "http",
-          url: endpoint,
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      },
-    },
-    null,
-    2,
-  );
+  const coreUrl = getAdapterCoreUrl();
+  const endpoint = buildMCPEndpoint(coreUrl);
+  const agentConfig = buildMCPAgentConfig(coreUrl, token);
 
   useEffect(() => {
     void mutate();
@@ -570,9 +560,10 @@ export const MCPSettingsCard = memo(function MCPSettingsCard() {
     }, 500);
 
     return () => window.clearTimeout(timer);
-  }, [enabled, mutate, port, token]);
+  }, [enabled, mutate, token]);
 
   const copyConfig = async () => {
+    if (!agentConfig) return;
     try {
       await navigator.clipboard.writeText(agentConfig);
       toast.success(t("mcpConfigCopied"));
@@ -596,12 +587,6 @@ export const MCPSettingsCard = memo(function MCPSettingsCard() {
         name="enableMcp"
         label={t("mcpEnable")}
         tooltip={t("mcpEnableTooltip")}
-      />
-      <SettingNumberField
-        name="mcpPort"
-        label={t("mcpPort")}
-        min={1024}
-        max={65535}
       />
       <SettingRow label={t("mcpStatus")}>
         <div className="flex items-center justify-end gap-2 text-sm">
@@ -639,7 +624,12 @@ export const MCPSettingsCard = memo(function MCPSettingsCard() {
               <RefreshCw className="size-4" />
               {t("mcpRegenerateToken")}
             </Button>
-            <Button type="button" variant="outline" onClick={copyConfig}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={copyConfig}
+              disabled={!endpoint}
+            >
               <Copy className="size-4" />
               {t("copy")}
             </Button>

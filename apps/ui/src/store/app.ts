@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { persist } from "zustand/middleware";
 import i18n from "../i18n";
+import { migrateAppStore } from "./app-store-migration";
 import { resolveAppLanguage } from "../utils";
 import { AppLanguage, type AppStore, AppTheme } from "@mediago/shared-common";
 
@@ -31,7 +32,6 @@ const initialState: AppStore = {
   closeMainWindow: false,
   apiKey: "",
   enableMcp: false,
-  mcpPort: 39720,
   mcpToken: "",
 };
 
@@ -67,6 +67,8 @@ export const useAppStore = create<AppStore & Actions>()(
       }),
       {
         name: "appstore-storage",
+        version: 1,
+        migrate: migrateAppStore,
       },
     ),
   ),

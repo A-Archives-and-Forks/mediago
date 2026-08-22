@@ -48,6 +48,9 @@ func NewRuntime(cfg *AppConfig) (*Runtime, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize app store: %w", err)
 	}
+	if err := migrateLegacyAppStore(appStore); err != nil {
+		return nil, err
+	}
 	logger.Infof("App store initialized at: %s", appStore.Path())
 
 	if appStore.Store().MachineId == "" {
@@ -149,6 +152,16 @@ func (rt *Runtime) Close() {
 	if rt.Database != nil {
 		_ = rt.Database.Close()
 	}
+}
+
+func migrateLegacyAppStore(store *conf.Conf[AppStore]) error {
+	if store.Get("mcpPort") == nil {
+		return nil
+	}
+	if err := store.Delete("mcpPort"); err != nil {
+		return fmt.Errorf("remove legacy mcpPort config: %w", err)
+	}
+	return nil
 }
 
 func syncAppStoreToCfg(store *conf.Conf[AppStore], cfg *AppConfig) {

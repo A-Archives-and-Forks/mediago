@@ -314,9 +314,8 @@ export interface AppStore {
   enableMobilePlayer: boolean;
   // server apikey
   apiKey: string;
-  // Built-in local MCP server
+  // Built-in MCP route
   enableMcp: boolean;
-  mcpPort: number;
   mcpToken: string;
 }
 

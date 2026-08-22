@@ -91,7 +91,6 @@ const EDITABLE_SETTING_KEYS = [
   "dockerUrl",
   "enableDocker",
   "enableMcp",
-  "mcpPort",
   "mcpToken",
 ] as const satisfies readonly SettingName[];
 

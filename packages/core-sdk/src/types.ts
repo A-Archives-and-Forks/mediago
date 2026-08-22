@@ -308,7 +308,6 @@ export interface AppStore {
   enableMobilePlayer: boolean;
   apiKey: string;
   enableMcp: boolean;
-  mcpPort: number;
   mcpToken: string;
 }
 

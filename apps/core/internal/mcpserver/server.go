@@ -8,13 +8,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"net"
 	"net/http"
-	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"caorushizi.cn/mediago/internal/service"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -26,14 +22,13 @@ type DownloadConfig interface {
 	GetDeleteSegments() bool
 }
 
-// Settings controls the dedicated loopback MCP listener.
+// Settings controls the MCP route exposed by the main HTTP server.
 type Settings struct {
 	Enabled bool
-	Port    int
 	Token   string
 }
 
-// Status reports the actual MCP listener state.
+// Status reports the MCP route's current readiness.
 type Status struct {
 	Enabled  bool   `json:"enabled"`
 	Running  bool   `json:"running"`
@@ -41,19 +36,22 @@ type Status struct {
 	Error    string `json:"error,omitempty"`
 }
 
-// Manager owns a restartable Streamable HTTP MCP listener.
+// Manager owns the Streamable HTTP MCP handler and its live settings.
 type Manager struct {
 	mu       sync.RWMutex
 	download *service.DownloadTaskService
 	config   DownloadConfig
 	settings Settings
-	server   *http.Server
+	handler  http.Handler
 	status   Status
 }
 
 // NewManager creates an MCP manager backed by MediaGo's existing task service.
 func NewManager(download *service.DownloadTaskService, config DownloadConfig) *Manager {
-	return &Manager{download: download, config: config}
+	manager := &Manager{download: download, config: config}
+	manager.handler = manager.httpHandler()
+	manager.Apply(Settings{})
+	return manager
 }
 
 // GenerateToken returns a cryptographically random bearer token.
@@ -65,84 +63,35 @@ func GenerateToken() (string, error) {
 	return hex.EncodeToString(data), nil
 }
 
-// Apply starts, stops, or restarts the listener to match settings.
-func (m *Manager) Apply(settings Settings) error {
+// Apply updates the live MCP route settings without restarting the HTTP server.
+func (m *Manager) Apply(settings Settings) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if settings.Port == 0 {
-		settings.Port = 39720
-	}
-	if settings.Port < 1 || settings.Port > 65535 {
-		return fmt.Errorf("invalid MCP port %d", settings.Port)
-	}
-
-	if m.server != nil && m.settings == settings {
-		return nil
-	}
-	if m.server != nil {
-		_ = m.server.Close()
-		m.server = nil
-	}
 	m.settings = settings
 	m.status = Status{
 		Enabled:  settings.Enabled,
-		Endpoint: fmt.Sprintf("http://127.0.0.1:%d/mcp", settings.Port),
+		Endpoint: "/mcp",
 	}
 
 	if !settings.Enabled {
-		return nil
-	}
-	if m.download == nil {
-		m.status.Error = "download persistence is unavailable"
-		return errors.New(m.status.Error)
+		return
 	}
 	if strings.TrimSpace(settings.Token) == "" {
 		m.status.Error = "MCP token is empty"
-		return errors.New(m.status.Error)
+		return
+	}
+	if m.download == nil {
+		m.status.Error = "download persistence is unavailable"
+		return
 	}
 
-	listener, err := net.Listen("tcp", "127.0.0.1:"+strconv.Itoa(settings.Port))
-	if err != nil {
-		m.status.Error = err.Error()
-		return fmt.Errorf("start MCP listener: %w", err)
-	}
-
-	server := &http.Server{
-		Handler:           m.httpHandler(settings.Token),
-		ReadHeaderTimeout: 10 * time.Second,
-	}
-	m.server = server
 	m.status.Running = true
-	m.status.Error = ""
-
-	go func() {
-		err := server.Serve(listener)
-		m.mu.Lock()
-		defer m.mu.Unlock()
-		if m.server != server {
-			return
-		}
-		m.server = nil
-		m.status.Running = false
-		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			m.status.Error = err.Error()
-		}
-	}()
-	return nil
 }
 
-// Close stops the MCP listener.
-func (m *Manager) Close() error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if m.server == nil {
-		return nil
-	}
-	err := m.server.Close()
-	m.server = nil
-	m.status.Running = false
-	return err
+// Handler returns the MCP HTTP handler mounted by the main Gin server.
+func (m *Manager) Handler() http.Handler {
+	return http.HandlerFunc(m.serveHTTP)
 }
 
 // Status returns a snapshot of the listener state.
@@ -152,7 +101,31 @@ func (m *Manager) Status() Status {
 	return m.status
 }
 
-func (m *Manager) httpHandler(token string) http.Handler {
+func (m *Manager) serveHTTP(w http.ResponseWriter, r *http.Request) {
+	m.mu.RLock()
+	settings := m.settings
+	downloadAvailable := m.download != nil
+	handler := m.handler
+	m.mu.RUnlock()
+
+	if !settings.Enabled {
+		http.NotFound(w, r)
+		return
+	}
+	if !hasValidBearerToken(r, settings.Token) {
+		w.Header().Set("WWW-Authenticate", "Bearer")
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if !downloadAvailable {
+		http.Error(w, "download persistence is unavailable", http.StatusServiceUnavailable)
+		return
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+func (m *Manager) httpHandler() http.Handler {
 	server := mcp.NewServer(
 		&mcp.Implementation{Name: "mediago", Version: "3.5.0"},
 		nil,
@@ -169,10 +142,7 @@ func (m *Manager) httpHandler(token string) http.Handler {
 		},
 	)
 	protected := http.NewCrossOriginProtection().Handler(streamable)
-
-	mux := http.NewServeMux()
-	mux.Handle("/mcp", bearerAuth(token, protected))
-	return mux
+	return protected
 }
 
 type emptyInput struct{}
@@ -295,15 +265,13 @@ func (m *Manager) registerTools(server *mcp.Server) {
 	})
 }
 
-func bearerAuth(token string, next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		authorization := r.Header.Get("Authorization")
-		provided := strings.TrimPrefix(authorization, "Bearer ")
-		if !strings.HasPrefix(authorization, "Bearer ") || len(provided) != len(token) || subtle.ConstantTimeCompare([]byte(provided), []byte(token)) != 1 {
-			w.Header().Set("WWW-Authenticate", "Bearer")
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
+func hasValidBearerToken(r *http.Request, token string) bool {
+	if strings.TrimSpace(token) == "" {
+		return false
+	}
+	authorization := r.Header.Get("Authorization")
+	provided := strings.TrimPrefix(authorization, "Bearer ")
+	return strings.HasPrefix(authorization, "Bearer ") &&
+		len(provided) == len(token) &&
+		subtle.ConstantTimeCompare([]byte(provided), []byte(token)) == 1
 }
