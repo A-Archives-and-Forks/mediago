@@ -38,16 +38,23 @@ test("finds one Release by tag and rejects ambiguous state", () => {
 });
 
 test("builds an isolated draft plan for desktop tests", () => {
+  const version = "3.5.0-test.42";
   const plan = buildDesktopReleasePlan({
     mode: "test",
     channel: "beta",
-    version: "3.5.0-test.42",
+    version,
     officialTag: "unused",
     sourceSha: "a".repeat(40),
     runId: "1234",
   });
   expect(plan.tag).toBe("desktop-test-1234");
-  expect(plan.title).toMatch(/Desktop test 3\.5\.0-test\.42/);
+  expect(plan.title).toBe(version);
+  expect(
+    plan.createArguments.filter((argument) => argument === "--title"),
+  ).toHaveLength(1);
+  expect(
+    plan.createArguments[plan.createArguments.indexOf("--title") + 1],
+  ).toBe(version);
   expect(plan.createArguments.includes("--draft")).toBeTruthy();
   expect(plan.createArguments.includes("--prerelease")).toBeTruthy();
   expect(!plan.createArguments.includes("--generate-notes")).toBeTruthy();
@@ -62,6 +69,13 @@ test("marks only prerelease channels as prereleases", () => {
     sourceSha: "b".repeat(40),
     runId: "1",
   });
+  expect(stable.title).toBe("3.6.0");
+  expect(
+    stable.createArguments.filter((argument) => argument === "--title"),
+  ).toHaveLength(1);
+  expect(
+    stable.createArguments[stable.createArguments.indexOf("--title") + 1],
+  ).toBe("3.6.0");
   expect(stable.createArguments.includes("--generate-notes")).toBeTruthy();
   expect(!stable.createArguments.includes("--prerelease")).toBeTruthy();
 
@@ -73,6 +87,13 @@ test("marks only prerelease channels as prereleases", () => {
     sourceSha: "c".repeat(40),
     runId: "2",
   });
+  expect(beta.title).toBe("3.6.0-beta.0");
+  expect(
+    beta.createArguments.filter((argument) => argument === "--title"),
+  ).toHaveLength(1);
+  expect(
+    beta.createArguments[beta.createArguments.indexOf("--title") + 1],
+  ).toBe("3.6.0-beta.0");
   expect(beta.createArguments.includes("--prerelease")).toBeTruthy();
   expect(beta.createArguments.includes("--latest=false")).toBeTruthy();
 });

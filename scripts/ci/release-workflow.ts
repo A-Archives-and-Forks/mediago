@@ -432,7 +432,7 @@ export function buildDesktopReleasePlan(options: {
     const tag = `desktop-test-${options.runId}`;
     return {
       tag,
-      title: `Desktop test ${options.version}`,
+      title: options.version,
       createArguments: [
         tag,
         "--draft",
@@ -440,7 +440,7 @@ export function buildDesktopReleasePlan(options: {
         "--target",
         options.sourceSha,
         "--title",
-        `Desktop test ${options.version}`,
+        options.version,
         "--prerelease",
         "--notes",
         `Private desktop test build from commit ${options.sourceSha}.`,
@@ -448,7 +448,7 @@ export function buildDesktopReleasePlan(options: {
     };
   }
 
-  const title = `MediaGo ${options.version}`;
+  const title = options.version;
   const createArguments = [
     options.officialTag,
     "--draft",
