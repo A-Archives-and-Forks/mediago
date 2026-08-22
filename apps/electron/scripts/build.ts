@@ -96,8 +96,7 @@ function getReleaseConfig(): Configuration {
         schemes: [process.env.APP_NAME as string],
       },
     ],
-    artifactName:
-      "${productName}-setup-${platform}-${arch}-${buildVersion}.${ext}",
+    artifactName: "mediago-setup-${platform}-${arch}-${buildVersion}.${ext}",
     npmRebuild: true,
     directories: {
       output: "./release",
@@ -173,7 +172,7 @@ function getReleaseConfig(): Configuration {
     },
     portable: {
       artifactName:
-        "${productName}-portable-${platform}-${arch}-${buildVersion}.${ext}",
+        "mediago-portable-${platform}-${arch}-${buildVersion}.${ext}",
     },
     dmg: {
       background: "../assets/dmg-background.png",

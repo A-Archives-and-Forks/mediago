@@ -37,27 +37,20 @@ test("collects and validates a complete cross-platform release", async () => {
   expect(names).toStrictEqual(
     names.toSorted((left, right) => left.localeCompare(right)),
   );
+  expect(names.includes("mediago-setup-linux-amd64-3.6.0.deb")).toBeTruthy();
   expect(
-    names.includes("mediago-community-setup-linux-amd64-3.6.0.deb"),
-  ).toBeTruthy();
+    names.some((name) => name.startsWith("mediago-community-")),
+  ).toBeFalsy();
   expect(!names.some((name) => name.startsWith("builder-"))).toBeTruthy();
   await expect(readFile(path.join(output, "stale.txt"))).rejects.toMatchObject({
     code: "ENOENT",
   });
 
   const merged = await readFile(path.join(output, "latest-mac.yml"), "utf8");
-  expect(merged).toMatch(
-    /url: mediago-community-setup-darwin-arm64-3\.6\.0\.dmg/,
-  );
-  expect(merged).toMatch(
-    /url: mediago-community-setup-darwin-arm64-3\.6\.0\.zip/,
-  );
-  expect(merged).toMatch(
-    /url: mediago-community-setup-darwin-x64-3\.6\.0\.dmg/,
-  );
-  expect(merged).toMatch(
-    /url: mediago-community-setup-darwin-x64-3\.6\.0\.zip/,
-  );
+  expect(merged).toMatch(/url: mediago-setup-darwin-arm64-3\.6\.0\.dmg/);
+  expect(merged).toMatch(/url: mediago-setup-darwin-arm64-3\.6\.0\.zip/);
+  expect(merged).toMatch(/url: mediago-setup-darwin-x64-3\.6\.0\.dmg/);
+  expect(merged).toMatch(/url: mediago-setup-darwin-x64-3\.6\.0\.zip/);
 });
 
 test("rejects an incomplete platform inventory", async () => {
@@ -288,7 +281,7 @@ async function createCompleteRelease(
     ),
   );
 
-  const prefix = "mediago-community";
+  const prefix = "mediago";
   const windowsInstaller = `${prefix}-setup-win32-x64-${version}.exe`;
   const windowsPortable = `${prefix}-portable-win32-x64-${version}.exe`;
   const macArmDmg = `${prefix}-setup-darwin-arm64-${version}.dmg`;
