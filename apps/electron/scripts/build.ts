@@ -7,6 +7,10 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { type Configuration, build } from "electron-builder";
 import { loadProfileEnv } from "../../../scripts/load-profile-env.ts";
+import {
+  resolveMacOSSigningSettings,
+  verifyMacOSDistributionArtifacts,
+} from "./macos-signing.ts";
 
 const args = process.argv.slice(2);
 const isDir = args.includes("--dir");
@@ -43,6 +47,11 @@ const { appBuilderPath } = electronBuilderRequire("app-builder-bin") as {
 };
 
 loadProfileEnv(projectRoot);
+
+const macOSSigning = resolveMacOSSigningSettings({
+  platform: process.platform,
+  isDir,
+});
 
 const pkg = JSON.parse(await fs.readFile("./app/package.json", "utf-8"));
 
@@ -168,6 +177,7 @@ function getReleaseConfig(): Configuration {
     },
     dmg: {
       background: "../assets/dmg-background.png",
+      sign: macOSSigning.signDmg,
       contents: [
         {
           x: 410,
@@ -184,6 +194,9 @@ function getReleaseConfig(): Configuration {
     },
     mac: {
       icon: "../assets/icon.icns",
+      forceCodeSigning: macOSSigning.forceCodeSigning,
+      hardenedRuntime: macOSSigning.hardenedRuntime,
+      notarize: macOSSigning.notarize,
       target: [
         {
           target: "dmg",
@@ -351,9 +364,16 @@ try {
 }
 
 const config = getReleaseConfig();
-await build({
+const artifacts = await build({
   config,
   dir: isDir,
   publish: "never",
   // targets: Platform.WINDOWS.createTarget(["nsis", "portable"], Arch.x64),
 });
+
+if (macOSSigning.enabled) {
+  verifyMacOSDistributionArtifacts({
+    releaseDirectory: path.resolve(appRoot, "release"),
+    artifacts,
+  });
+}

@@ -23,6 +23,21 @@ on:
       APP_TD_APPID:
         description: "Optional application telemetry identifier."
         required: false
+      CSC_LINK:
+        description: "Base64-encoded Developer ID Application certificate."
+        required: true
+      CSC_KEY_PASSWORD:
+        description: "Password for the Developer ID certificate."
+        required: true
+      APPLE_ID:
+        description: "Apple Developer account used for notarization."
+        required: true
+      APPLE_APP_SPECIFIC_PASSWORD:
+        description: "Apple app-specific password used for notarization."
+        required: true
+      APPLE_TEAM_ID:
+        description: "Apple Developer Team ID used for notarization."
+        required: true
     outputs:
       artifact_prefix:
         description: "Prefix shared by all four uploaded desktop artifacts."
@@ -162,6 +177,11 @@ jobs:
         run: task ci:desktop:release
         env:
           APP_TD_APPID: ${{ inputs.run_mode == 'release' && secrets.APP_TD_APPID || '' }}
+          CSC_LINK: ${{ runner.os == 'macOS' && secrets.CSC_LINK || '' }}
+          CSC_KEY_PASSWORD: ${{ runner.os == 'macOS' && secrets.CSC_KEY_PASSWORD || '' }}
+          APPLE_ID: ${{ runner.os == 'macOS' && secrets.APPLE_ID || '' }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ runner.os == 'macOS' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ runner.os == 'macOS' && secrets.APPLE_TEAM_ID || '' }}
 
       - name: Upload desktop artifacts
         uses: actions/upload-artifact@v7

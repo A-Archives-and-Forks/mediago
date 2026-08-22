@@ -123,6 +123,14 @@ const desktopRunAllowlist = {
       env: {
         APP_TD_APPID:
           "${{ inputs.run_mode == 'release' && secrets.APP_TD_APPID || '' }}",
+        CSC_LINK: "${{ runner.os == 'macOS' && secrets.CSC_LINK || '' }}",
+        CSC_KEY_PASSWORD:
+          "${{ runner.os == 'macOS' && secrets.CSC_KEY_PASSWORD || '' }}",
+        APPLE_ID: "${{ runner.os == 'macOS' && secrets.APPLE_ID || '' }}",
+        APPLE_APP_SPECIFIC_PASSWORD:
+          "${{ runner.os == 'macOS' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}",
+        APPLE_TEAM_ID:
+          "${{ runner.os == 'macOS' && secrets.APPLE_TEAM_ID || '' }}",
       },
     },
   ],
@@ -423,6 +431,24 @@ describe("build-docs.yml Task workflow contract", () => {
 describe("build-electron.yml Task workflow contract", () => {
   const workflow = loadWorkflow("build-electron.yml");
 
+  it("declares the standard macOS signing and notarization secrets", () => {
+    const workflowCall = asRecord(
+      asRecord(workflow.definition.on, "build-electron on").workflow_call,
+      "build-electron workflow_call",
+    );
+    const secrets = asRecord(
+      workflowCall.secrets,
+      "build-electron workflow_call secrets",
+    );
+    expect(secrets).toMatchObject({
+      CSC_LINK: { required: true },
+      CSC_KEY_PASSWORD: { required: true },
+      APPLE_ID: { required: true },
+      APPLE_APP_SPECIFIC_PASSWORD: { required: true },
+      APPLE_TEAM_ID: { required: true },
+    });
+  });
+
   it("routes desktop metadata and the install/download/release sequence through exact public Tasks", () => {
     expectTaskEntries(workflow, {
       prepare: [
@@ -486,6 +512,17 @@ describe("build-server.yml Task workflow contract", () => {
 describe("release.yml Task workflow contract", () => {
   const workflow = loadWorkflow("release.yml");
 
+  it("passes the standard macOS signing secrets to desktop builds", () => {
+    const desktop = asRecord(workflow.jobs.desktop, "release desktop job");
+    expect(asRecord(desktop.secrets, "release desktop secrets")).toMatchObject({
+      CSC_LINK: "${{ secrets.CSC_LINK }}",
+      CSC_KEY_PASSWORD: "${{ secrets.CSC_KEY_PASSWORD }}",
+      APPLE_ID: "${{ secrets.APPLE_ID }}",
+      APPLE_APP_SPECIFIC_PASSWORD: "${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}",
+      APPLE_TEAM_ID: "${{ secrets.APPLE_TEAM_ID }}",
+    });
+  });
+
   it("routes all release and artifact commands through exact public Tasks", () => {
     expectTaskEntries(workflow, {
       prepare: [
@@ -520,6 +557,7 @@ describe("release.yml Task workflow contract", () => {
 });
 
 interface LoadedWorkflow {
+  definition: Record<string, unknown>;
   jobs: Record<string, unknown>;
 }
 
@@ -530,6 +568,7 @@ function loadWorkflow(basename: string): LoadedWorkflow {
   );
   const workflow = asRecord(parse(source), basename);
   return {
+    definition: workflow,
     jobs: asRecord(workflow.jobs, `${basename} jobs`),
   };
 }
