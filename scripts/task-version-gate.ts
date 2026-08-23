@@ -1,42 +1,84 @@
 import { pathToFileURL } from "node:url";
 
-export const REQUIRED_TASK_VERSION = "3.51.1";
+export const MINIMUM_TASK_VERSION = "3.51.1";
 
-const TASK_VERSION_PATTERN = /^\d+\.\d+\.\d+$/;
+const TASK_VERSION_PATTERN = /^(\d+)\.(\d+)\.(\d+)$/;
 
 export type TaskVersionGateResult =
-  | { exitCode: 0 }
+  | { exitCode: 0; version: string }
   | { exitCode: 1; message: string };
 
 export function evaluateTaskVersion(
   actualVersion: unknown,
-  requiredVersion: unknown,
+  minimumVersion: unknown,
 ): TaskVersionGateResult {
-  if (requiredVersion !== REQUIRED_TASK_VERSION) {
+  if (minimumVersion !== MINIMUM_TASK_VERSION) {
     return {
       exitCode: 1,
-      message: `Task version gate is misconfigured; the repository pin must remain ${REQUIRED_TASK_VERSION}.`,
+      message: `Task version gate is misconfigured; the repository minimum must remain ${MINIMUM_TASK_VERSION}.`,
     };
   }
-  if (
-    typeof actualVersion !== "string" ||
-    !TASK_VERSION_PATTERN.test(actualVersion)
-  ) {
+  if (typeof actualVersion !== "string") {
     return {
       exitCode: 1,
       message: "Invalid Task version received from the Task runner.",
     };
   }
-  if (actualVersion !== REQUIRED_TASK_VERSION) {
+  const parsedActualVersion = parseTaskVersion(actualVersion);
+  if (parsedActualVersion === undefined) {
+    return {
+      exitCode: 1,
+      message: "Invalid Task version received from the Task runner.",
+    };
+  }
+  const parsedMinimumVersion = parseTaskVersion(MINIMUM_TASK_VERSION);
+  if (parsedMinimumVersion === undefined) {
+    return {
+      exitCode: 1,
+      message: "Task version gate is misconfigured.",
+    };
+  }
+  const nextMajorVersion = `${parsedMinimumVersion[0] + 1n}.0.0`;
+  const supportedRange = `>=${MINIMUM_TASK_VERSION} and <${nextMajorVersion}`;
+  if (compareTaskVersions(parsedActualVersion, parsedMinimumVersion) < 0) {
     return {
       exitCode: 1,
       message: [
-        `Task ${actualVersion} is installed; MediaGo requires ${REQUIRED_TASK_VERSION}.`,
-        `Install or switch Task: https://taskfile.dev/installation/ (mise: mise use task@${REQUIRED_TASK_VERSION}).`,
+        `Task ${actualVersion} is installed; MediaGo requires ${supportedRange}.`,
+        `Install or switch Task: https://taskfile.dev/installation/ (mise: mise use task@${MINIMUM_TASK_VERSION}).`,
       ].join(" "),
     };
   }
-  return { exitCode: 0 };
+  if (parsedActualVersion[0] !== parsedMinimumVersion[0]) {
+    return {
+      exitCode: 1,
+      message: [
+        `Task ${actualVersion} is installed; MediaGo supports ${supportedRange}.`,
+        `Install or switch to Task v3: https://taskfile.dev/installation/ (mise: mise use task@${MINIMUM_TASK_VERSION}).`,
+      ].join(" "),
+    };
+  }
+  return { exitCode: 0, version: actualVersion };
+}
+
+type TaskVersion = readonly [major: bigint, minor: bigint, patch: bigint];
+
+function parseTaskVersion(version: string): TaskVersion | undefined {
+  const match = TASK_VERSION_PATTERN.exec(version);
+  if (match === null) return undefined;
+  const [, major, minor, patch] = match;
+  if (major === undefined || minor === undefined || patch === undefined) {
+    return undefined;
+  }
+  return [BigInt(major), BigInt(minor), BigInt(patch)];
+}
+
+function compareTaskVersions(left: TaskVersion, right: TaskVersion): number {
+  for (const index of [0, 1, 2] as const) {
+    if (left[index] < right[index]) return -1;
+    if (left[index] > right[index]) return 1;
+  }
+  return 0;
 }
 
 export function runTaskVersionGate(

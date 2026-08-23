@@ -116,12 +116,12 @@ docker run -d --name mediago -p 8899:8899 -v /path/to/mediago:/app/mediago caoru
 
 ## 🧑‍💻 ソースからの開発
 
-リポジトリのタスク実行には固定版の [Task](https://taskfile.dev/) v3.51.1 を使用します。
-macOS、Linux、Windows（PowerShell）では Go ツールチェーンで固定版をインストールできます。
+リポジトリのタスク実行は [Task](https://taskfile.dev/) v3.51.1 以降の v3 リリースに対応しています。
+macOS、Linux、Windows（PowerShell）では、Go ツールチェーンで最新の互換 v3 リリースをインストールできます。
 Go のバイナリディレクトリを `PATH` に追加してから、バージョンを確認してください：
 
 ```shell
-go install github.com/go-task/task/v3/cmd/task@v3.51.1
+go install github.com/go-task/task/v3/cmd/task@latest
 task --version
 ```
 

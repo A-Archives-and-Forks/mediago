@@ -113,7 +113,7 @@ test("typed Task version mismatch blocks its implementation leaf", () => {
 
   expect(result.status).not.toBe(0);
   expect(result.output).not.toContain("VERSION_LEAF_EXECUTED");
-  expect(result.output).toMatch(/requires 3\.51\.1/i);
+  expect(result.output).toMatch(/requires.*>=3\.51\.1.*<4\.0\.0/i);
   expect(result.output).toMatch(/taskfile\.dev\/installation|mise use/i);
 });
 
@@ -442,7 +442,7 @@ const nodePrerequisiteCases = [
     target: "doctor",
   },
   {
-    expected: /Node 22\.18\.0 or newer.*validate the pinned Task version/i,
+    expected: /Node 22\.18\.0 or newer.*validate the supported Task version/i,
     target: "version gate",
   },
   {
@@ -506,7 +506,7 @@ doctorInjectionTest(
 
     expect(existsSync(markerPath)).toBe(false);
     expect(result.status).not.toBe(0);
-    expect(result.output).toContain("Task 3.51.1");
+    expect(result.output).toMatch(/Task 3\.\d+\.\d+ ready/i);
     expect(result.output).toMatch(/Node .*ready/i);
     expect(result.output).toMatch(/pnpm .*ready/i);
     expect(result.output).toMatch(/Go /i);
@@ -534,7 +534,7 @@ test("doctor continues every diagnostic when pnpm is unavailable", () => {
   }
 
   expect(result.status).not.toBe(0);
-  expect(result.output).toContain("Task 3.51.1");
+  expect(result.output).toMatch(/Task 3\.\d+\.\d+ ready/i);
   expect(result.output).toMatch(/Node .*ready/i);
   expect(result.output).toMatch(/pnpm version unavailable/i);
   expect(result.output).toMatch(/Go unavailable/i);

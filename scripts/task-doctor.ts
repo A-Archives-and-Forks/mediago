@@ -144,7 +144,7 @@ export async function collectDoctorDiagnostics(
     environment.MEDIAGO_REQUIRED_TASK_VERSION,
   );
   if (taskVersion.exitCode === 0) {
-    lines.push("ok: Task 3.51.1 ready");
+    lines.push(`ok: Task ${taskVersion.version} ready`);
   } else {
     failed = true;
     lines.push(`error: ${taskVersion.message}`);

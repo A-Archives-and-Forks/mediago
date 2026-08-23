@@ -22,7 +22,7 @@
 
 ### 使用仓库 Task（推荐）
 
-请从仓库根目录执行以下命令。仓库要求固定版本 Task v3.51.1；安装方法见
+请从仓库根目录执行以下命令。仓库支持 Task v3.51.1 及以上的 v3 版本；安装方法见
 [CONTRIBUTING.md](../../CONTRIBUTING.md)，开始前请先运行 `task --version` 验证版本。
 
 ```bash

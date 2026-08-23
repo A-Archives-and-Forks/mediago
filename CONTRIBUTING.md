@@ -9,14 +9,14 @@ main [README](./README.md).
 - **Node.js** ≥ 24.14 — install from [nodejs.org](https://nodejs.org/)
 - **pnpm** ≥ 10 — `npm i -g pnpm`
 - **Go** ≥ 1.25 — install from [go.dev](https://go.dev/dl/)
-- **Task** v3.51.1 — the fixed repository task runner
+- **Task** ≥ 3.51.1 and < 4.0.0 — the repository task runner
 
-Install the exact Task version on macOS, Linux, or Windows (PowerShell) with
-the Go toolchain. Make sure the Go binary directory is on `PATH`, then verify
-the installed version:
+Install the latest compatible Task v3 release on macOS, Linux, or Windows
+(PowerShell) with the Go toolchain. Make sure the Go binary directory is on
+`PATH`, then verify the installed version:
 
 ```shell
-go install github.com/go-task/task/v3/cmd/task@v3.51.1
+go install github.com/go-task/task/v3/cmd/task@latest
 task --version
 ```
 

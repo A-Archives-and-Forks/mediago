@@ -136,13 +136,13 @@ Browsing older releases? See the [GitHub Releases page](https://github.com/caoru
 
 ## 🧑‍💻 Development from source
 
-Repository workflows use [Task](https://taskfile.dev/) v3.51.1. Install the
-fixed version on macOS, Linux, or Windows (PowerShell) with a Go toolchain,
-make sure the Go binary directory is on `PATH`, and verify it before running
-repository commands:
+Repository workflows support [Task](https://taskfile.dev/) v3.51.1 or newer
+within the v3 release line. Install the latest compatible v3 release on macOS,
+Linux, or Windows (PowerShell) with a Go toolchain, make sure the Go binary
+directory is on `PATH`, and verify it before running repository commands:
 
 ```shell
-go install github.com/go-task/task/v3/cmd/task@v3.51.1
+go install github.com/go-task/task/v3/cmd/task@latest
 task --version
 ```
 

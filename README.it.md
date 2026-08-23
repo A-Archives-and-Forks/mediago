@@ -143,13 +143,14 @@ Per le versioni precedenti, consulta la [pagina GitHub Releases](https://github.
 
 ## 🧑‍💻 Sviluppo dal sorgente
 
-I workflow del repository usano la versione fissa v3.51.1 di
-[Task](https://taskfile.dev/). Su macOS, Linux o Windows (PowerShell),
-installala con la toolchain Go, assicurati che la directory dei binari Go sia
-nel `PATH` e verifica la versione prima di eseguire i comandi del repository:
+I workflow del repository supportano [Task](https://taskfile.dev/) v3.51.1 o
+una versione successiva della serie v3. Su macOS, Linux o Windows
+(PowerShell), installa l'ultima versione v3 compatibile con la toolchain Go,
+assicurati che la directory dei binari Go sia nel `PATH` e verifica la versione
+prima di eseguire i comandi del repository:
 
 ```shell
-go install github.com/go-task/task/v3/cmd/task@v3.51.1
+go install github.com/go-task/task/v3/cmd/task@latest
 task --version
 ```
 

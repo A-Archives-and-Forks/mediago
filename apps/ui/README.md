@@ -35,9 +35,9 @@ This package contains the React frontend that:
 
 ## Development
 
-Run repository workflows from the repository root with the fixed Task v3.51.1.
-See [CONTRIBUTING.md](../../CONTRIBUTING.md) for installation and confirm it
-with `task --version` before starting.
+Run repository workflows from the repository root with Task v3.51.1 or newer
+within the v3 release line. See [CONTRIBUTING.md](../../CONTRIBUTING.md) for
+installation and confirm it with `task --version` before starting.
 
 ```bash
 # Install the Node workspace and pinned runtime tools

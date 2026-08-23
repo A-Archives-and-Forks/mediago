@@ -116,12 +116,12 @@ docker run -d --name mediago -p 8899:8899 -v /path/to/mediago:/app/mediago caoru
 
 ## 🧑‍💻 从源码开发
 
-仓库统一使用固定版本的 [Task](https://taskfile.dev/) v3.51.1 编排任务。在
-macOS、Linux 或 Windows（PowerShell）中，可以通过 Go 工具链安装该固定版本；
-请确保 Go 的二进制目录已经加入 `PATH`，然后验证版本：
+仓库使用 [Task](https://taskfile.dev/) v3.51.1 及以上的 v3 版本编排任务。在
+macOS、Linux 或 Windows（PowerShell）中，可以通过 Go 工具链安装最新兼容的
+v3 版本；请确保 Go 的二进制目录已经加入 `PATH`，然后验证版本：
 
 ```shell
-go install github.com/go-task/task/v3/cmd/task@v3.51.1
+go install github.com/go-task/task/v3/cmd/task@latest
 task --version
 ```
 

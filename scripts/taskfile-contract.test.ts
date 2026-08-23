@@ -749,10 +749,10 @@ describe("Task version gate and doctor", () => {
   };
   const gateNodePrerequisite = {
     sh: `node -e "const [major, minor] = process.versions.node.split('.').map(Number); process.exit(major > 22 || (major === 22 && minor >= 18) ? 0 : 1)"`,
-    msg: "Node 22.18.0 or newer is required to validate the pinned Task version. Install or switch Node, then retry.",
+    msg: "Node 22.18.0 or newer is required to validate the supported Task version. Install or switch Node, then retry.",
   };
 
-  it("contains exactly one typed 3.51.1 gate with environment-only inputs", () => {
+  it("contains exactly one typed minimum-version gate with environment-only inputs", () => {
     const gates = Object.keys(tasks).filter(
       (name) => name === "internal:require-task-version",
     );
@@ -1290,7 +1290,7 @@ describe("normative documentation Task contract", () => {
         expect(source).toContain("Linux");
         expect(source).toContain("Windows");
         expect(source).toContain(
-          "go install github.com/go-task/task/v3/cmd/task@v3.51.1",
+          "go install github.com/go-task/task/v3/cmd/task@latest",
         );
         expect(
           source.indexOf("task setup"),

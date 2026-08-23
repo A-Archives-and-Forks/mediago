@@ -85,7 +85,9 @@ test("aggregates every diagnostic and never reflects unrelated environment", asy
   });
 
   expect(result.exitCode).toBe(1);
-  expect(result.lines.join("\n")).toMatch(/Task.*requires 3\.51\.1/i);
+  expect(result.lines.join("\n")).toMatch(
+    /Task.*requires.*>=3\.51\.1.*<4\.0\.0/i,
+  );
   expect(result.lines.join("\n")).toMatch(/Node 25\.4\.0.*ready/i);
   expect(result.lines.join("\n")).toMatch(
     /pnpm 10\.14\.0.*expected 10\.15\.0/i,
@@ -121,7 +123,7 @@ test("returns success only when every exact tool and runtime check is ready", as
     environment: {
       MEDIAGO_DEPS_ROOT: "/validated/deps",
       MEDIAGO_REQUIRED_TASK_VERSION: "3.51.1",
-      MEDIAGO_TASK_VERSION: "3.51.1",
+      MEDIAGO_TASK_VERSION: "3.53.1",
       npm_config_user_agent: "pnpm/99.0.0 npm/? node/v25.4.0 linux x64",
     },
     inspectRuntime: async () => readiness,
@@ -132,6 +134,7 @@ test("returns success only when every exact tool and runtime check is ready", as
   });
 
   expect(result.exitCode).toBe(0);
+  expect(result.lines).toContain("ok: Task 3.53.1 ready");
   expect(result.lines).toHaveLength(5 + RUNTIME_TOOLS.length);
 });
 
