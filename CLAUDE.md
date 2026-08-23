@@ -12,6 +12,16 @@ MediaGo is a cross-platform video downloader supporting m3u8/HLS streams. The co
 
 All three products share the Go Core backend (`apps/core`) for download orchestration.
 
+## Documentation Site Safety
+
+`docs/` is the production VitePress source directory. Everything placed there can be packaged and deployed to the public documentation site.
+
+- Never create agent planning or working artifacts anywhere under `docs/`. This includes `docs/plans/`, `docs/superpowers/`, design or implementation plans, audit reports, task logs, handoff notes, scratch Markdown, generated prompts, and session notes.
+- Only add or edit files under `docs/` when they are intentional public documentation, documentation assets, VitePress source/configuration, or tests required for the documentation site.
+- Store persistent internal planning artifacts under `.agents/plans/`. Store disposable artifacts in the system temporary directory.
+- This rule overrides any skill, tool, or template that defaults to writing plans under `docs/` or `docs/plans/`.
+- Before finishing a task that touches documentation, inspect `git status --short -- docs` and remove accidental internal artifacts without deleting legitimate documentation content.
+
 ## Common Commands
 
 ```bash

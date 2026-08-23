@@ -11,4 +11,13 @@ describe("VitePress configuration", () => {
     expect(configSource).toContain('from "./plugins.ts"');
     expect(configSource).not.toContain('from "./plugins"');
   });
+
+  it("keeps documentation search local and excludes internal plans", () => {
+    const configSource = readFileSync(configPath, "utf8");
+
+    expect(configSource).toContain(
+      'srcExclude: ["superpowers/**", "plans/**"]',
+    );
+    expect(configSource).toContain('search: { provider: "local" }');
+  });
 });

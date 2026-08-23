@@ -20,6 +20,13 @@ const giscusProps = computed(() => getGiscusProps(lang.value, isDark.value));
 
 <style scoped>
 .giscus-comments {
-  margin-top: 20px;
+  margin-top: 32px;
+  border-top: 1px solid var(--vp-c-divider);
+  padding-top: 24px;
+  color-scheme: light;
+}
+
+:global(.dark) .giscus-comments {
+  color-scheme: dark;
 }
 </style>

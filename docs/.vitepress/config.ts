@@ -6,7 +6,7 @@ const isDev = process.env.NODE_ENV === "development";
 const siteUrl = "https://downloader.caorushizi.cn";
 
 const head: HeadConfig[] = [
-  ["link", { rel: "shortcut icon", href: "/favicon.svg" }],
+  ["link", { rel: "shortcut icon", href: "/favicon.ico" }],
 ];
 if (!isDev) {
   head.push(...baiduAnalytics(), ...googleAnalytics());
@@ -121,7 +121,7 @@ export default defineConfig({
   description: "简单易用，快速下载",
   lastUpdated: true,
   head,
-  srcExclude: ["superpowers/**"],
+  srcExclude: ["superpowers/**", "plans/**"],
   sitemap: {
     hostname: siteUrl,
   },
@@ -251,6 +251,8 @@ export default defineConfig({
     return entries;
   },
   themeConfig: {
+    search: { provider: "local" },
+
     nav: [
       { text: "Home", link: "/" },
       { text: "教程", link: "/guides" },
@@ -294,7 +296,7 @@ export default defineConfig({
             { text: "通过宝塔面板部署", link: "/bt-install" },
             { text: "浏览器扩展", link: "/extension" },
             { text: "配合猫爪下载视频", link: "/catcatch" },
-            { text: "🦞 OpenClaw Skill", link: "/skills" },
+            { text: "OpenClaw Skill", link: "/skills" },
           ],
         },
         {
@@ -310,7 +312,7 @@ export default defineConfig({
     },
 
     socialLinks: [
-      { icon: "github", link: "https://github.com/caorushizi/m3u8-downloader" },
+      { icon: "github", link: "https://github.com/caorushizi/mediago" },
     ],
   },
 
@@ -362,7 +364,7 @@ export default defineConfig({
                 { text: "Download API", link: "/en/api" },
                 { text: "Changelog", link: "/en/changelog" },
                 { text: "Browser extension", link: "/en/extension" },
-                { text: "🦞 OpenClaw Skill", link: "/en/skills" },
+                { text: "OpenClaw Skill", link: "/en/skills" },
               ],
             },
             {
@@ -390,29 +392,29 @@ export default defineConfig({
       themeConfig: {
         nav: [
           { text: "Home", link: "/jp" },
-          { text: "です", link: "/jp/guides" },
-          { text: "ログを更新します。", link: "/jp/changelog" },
+          { text: "ガイド", link: "/jp/guides" },
+          { text: "更新履歴", link: "/jp/changelog" },
         ],
 
         sidebar: [
           {
-            text: "始める",
+            text: "はじめに",
             items: [
-              { text: "早く始めます", link: "/jp/guides" },
-              { text: "塔のパネル配置です", link: "/jp/bt-install" },
-              { text: "使用説明書です", link: "/jp/documents" },
+              { text: "クイックスタート", link: "/jp/guides" },
+              { text: "宝塔パネルでの導入", link: "/jp/bt-install" },
+              { text: "ユーザーガイド", link: "/jp/documents" },
               { text: "ダウンロード API", link: "/jp/api" },
-              { text: "ログを更新します。", link: "/jp/changelog" },
+              { text: "更新履歴", link: "/jp/changelog" },
               { text: "ブラウザ拡張機能", link: "/jp/extension" },
-              { text: "🦞 OpenClaw Skill", link: "/jp/skills" },
+              { text: "OpenClaw Skill", link: "/jp/skills" },
             ],
           },
           {
             text: "Q&A",
             items: [
-              { text: "古いバージョンです", link: "/jp/history" },
-              { text: "意見収集です", link: "/jp/proposal" },
-              { text: "サポートリストです", link: "/jp/list" },
+              { text: "旧バージョン", link: "/jp/history" },
+              { text: "フィードバック", link: "/jp/proposal" },
+              { text: "対応サイト", link: "/jp/list" },
             ],
           },
         ],
@@ -445,7 +447,7 @@ export default defineConfig({
               { text: "API di download", link: "/it/api" },
               { text: "Changelog", link: "/it/changelog" },
               { text: "Estensione browser", link: "/it/extension" },
-              { text: "🦞 OpenClaw Skill", link: "/it/skills" },
+              { text: "OpenClaw Skill", link: "/it/skills" },
             ],
           },
           {

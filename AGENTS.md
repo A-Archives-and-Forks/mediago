@@ -4,6 +4,16 @@
 
 MediaGo is a pnpm/turborepo monorepo. Feature apps live in `apps/` (`frontend-main`, `frontend-mobile`, `backend-web`, `backend-electron`) for the user surfaces and API. Reusable logic stays in `packages/` (`shared` for cross-runtime helpers, `backend` for orchestration, `main` for Electron packaging). Long-form docs and assets sit in `docs/`, `images/`, and `docker/`. End-to-end checks live in `tests/`.
 
+## Documentation Site Safety
+
+`docs/` is the production VitePress source directory. Its contents are packaged and deployed to the public documentation site.
+
+- Never create agent planning or working artifacts anywhere under `docs/`. This includes `docs/plans/`, `docs/superpowers/`, design or implementation plans, audit reports, task logs, handoff notes, scratch Markdown, generated prompts, and session notes.
+- Only add or edit files under `docs/` when they are intentional public documentation, documentation assets, VitePress source/configuration, or tests required for the documentation site.
+- Store persistent internal planning artifacts under `.agents/plans/`. Store disposable artifacts in the system temporary directory.
+- This rule overrides any skill, tool, or template that defaults to writing plans under `docs/` or `docs/plans/`.
+- Before finishing a task that touches documentation, inspect `git status --short -- docs` and remove accidental internal artifacts without deleting legitimate documentation content.
+
 ## Build, Test, and Development Commands
 
 Run `pnpm install` once per clone. Use `pnpm dev` for the unified desktop + web experience, or scope to `pnpm dev:web` / `pnpm dev:electron`. `pnpm build` triggers the production Turborepo pipeline; `pnpm build:web-release` plus `pnpm build:docker` produce the deployable web bundle. Keep the codebase healthy with `pnpm lint`, `pnpm lint:fix`, `pnpm format`, and verify types through `pnpm types`.
