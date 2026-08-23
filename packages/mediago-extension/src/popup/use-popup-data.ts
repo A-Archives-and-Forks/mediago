@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type {
   DetectedSource,
@@ -9,6 +9,18 @@ import type {
   ServerStatus,
 } from "@/shared/types";
 import { storageKeyTab } from "@/shared/constants";
+
+import {
+  createPopupRequestGate,
+  loadPopupData,
+  normalizePopupLoadError,
+  parsePopupSettingsResponse,
+  parsePopupSourcesResponse,
+  parsePopupStatusResponse,
+  resolveClearSources,
+  resolveSnapshotSources,
+  type PopupLoadError,
+} from "./popup-data-loader";
 
 async function sendMessage<T extends ExtensionResponse>(
   msg: ExtensionMessage,
@@ -21,6 +33,8 @@ interface PopupData {
   sources: DetectedSource[];
   settings: ExtensionSettings | null;
   serverStatus: ServerStatus | null;
+  loading: boolean;
+  loadError: PopupLoadError | null;
   refresh: () => Promise<void>;
   clear: () => Promise<void>;
   importAll: () => Promise<void>;
@@ -57,66 +71,125 @@ export function usePopupData(
   const [settings, setSettings] = useState<ExtensionSettings | null>(null);
   const [serverStatus, setServerStatus] = useState<ServerStatus | null>(null);
   const [importing, setImporting] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<PopupLoadError | null>(null);
+  const requestGateRef = useRef(createPopupRequestGate());
+  const activeTabIdRef = useRef<number | null>(null);
+  const sourceEventSequenceRef = useRef(0);
+  const sourceEventsRef = useRef(
+    new Map<string, { sequence: number; sources: DetectedSource[] }>(),
+  );
 
   const refresh = useCallback(async () => {
-    const [active] = await chrome.tabs.query({
-      active: true,
-      currentWindow: true,
-    });
-    if (!active?.id) return;
-    setTab(active);
-
-    const sourcesRes = await sendMessage<ExtensionResponse>({
-      type: "GET_SOURCES",
-      tabId: active.id,
-    });
-    if (sourcesRes.type === "SOURCES") setSources(sourcesRes.sources);
-
-    const settingsRes = await sendMessage<ExtensionResponse>({
-      type: "GET_SETTINGS",
-    });
-    if (settingsRes.type !== "SETTINGS") return;
-    setSettings(settingsRes.settings);
-
-    if (settingsRes.settings.mode === "desktop-schema") {
-      // Silent probe would spawn an OS handoff every time the popup
-      // opens. Just flag the mode instead.
-      setServerStatus({ ok: true, message: { key: "status.schemaMode" } });
-      return;
+    const request = requestGateRef.current.begin();
+    const startSourceSequence = sourceEventSequenceRef.current;
+    if (!requestGateRef.current.canCommit(request)) return;
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const snapshot = await loadPopupData({
+        getActiveTab: async () => {
+          const [active] = await chrome.tabs.query({
+            active: true,
+            currentWindow: true,
+          });
+          return active ?? null;
+        },
+        getSources: async (tabId) => {
+          const response = await sendMessage<ExtensionResponse>({
+            type: "GET_SOURCES",
+            tabId,
+          });
+          return parsePopupSourcesResponse(response);
+        },
+        getSettings: async () => {
+          const response = await sendMessage<ExtensionResponse>({
+            type: "GET_SETTINGS",
+          });
+          return parsePopupSettingsResponse(response);
+        },
+        getServerStatus: async (currentSettings) => {
+          const response = await sendMessage<ExtensionResponse>({
+            type: "TEST_CONNECTION",
+            mode: currentSettings.mode,
+            serverUrl: currentSettings.serverUrl,
+            apiKey: currentSettings.apiKey,
+          });
+          return parsePopupStatusResponse(response);
+        },
+      });
+      if (!requestGateRef.current.canCommit(request)) return;
+      activeTabIdRef.current = snapshot.tab?.id ?? null;
+      setTab(snapshot.tab);
+      const snapshotKey = snapshot.tab?.id
+        ? storageKeyTab(snapshot.tab.id)
+        : null;
+      setSources(
+        snapshotKey
+          ? resolveSnapshotSources({
+              snapshotSources: snapshot.sources,
+              snapshotKey,
+              startSequence: startSourceSequence,
+              sourceEvents: sourceEventsRef.current,
+            })
+          : snapshot.sources,
+      );
+      setSettings(snapshot.settings);
+      setServerStatus(snapshot.serverStatus);
+    } catch (error) {
+      if (requestGateRef.current.canCommit(request)) {
+        setLoadError(normalizePopupLoadError(error));
+      }
+    } finally {
+      if (requestGateRef.current.canCommit(request)) setLoading(false);
     }
-    const statusRes = await sendMessage<ExtensionResponse>({
-      type: "TEST_CONNECTION",
-      mode: settingsRes.settings.mode,
-      serverUrl: settingsRes.settings.serverUrl,
-      apiKey: settingsRes.settings.apiKey,
-    });
-    if (statusRes.type === "STATUS") setServerStatus(statusRes.status);
   }, []);
 
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
-
-  useEffect(() => {
-    if (!tab?.id) return;
-    const key = storageKeyTab(tab.id);
     const onStorageChanged = (
       changes: Record<string, chrome.storage.StorageChange>,
       areaName: string,
     ) => {
       if (areaName !== "session") return;
-      if (!changes[key]) return;
-      const nextSources = changes[key].newValue as DetectedSource[] | undefined;
-      setSources(nextSources ?? []);
+      for (const [key, change] of Object.entries(changes)) {
+        if (!key.startsWith("mediago.tab.")) continue;
+        const eventSources =
+          (change.newValue as DetectedSource[] | undefined) ?? [];
+        const sequence = sourceEventSequenceRef.current + 1;
+        sourceEventSequenceRef.current = sequence;
+        sourceEventsRef.current.set(key, { sequence, sources: eventSources });
+
+        const activeTabId = activeTabIdRef.current;
+        if (activeTabId !== null && key === storageKeyTab(activeTabId)) {
+          setSources(eventSources);
+        }
+      }
     };
+
     chrome.storage.onChanged.addListener(onStorageChanged);
-    return () => chrome.storage.onChanged.removeListener(onStorageChanged);
-  }, [tab?.id]);
+    void refresh();
+    return () => {
+      chrome.storage.onChanged.removeListener(onStorageChanged);
+      requestGateRef.current.cancel();
+    };
+  }, [refresh]);
 
   const clear = useCallback(async () => {
     if (!tab?.id) return;
+    const key = storageKeyTab(tab.id);
+    const clearStartSequence = sourceEventSequenceRef.current;
     await sendMessage({ type: "CLEAR_SOURCES", tabId: tab.id });
-    setSources([]);
+    const resolution = resolveClearSources({
+      key,
+      clearStartSequence,
+      sourceEvents: sourceEventsRef.current,
+    });
+    if (resolution.shouldSynthesizeEmptyEvent) {
+      const sequence = sourceEventSequenceRef.current + 1;
+      sourceEventSequenceRef.current = sequence;
+      sourceEventsRef.current.set(key, { sequence, sources: [] });
+    }
+    setSources(resolution.sources);
   }, [tab?.id]);
 
   const runImport = useCallback(
@@ -156,6 +229,8 @@ export function usePopupData(
     sources,
     settings,
     serverStatus,
+    loading,
+    loadError,
     refresh,
     clear,
     importAll,

@@ -3,15 +3,37 @@ import type { ExtensionResources } from "./zh";
 const resource: ExtensionResources = {
   popup: {
     header: "Sniffer MediaGo",
+    workspaceLabel: "Area risorse",
+    pageContext: "Pagina corrente",
+    untitledPage: "Pagina senza titolo",
+    noPageUrl: "URL pagina non disponibile",
+    detectedCount_one: "{{count}} risorsa rilevata",
+    detectedCount_other: "{{count}} risorse rilevate",
+    resourceList: "Risorse rilevate",
     clear: "Azzera",
+    clearLabel: "Azzera le risorse rilevate",
     importAll: "Importa tutto",
     importAllWithCount: "Importa tutto ({{count}})",
+    importing: "Importazione risorse",
     settings: "Impostazioni",
     imported: "Importate {{count}} attività",
     importFailed: "Importazione fallita",
+    loadingTitle: "Analisi della pagina",
+    loadErrorTitle: "Impossibile caricare le risorse",
+    loadErrorHint:
+      "L'estensione non è riuscita a leggere questa pagina. Riprova.",
+    retry: "Riprova",
+    setupTitle: "Completa la configurazione",
+    setupHint:
+      "Aggiungi l'indirizzo del server MediaGo prima di importare le risorse rilevate.",
+    openConnectionSettings: "Apri impostazioni connessione",
+    connectionErrorTitle: "MediaGo è offline",
+    connectionErrorHint:
+      "Controlla che MediaGo sia in esecuzione e che le impostazioni di connessione siano corrette.",
   },
   status: {
     detecting: "Rilevamento",
+    unavailable: "Stato non disponibile",
     schemaMode: "Modo schema",
     notConfigured: "Non configurato",
     connectionFailed: "Connessione fallita",
@@ -25,12 +47,23 @@ const resource: ExtensionResources = {
   source: {
     unnamed: "(senza titolo)",
     import: "Importa",
+    importNamed: "Importa {{name}}",
     inspecting: "Analisi in corso",
     autoBest: "Migliore automatico",
     qualityUnknown: "Qualità sconosciuta",
   },
   options: {
     pageTitle: "Impostazioni estensione MediaGo",
+    workspaceLabel: "Area di lavoro browser",
+    settingsLabel: "Impostazioni",
+    description:
+      "Configura come inviare a MediaGo le risorse rilevate e gestisci le preferenze dell'estensione.",
+    preferencesLabel: "Preferenze estensione",
+    loadingTitle: "Caricamento impostazioni",
+    loadErrorTitle: "Impossibile caricare le impostazioni",
+    loadErrorHint:
+      "L'estensione non riesce a leggere le impostazioni salvate. Prova a ricaricarle.",
+    retry: "Riprova",
     language: {
       title: "Lingua interfaccia",
       description: `Lingua usata dal popup e dalla pagina delle opzioni. Scelte "Usa stessa lingua sistema" in base alla lingua dell'interfaccia utente del browser.`,
@@ -41,12 +74,14 @@ const resource: ExtensionResources = {
     },
     server: {
       title: "Modalità spedizione",
+      eyebrow: "Connessione",
+      modeLegend: "Modalità di connessione MediaGo",
       description:
-        "L'estensione non fallisce mai silenziosamente. Una volta scelta una modalità, qualsiasi errore viene segnalato così com'è: se necessario cambia modalità manualmente in questa pagina.",
-      modeSchemaTitle: "Desktop · Protocollo schema",
+        "Scegli un percorso esplicito per inviare le risorse rilevate a MediaGo. Gli errori restano visibili finché non risolvi la connessione o cambi modalità.",
+      modeSchemaTitle: "Desktop / Protocollo schema",
       modeSchemaDesc:
         "Apre MediaGo Desktop tramite mediago-community:// e mostra una finestra di revisione precompilata. Desktop viene avviato automaticamente se necessario.",
-      modeDesktopHttpTitle: "Desktop · HTTP locale",
+      modeDesktopHttpTitle: "Desktop / HTTP locale",
       modeDesktopHttpDesc:
         "Parla con l'app desktop in esecuzione tramite {{base}}. Richiede che l'app desktop sia in esecuzione, ma non c'è nessuna finestra di conferma.",
       modeDockerHttpTitle: "Docker / HTTP self-hosted",
@@ -58,6 +93,8 @@ const resource: ExtensionResources = {
       apiKeyOptional: "(opzionale)",
       apiKeyPlaceholder: "Lascia vuoto per saltare l'intestazione X-API-Key",
       schemaNoteLead: "Usa il nuovo",
+      schemaNoteBody:
+        "protocollo Share Intent per aprire MediaGo Desktop con una finestra di revisione.",
       schemaNoteMid:
         "protocollo Share Intent per richiamare Desktop. La scheda attiva apre l'URL del protocollo. Quando Chrome mostra per la prima volta 'Apri MediaGo-community?', scegli",
       schemaAllow: "Consenti",
@@ -69,7 +106,7 @@ const resource: ExtensionResources = {
         "Lo schema invia un'attività senza intestazioni. Usa HTTP per batch o sorgenti che richiedono intestazioni.",
       desktopHttpNoteLead: "Collegati sempre a",
       desktopHttpNoteTail:
-        "Il desktop ascolta automaticamente all'avvio; per verificare che sia online usa 'Verifica connessione'.",
+        ". Il desktop ascolta automaticamente all'avvio; per verificare che sia online usa 'Verifica connessione'.",
     },
     importBehaviour: {
       title: "Comportamento importazione",
@@ -77,12 +114,16 @@ const resource: ExtensionResources = {
         "Le modalità HTTP possono aggiungere attività direttamente e avviare subito il download.",
       schemaReviewOnly:
         "La modalità Schema apre MediaGo con una finestra di revisione e non crea né avvia attività automaticamente.",
+      schemaDisabled:
+        "Il download immediato non è disponibile perché la modalità Schema apre sempre la finestra di revisione.",
       downloadNowLabel: "Avvia immediatamente download",
       downloadNowDesc:
         "ON: l'attività viene aggiunta e avviata. OFF: viene solo aggiunta all'elenco. Si applica solo alle modalità HTTP.",
     },
     rules: {
       title: "Regole sniffing",
+      description:
+        "Una panoramica compatta dei modelli di risorse condivisi con MediaGo Desktop.",
       descriptionLead: "Le regole vengono mantenute centralmente in",
       descriptionTail:
         "e condivise tra app desktop e l'estensione del browser.",
@@ -91,12 +132,19 @@ const resource: ExtensionResources = {
       bilibiliLabel: "Pagine video Bilibili",
       youtubeLabel: "YouTube",
     },
+    about: {
+      title: "Informazioni",
+      description: "Assistente di acquisizione multimediale per MediaGo",
+      version: "Versione {{version}}",
+    },
   },
   common: {
     save: "Salva",
     saved: "Salvato",
     saveFailed: "Impossibile salvare",
     testConnection: "Test connessione",
+    testing: "Test in corso",
+    saving: "Salvataggio",
   },
   errors: {
     serverUrlRequired: "Prima inserisci l'URL del server",

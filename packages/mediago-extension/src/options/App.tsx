@@ -1,68 +1,284 @@
+import { AlertCircle, RefreshCw, SlidersHorizontal } from "lucide-react";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 
+import { Button } from "../components/ui/button";
+import { resolveLanguage } from "../i18n";
+import { renderLocalized } from "../i18n/localized-message";
+import type {
+  ExtensionLanguage,
+  ExtensionSettings,
+  InvocationMode,
+  LocalizedMessage,
+  ServerStatus,
+} from "../shared/types";
+import { AboutCard } from "./components/AboutCard";
 import { ImportBehaviourCard } from "./components/ImportBehaviourCard";
 import { LanguageCard } from "./components/LanguageCard";
 import { RuleListCard } from "./components/RuleListCard";
 import { ServerCard } from "./components/ServerCard";
+import type { ConnectionDraft } from "./settings-model";
+import { useOptions } from "./use-options";
+
+export interface OptionsViewProps {
+  settings: ExtensionSettings | null;
+  draft: ConnectionDraft;
+  loading: boolean;
+  loadError: LocalizedMessage | string | null;
+  testing: boolean;
+  savingConnection: boolean;
+  savingPreference: boolean;
+  lastStatus: ServerStatus | null;
+  version: string;
+  onRetry: () => void;
+  onModeChange: (mode: InvocationMode) => void;
+  onServerUrlChange: (value: string) => void;
+  onApiKeyChange: (value: string) => void;
+  onTest: () => void;
+  onSaveConnection: () => void;
+  onDownloadNowChange: (checked: boolean) => void;
+  onLanguageChange: (language: ExtensionLanguage) => void;
+}
+
+function OptionsHeader() {
+  const { t } = useTranslation();
+  return (
+    <header
+      data-options-header="brand"
+      className="border-b border-action-active bg-action text-white shadow-ambient"
+    >
+      <div className="mx-auto flex h-14 max-w-[1120px] items-center justify-between gap-4 px-5 sm:px-6">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-white shadow-sm">
+            <img
+              src="/public/icons/mediago-32.png"
+              width="24"
+              height="24"
+              alt=""
+              aria-hidden="true"
+            />
+          </span>
+          <div className="min-w-0 leading-tight">
+            <p className="truncate text-sm font-semibold">MediaGo</p>
+            <p className="truncate text-[11px] text-white">
+              {t("options.workspaceLabel")}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 rounded-md bg-black/35 px-2.5 py-1.5 text-[11px] font-medium text-white">
+          <SlidersHorizontal className="size-3.5" aria-hidden="true" />
+          {t("options.settingsLabel")}
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function OptionsLoading() {
+  const { t } = useTranslation();
+  return (
+    <div
+      data-options-state="loading"
+      aria-busy="true"
+      role="status"
+      className="grid gap-5 md:grid-cols-[minmax(0,1.3fr)_minmax(280px,0.7fr)]"
+    >
+      <span className="sr-only">{t("options.loadingTitle")}</span>
+      <div className="h-[520px] animate-pulse rounded-lg border border-border bg-card motion-reduce:animate-none" />
+      <div className="space-y-5">
+        {[180, 220, 130].map((height) => (
+          <div
+            key={height}
+            style={{ height }}
+            className="animate-pulse rounded-lg border border-border bg-card motion-reduce:animate-none"
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function OptionsLoadError({
+  error,
+  onRetry,
+}: {
+  error: LocalizedMessage | string;
+  onRetry: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div
+      data-options-state="load-error"
+      role="alert"
+      className="flex min-h-80 flex-col items-center justify-center rounded-lg border border-border bg-card px-6 py-10 text-center shadow-ambient"
+    >
+      <div className="grid size-11 place-items-center rounded-lg border border-destructive/20 bg-destructive/10 text-destructive">
+        <AlertCircle className="size-5" aria-hidden="true" />
+      </div>
+      <h2 className="mt-4 text-base font-semibold">
+        {t("options.loadErrorTitle")}
+      </h2>
+      <p className="mt-1.5 max-w-md text-sm leading-6 text-muted-foreground">
+        {t("options.loadErrorHint")}
+      </p>
+      <p className="mt-3 max-w-lg break-words rounded-md bg-surface-subtle px-3 py-2 font-mono text-[11px] text-foreground-secondary">
+        {renderLocalized(t, error)}
+      </p>
+      <Button
+        type="button"
+        variant="outline"
+        className="mt-5"
+        data-action="retry"
+        onClick={onRetry}
+      >
+        <RefreshCw className="size-3.5" aria-hidden="true" />
+        {t("options.retry")}
+      </Button>
+    </div>
+  );
+}
+
+export function OptionsView({
+  settings,
+  draft,
+  loading,
+  loadError,
+  testing,
+  savingConnection,
+  savingPreference,
+  lastStatus,
+  version,
+  onRetry,
+  onModeChange,
+  onServerUrlChange,
+  onApiKeyChange,
+  onTest,
+  onSaveConnection,
+  onDownloadNowChange,
+  onLanguageChange,
+}: OptionsViewProps) {
+  const { t } = useTranslation();
+
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      <OptionsHeader />
+      <main className="mx-auto max-w-[1120px] px-5 py-7 sm:px-6 sm:py-8">
+        <div className="mb-6 max-w-2xl">
+          <p className="font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-brand-foreground">
+            MediaGo / Extension
+          </p>
+          <h1 className="mt-2 text-[26px] font-semibold leading-tight tracking-[-0.025em] sm:text-[28px]">
+            {t("options.pageTitle")}
+          </h1>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            {t("options.description")}
+          </p>
+        </div>
+
+        {loading ? <OptionsLoading /> : null}
+        {!loading && loadError ? (
+          <OptionsLoadError error={loadError} onRetry={onRetry} />
+        ) : null}
+        {!loading && !loadError && settings ? (
+          <div
+            data-options-grid="workspace"
+            className="grid grid-cols-1 items-start gap-5 md:grid-cols-[minmax(0,1.3fr)_minmax(280px,0.7fr)]"
+          >
+            <div className="min-w-0 space-y-5">
+              <ServerCard
+                draft={draft}
+                testing={testing}
+                saving={savingConnection}
+                lastStatus={lastStatus}
+                onModeChange={onModeChange}
+                onServerUrlChange={onServerUrlChange}
+                onApiKeyChange={onApiKeyChange}
+                onTest={onTest}
+                onSave={onSaveConnection}
+              />
+              <RuleListCard />
+            </div>
+            <aside
+              aria-label={t("options.preferencesLabel")}
+              className="min-w-0 space-y-5 md:sticky md:top-5"
+            >
+              <ImportBehaviourCard
+                settings={settings}
+                mode={draft.mode}
+                saving={savingPreference}
+                onDownloadNowChange={onDownloadNowChange}
+              />
+              <LanguageCard
+                language={settings.language}
+                saving={savingPreference}
+                onLanguageChange={onLanguageChange}
+              />
+              <AboutCard version={version} />
+            </aside>
+          </div>
+        ) : null}
+      </main>
+    </div>
+  );
+}
 
 export function App() {
-  const { t } = useTranslation();
-  // Keep the browser tab title in sync with the UI language so the
-  // options page reads "MediaGo 扩展设置" in Chinese and
-  // "MediaGo Extension Settings" in English.
+  const { t, i18n } = useTranslation();
+  const options = useOptions();
+
   useEffect(() => {
     document.title = t("options.pageTitle");
   }, [t]);
 
+  const handleSaveConnection = async () => {
+    const result = await options.saveConnection();
+    if (result.ok) toast.success(t("common.saved"));
+    else {
+      toast.error(renderLocalized(t, result.error, "common.saveFailed"));
+    }
+  };
+
+  const handleDownloadNowChange = async (checked: boolean) => {
+    const ok = await options.changeDownloadNow(checked);
+    if (ok) toast.success(t("common.saved"));
+    else toast.error(t("common.saveFailed"));
+  };
+
+  const handleLanguageChange = async (language: ExtensionLanguage) => {
+    const ok = await options.changeLanguage(language);
+    if (!ok) {
+      toast.error(t("common.saveFailed"));
+      return;
+    }
+    await i18n.changeLanguage(resolveLanguage(language));
+    toast.success(t("common.saved"));
+  };
+
+  const version =
+    typeof chrome === "undefined"
+      ? "0.0.0"
+      : chrome.runtime.getManifest().version;
+
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      {/* Hero band — surface-100, the lightest warm cream in the scale.
-          The Cursor-style compressed display headline lives here with
-          two corner blurs that echo the ambient/elevated shadow recipe
-          without costing a box-shadow.
-
-          Section tonal rhythm on this page: surface-100 (hero) →
-          background (main content) → surface-200 (footer closer). This
-          is the "warm section variation" the spec calls out — alternate
-          cream tones instead of hard dividers. */}
-      <header className="relative overflow-hidden border-b border-border bg-surface-100 pt-20 pb-16">
-        <div className="absolute -top-32 -right-16 h-72 w-72 rounded-full bg-timeline-thinking/25 blur-3xl" />
-        <div className="absolute -top-24 -left-20 h-72 w-72 rounded-full bg-timeline-read/20 blur-3xl" />
-
-        <div className="relative mx-auto flex max-w-2xl flex-col gap-5 px-6">
-          <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-            <span className="inline-block h-1.5 w-1.5 rounded-full bg-orange" />
-            MediaGo / Extension
-          </div>
-          <h1 className="max-w-xl text-hero font-medium font-feat-display">
-            {t("options.pageTitle")}
-          </h1>
-          <p className="max-w-lg font-serif text-[17px] leading-relaxed font-feat-editorial text-muted-foreground">
-            {t("options.server.description")}
-          </p>
-        </div>
-      </header>
-
-      {/* Settings stack — the long-form body. `gap-6` leaves enough
-          warm space between cards that the tonal shifts (page → card)
-          feel intentional. */}
-      <main className="mx-auto flex max-w-2xl flex-col gap-6 px-6 py-10">
-        <ServerCard />
-        <ImportBehaviourCard />
-        <LanguageCard />
-        <RuleListCard />
-      </main>
-
-      {/* Closing strip — surface-200 (= page background in the spec's
-          scale) gives the composition a deliberate "outro" beat. The
-          mono label keeps it from feeling like dead negative space. */}
-      <footer className="border-t border-border bg-surface-200 py-10">
-        <div className="mx-auto flex max-w-2xl items-center justify-center gap-2 px-6 font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-          <span className="inline-block h-1 w-1 rounded-full bg-success" />
-          MediaGo · v{chrome.runtime.getManifest().version}
-        </div>
-      </footer>
-    </div>
+    <OptionsView
+      settings={options.settings}
+      draft={options.draft}
+      loading={options.loading}
+      loadError={options.loadError}
+      testing={options.testing}
+      savingConnection={options.savingConnection}
+      savingPreference={options.savingPreference}
+      lastStatus={options.lastStatus}
+      version={version}
+      onRetry={() => void options.refresh()}
+      onModeChange={options.setMode}
+      onServerUrlChange={options.setServerUrl}
+      onApiKeyChange={options.setApiKey}
+      onTest={() => void options.test()}
+      onSaveConnection={() => void handleSaveConnection()}
+      onDownloadNowChange={(checked) => void handleDownloadNowChange(checked)}
+      onLanguageChange={(language) => void handleLanguageChange(language)}
+    />
   );
 }

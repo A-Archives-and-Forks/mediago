@@ -1,5 +1,5 @@
+import { Download, Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
 
 import {
   Card,
@@ -7,91 +7,85 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import type { ExtensionSettings } from "@/shared/types";
+} from "../../components/ui/card";
+import { Label } from "../../components/ui/label";
+import { Switch } from "../../components/ui/switch";
+import type { ExtensionSettings, InvocationMode } from "../../shared/types";
+import { isDownloadNowAvailable } from "../settings-model";
 
-import { useImportBehaviour } from "../use-import-behaviour";
+export interface ImportBehaviourCardProps {
+  settings: ExtensionSettings;
+  mode: InvocationMode;
+  saving: boolean;
+  onDownloadNowChange: (checked: boolean) => void;
+}
 
-export function ImportBehaviourCard() {
+export function ImportBehaviourCard({
+  settings,
+  mode,
+  saving,
+  onDownloadNowChange,
+}: ImportBehaviourCardProps) {
   const { t } = useTranslation();
-  const { settings, patch } = useImportBehaviour();
-  const disabled = settings === null;
-  const downloadNow = settings?.downloadNow ?? false;
-  const schemaOnly = settings?.mode === "desktop-schema";
-
-  const apply = async (update: Partial<ExtensionSettings>) => {
-    const ok = await patch(update);
-    if (ok) toast.success(t("common.saved"));
-    else toast.error(t("common.saveFailed"));
-  };
+  const available = isDownloadNowAvailable(mode);
+  const description = available
+    ? t("options.importBehaviour.httpDescription")
+    : t("options.importBehaviour.schemaReviewOnly");
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-          <span className="inline-block h-1 w-1 rounded-full bg-timeline-edit" />
-          behaviour
+    <Card
+      data-card="import-behaviour"
+      data-download-now-available={String(available)}
+      aria-busy={saving || undefined}
+    >
+      <CardHeader className="pb-4">
+        <div className="flex items-start gap-3">
+          <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-surface-selected text-primary">
+            <Download className="size-4" aria-hidden="true" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <CardTitle>{t("options.importBehaviour.title")}</CardTitle>
+            <CardDescription className="mt-1">{description}</CardDescription>
+          </div>
+          {saving ? (
+            <Loader2
+              className="size-4 animate-spin text-muted-foreground motion-reduce:animate-none"
+              aria-label={t("common.saving")}
+            />
+          ) : null}
         </div>
-        <CardTitle>{t("options.importBehaviour.title")}</CardTitle>
-        <CardDescription>
-          {schemaOnly
-            ? t("options.importBehaviour.schemaReviewOnly")
-            : t("options.importBehaviour.httpDescription")}
-        </CardDescription>
       </CardHeader>
       <CardContent>
-        {schemaOnly ? (
-          <div className="rounded-lg border border-border bg-surface-200 p-4 font-serif text-[13px] leading-relaxed text-muted-foreground">
-            {t("options.importBehaviour.schemaReviewOnly")}
+        <div className="flex items-start justify-between gap-4 rounded-lg border border-border bg-surface-subtle p-3.5">
+          <div className="min-w-0 flex-1 space-y-1">
+            <Label
+              htmlFor="download-now"
+              className={
+                available
+                  ? "cursor-pointer"
+                  : "cursor-not-allowed text-muted-foreground"
+              }
+            >
+              {t("options.importBehaviour.downloadNowLabel")}
+            </Label>
+            <p
+              id="download-now-description"
+              className="text-[13px] leading-5 text-muted-foreground"
+            >
+              {available
+                ? t("options.importBehaviour.downloadNowDesc")
+                : t("options.importBehaviour.schemaDisabled")}
+            </p>
           </div>
-        ) : (
-          <ToggleRow
-            label={t("options.importBehaviour.downloadNowLabel")}
-            description={t("options.importBehaviour.downloadNowDesc")}
-            checked={downloadNow}
-            disabled={disabled}
-            onCheckedChange={(v) => apply({ downloadNow: v })}
+          <Switch
+            id="download-now"
+            checked={available && settings.downloadNow}
+            onCheckedChange={onDownloadNowChange}
+            disabled={!available}
+            aria-describedby="download-now-description"
           />
-        )}
+        </div>
       </CardContent>
     </Card>
-  );
-}
-
-interface ToggleRowProps {
-  label: string;
-  description: string;
-  checked: boolean;
-  disabled?: boolean;
-  onCheckedChange: (checked: boolean) => void;
-}
-
-function ToggleRow({
-  label,
-  description,
-  checked,
-  disabled,
-  onCheckedChange,
-}: ToggleRowProps) {
-  const id = `toggle-${label}`;
-  return (
-    <div className="flex items-start justify-between gap-4 rounded-lg border border-border bg-surface-200 p-4">
-      <div className="flex-1 space-y-1.5">
-        <Label htmlFor={id} className="text-sm font-medium">
-          {label}
-        </Label>
-        <p className="font-serif text-[13px] leading-relaxed text-muted-foreground">
-          {description}
-        </p>
-      </div>
-      <Switch
-        id={id}
-        checked={checked}
-        onCheckedChange={onCheckedChange}
-        disabled={disabled}
-      />
-    </div>
   );
 }

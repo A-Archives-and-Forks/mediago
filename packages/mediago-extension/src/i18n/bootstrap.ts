@@ -1,9 +1,43 @@
 import type { i18n } from "i18next";
 
-import { DEFAULT_SETTINGS, STORAGE_KEY_SETTINGS } from "@/shared/constants";
-import type { ExtensionLanguage, ExtensionSettings } from "@/shared/types";
+import { DEFAULT_SETTINGS, STORAGE_KEY_SETTINGS } from "../shared/constants";
+import type { ExtensionLanguage, ExtensionSettings } from "../shared/types";
 
 import { createExtensionI18n, resolveLanguage } from "./index";
+
+export interface DocumentLanguageTarget {
+  lang: string;
+}
+
+export interface LanguageChangeSource {
+  language: string;
+  resolvedLanguage?: string;
+  on(event: "languageChanged", listener: (language: string) => void): unknown;
+  off(event: "languageChanged", listener: (language: string) => void): unknown;
+}
+
+function concreteDocumentLanguage(language: string): "zh" | "en" | "it" {
+  const normalized = language.toLowerCase();
+  if (normalized.startsWith("zh")) return "zh";
+  if (normalized.startsWith("it")) return "it";
+  return "en";
+}
+
+export function bindDocumentLanguage(
+  instance: LanguageChangeSource,
+  target: DocumentLanguageTarget,
+): () => void {
+  const update = (language: string) => {
+    target.lang = concreteDocumentLanguage(language);
+  };
+  update(instance.resolvedLanguage ?? instance.language);
+  instance.on("languageChanged", update);
+  return () => {
+    instance.off("languageChanged", update);
+  };
+}
+
+let releaseDocumentLanguage: (() => void) | null = null;
 
 /**
  * Bootstrap an i18next instance for a popup / options page:
@@ -24,6 +58,14 @@ export async function bootstrapExtensionI18n(): Promise<i18n> {
   const setting: ExtensionLanguage =
     stored.language ?? DEFAULT_SETTINGS.language;
   const instance = createExtensionI18n(resolveLanguage(setting));
+
+  if (typeof document !== "undefined") {
+    releaseDocumentLanguage?.();
+    releaseDocumentLanguage = bindDocumentLanguage(
+      instance,
+      document.documentElement,
+    );
+  }
 
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "local") return;

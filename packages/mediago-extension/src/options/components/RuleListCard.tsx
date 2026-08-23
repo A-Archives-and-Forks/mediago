@@ -1,23 +1,16 @@
+import { ScanSearch } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { Badge, variantForDownloadType } from "@/components/ui/badge";
+import { Badge } from "../../components/ui/badge";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from "../../components/ui/card";
 
-type RuleType = "m3u8" | "bilibili" | "direct" | "youtube";
-
-interface Rule {
-  type: RuleType;
-  labelKey: string;
-  detail: string;
-}
-
-const RULES: Rule[] = [
+const RULES = [
   { type: "m3u8", labelKey: "options.rules.m3u8Label", detail: "*.m3u8" },
   {
     type: "direct",
@@ -34,50 +27,38 @@ const RULES: Rule[] = [
     labelKey: "options.rules.youtubeLabel",
     detail: "youtube.com, youtu.be",
   },
-];
+] as const;
 
 export function RuleListCard() {
   const { t } = useTranslation();
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-          <span className="inline-block h-1 w-1 rounded-full bg-timeline-thinking" />
-          rules
+    <Card data-card="rules">
+      <CardHeader className="pb-4">
+        <div className="flex items-start gap-3">
+          <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-surface-selected text-primary">
+            <ScanSearch className="size-4" aria-hidden="true" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <CardTitle>{t("options.rules.title")}</CardTitle>
+            <CardDescription className="mt-1">
+              {t("options.rules.description")}
+            </CardDescription>
+          </div>
         </div>
-        <CardTitle>{t("options.rules.title")}</CardTitle>
-        <CardDescription>
-          {t("options.rules.descriptionLead")}{" "}
-          <code className="rounded-xs bg-surface-300 px-1 py-0.5 font-mono text-[11px] text-foreground">
-            @mediago/shared-common
-          </code>{" "}
-          {t("options.rules.descriptionTail")}
-        </CardDescription>
       </CardHeader>
       <CardContent>
-        {/* Vertical list styled like a timeline: a faint warm rule
-            runs down the left edge, and each row has a color dot
-            matching the DownloadType's timeline color. This riffs on
-            Cursor's AI timeline visualisation — thinking / grep /
-            read / edit as connected beats — but applied to our
-            sniff-rule taxonomy. */}
-        <ul className="relative space-y-3 pl-5 before:absolute before:inset-y-1 before:left-[5px] before:w-px before:bg-border">
+        <ul className="divide-y divide-border rounded-lg border border-border bg-surface-subtle">
           {RULES.map((rule) => (
-            <li key={rule.type} className="relative flex items-start gap-3">
-              <span
-                className={`absolute -left-[calc(1.25rem-1px)] top-1.5 h-2 w-2 rounded-full ring-4 ring-card ${DOT_CLASS[rule.type]}`}
-              />
+            <li key={rule.type} className="flex items-start gap-3 px-3.5 py-3">
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium leading-tight">
+                <p className="text-[13px] font-medium leading-5">
                   {t(rule.labelKey)}
-                </div>
-                <div className="mt-0.5 font-mono text-[11px] text-muted-foreground">
+                </p>
+                <p className="mt-0.5 break-words font-mono text-[10px] leading-4 text-muted-foreground">
                   {rule.detail}
-                </div>
+                </p>
               </div>
-              <Badge variant={variantForDownloadType(rule.type)}>
-                {rule.type}
-              </Badge>
+              <Badge variant="outline">{rule.type}</Badge>
             </li>
           ))}
         </ul>
@@ -85,16 +66,3 @@ export function RuleListCard() {
     </Card>
   );
 }
-
-/**
- * Fully-literal Tailwind class strings so the JIT scanner can pick
- * them up. We *can't* build these with a template literal
- * (`bg-timeline-${…}`) — Tailwind scans text, not JS, so a dynamic
- * fragment would be dropped from the generated CSS.
- */
-const DOT_CLASS: Record<RuleType, string> = {
-  bilibili: "bg-timeline-thinking",
-  direct: "bg-timeline-grep",
-  youtube: "bg-timeline-read",
-  m3u8: "bg-timeline-edit",
-};

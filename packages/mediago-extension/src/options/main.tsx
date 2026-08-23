@@ -13,7 +13,9 @@ applySystemTheme();
 
 void (async () => {
   const i18n = await bootstrapExtensionI18n();
-  const root = createRoot(document.getElementById("root")!);
+  const rootElement = document.getElementById("root");
+  if (!rootElement) throw new Error("Options root element not found");
+  const root = createRoot(rootElement);
   root.render(
     <React.StrictMode>
       <I18nextProvider i18n={i18n}>

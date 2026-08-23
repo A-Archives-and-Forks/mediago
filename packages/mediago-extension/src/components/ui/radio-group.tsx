@@ -1,19 +1,6 @@
 import * as React from "react";
 
-import { cn } from "@/lib/utils";
-
-/**
- * Minimal headless radio group. We don't need @radix-ui/react-radio-group
- * for the options page — only one consumer, 3 fixed options — so this
- * keeps the bundle leaner and the API familiar (native `input type=radio`
- * with styled labels).
- *
- * Visuals follow Cursor: each option is a cream card with an oklab
- * ring; the selected card gets a stronger ring + warm-filled background
- * instead of a bright brand color. Hover subtly tints but does NOT
- * shift color — the crimson hover is reserved for clickable text, not
- * for choice-making widgets.
- */
+import { cn } from "../../lib/utils";
 
 interface RadioGroupProps<Value extends string> extends Omit<
   React.HTMLAttributes<HTMLDivElement>,
@@ -32,10 +19,6 @@ export function RadioGroup<Value extends string>({
   children,
   ...props
 }: RadioGroupProps<Value>) {
-  // Widen to string at the context boundary — RadioGroupItem is the
-  // sole consumer and it only reads the current value for an equality
-  // check, never assigns. Keeps callers strongly typed while the
-  // runtime contract stays plain string-in / string-out.
   const ctx = {
     value,
     onValueChange: onValueChange as (v: string) => void,
@@ -59,6 +42,7 @@ interface RadioGroupItemProps extends React.HTMLAttributes<HTMLLabelElement> {
   title: string;
   description?: string;
   disabled?: boolean;
+  variant?: "card" | "segment" | "compact";
 }
 
 export function RadioGroupItem({
@@ -67,6 +51,7 @@ export function RadioGroupItem({
   title,
   description,
   disabled,
+  variant = "card",
   ...rest
 }: RadioGroupItemProps) {
   const ctx = React.useContext(RadioGroupContext);
@@ -75,10 +60,13 @@ export function RadioGroupItem({
   return (
     <label
       className={cn(
-        "group flex cursor-pointer items-start gap-3 rounded-lg border border-border bg-surface-200 p-3 transition-colors",
+        "group flex cursor-pointer gap-3 border border-border bg-surface-raised transition-[border-color,background-color,box-shadow] duration-150 motion-reduce:transition-none",
+        variant === "card" && "items-start rounded-lg p-3",
+        variant === "segment" && "items-center rounded-md px-3 py-2",
+        variant === "compact" && "items-center rounded-md px-2.5 py-2",
         checked
-          ? "border-foreground/55 bg-surface-300"
-          : "hover:border-ring hover:bg-surface-100",
+          ? "border-primary bg-surface-selected shadow-ambient"
+          : "hover:border-border-strong hover:bg-surface-hover",
         disabled && "cursor-not-allowed opacity-50",
         className,
       )}
@@ -91,12 +79,16 @@ export function RadioGroupItem({
         checked={checked}
         onChange={() => ctx.onValueChange(value)}
         disabled={disabled}
-        className="mt-0.5 h-4 w-4 cursor-pointer accent-foreground"
+        className={cn(
+          "h-4 w-4 shrink-0 accent-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring",
+          variant === "card" && "mt-0.5",
+          disabled ? "cursor-not-allowed" : "cursor-pointer",
+        )}
       />
       <div className="flex flex-1 flex-col">
         <span className="text-sm font-medium leading-tight">{title}</span>
         {description && (
-          <span className="mt-1 font-serif text-[13px] leading-relaxed text-muted-foreground">
+          <span className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
             {description}
           </span>
         )}
