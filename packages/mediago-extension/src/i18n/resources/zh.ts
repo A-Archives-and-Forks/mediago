@@ -110,6 +110,13 @@ const resource = {
       downloadNowDesc:
         "开：任务进队列并立刻开跑。关：仅加入下载列表，等用户手动触发。仅对 HTTP 模式生效。",
     },
+    pageQuickAction: {
+      title: "页面快捷按钮",
+      description: "在支持的页面右上角显示“添加到 MediaGo”。",
+      enabledLabel: "显示页面快捷按钮",
+      enabledDescription:
+        "点击后把当前页面加入扩展 popup 列表，并自动打开列表。",
+    },
     rules: {
       title: "嗅探规则",
       description: "简要展示与 MediaGo Desktop 共享的资源匹配规则。",

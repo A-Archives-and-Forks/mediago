@@ -16,6 +16,7 @@ const currentSettings: ExtensionSettings = {
   apiKey: "api-key",
   downloadNow: true,
   language: "zh",
+  pageQuickActionEnabled: true,
 };
 
 type SaveResult = { ok: boolean; settings: ExtensionSettings };
@@ -87,6 +88,12 @@ describe("applySettingsPatch", () => {
       ...currentSettings,
       language: "en",
     });
+  });
+
+  test("preserves other preferences when changing the page quick action", () => {
+    expect(
+      applySettingsPatch(currentSettings, { pageQuickActionEnabled: false }),
+    ).toEqual({ ...currentSettings, pageQuickActionEnabled: false });
   });
 
   test("does not mutate either input", () => {

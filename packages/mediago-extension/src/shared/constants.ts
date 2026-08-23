@@ -33,6 +33,7 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
   apiKey: "",
   downloadNow: false,
   language: "system",
+  pageQuickActionEnabled: true,
 };
 
 /** localStorage keys in `chrome.storage.local`. */

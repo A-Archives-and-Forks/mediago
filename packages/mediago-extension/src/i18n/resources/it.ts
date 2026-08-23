@@ -120,6 +120,14 @@ const resource: ExtensionResources = {
       downloadNowDesc:
         "ON: l'attività viene aggiunta e avviata. OFF: viene solo aggiunta all'elenco. Si applica solo alle modalità HTTP.",
     },
+    pageQuickAction: {
+      title: "Scorciatoia pagina",
+      description:
+        "Mostra “Aggiungi a MediaGo” nell'angolo in alto a destra delle pagine supportate.",
+      enabledLabel: "Mostra la scorciatoia pagina",
+      enabledDescription:
+        "Il clic aggiunge la pagina corrente all'elenco del popup dell'estensione e lo apre.",
+    },
     rules: {
       title: "Regole sniffing",
       description:

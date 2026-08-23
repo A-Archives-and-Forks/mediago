@@ -2,16 +2,49 @@ import {
   DownloadType,
   matchPageUrl,
   matchRequestUrl,
-  mergeSniffedSource,
 } from "@mediago/shared-common";
-import type { DetectedSource } from "@/shared/types";
+import type {
+  DetectedSource,
+  PageContextChangedMessage,
+} from "../shared/types";
 import { inspectSources } from "./mediago-client";
-import {
-  clearTabSources,
-  loadSettings,
-  loadTabSources,
-  saveTabSources,
-} from "./storage";
+import { loadSettings } from "./storage";
+import { tabSourceService, type TabSourceService } from "./tab-sources";
+
+export type SnifferErrorContext =
+  | "request detection"
+  | "inspection flush"
+  | "tab update"
+  | "tab removal";
+
+export type SnifferErrorReporter = (
+  context: SnifferErrorContext,
+  error: unknown,
+) => void;
+
+const defaultErrorReporter: SnifferErrorReporter = (context, error) => {
+  // eslint-disable-next-line no-console -- MV3 background failures need a diagnostic sink.
+  console.error(`[MediaGo extension] ${context} failed`, error);
+};
+
+function reportAsyncFailure(
+  context: SnifferErrorContext,
+  operation: Promise<unknown>,
+  reportError: SnifferErrorReporter,
+): void {
+  void operation.catch((error: unknown) => {
+    try {
+      reportError(context, error);
+    } catch (reporterError) {
+      // eslint-disable-next-line no-console -- Reporter failures must not become unhandled rejections.
+      console.error(
+        "[MediaGo extension] error reporter failed",
+        reporterError,
+        { context, error },
+      );
+    }
+  });
+}
 
 /**
  * Turn `chrome.webRequest.HttpHeader[]` into the newline format accepted by
@@ -29,62 +62,6 @@ function formatHeaders(
   return parts.join("\n");
 }
 
-async function updateBadge(tabId: number, count: number): Promise<void> {
-  if (count > 0) {
-    await chrome.action.setBadgeBackgroundColor({
-      tabId,
-      color: "#ef4444",
-    });
-    await chrome.action.setBadgeText({
-      tabId,
-      text: String(count),
-    });
-  } else {
-    await chrome.action.setBadgeText({ tabId, text: "" });
-  }
-}
-
-const tabStorageQueues = new Map<number, Promise<void>>();
-
-async function enqueueTabStorageUpdate(
-  tabId: number,
-  update: () => Promise<void>,
-): Promise<void> {
-  const previous = tabStorageQueues.get(tabId) ?? Promise.resolve();
-  const current = previous.catch(() => undefined).then(update);
-  tabStorageQueues.set(tabId, current);
-  try {
-    await current;
-  } finally {
-    if (tabStorageQueues.get(tabId) === current) {
-      tabStorageQueues.delete(tabId);
-    }
-  }
-}
-
-async function addSource(tabId: number, source: DetectedSource): Promise<void> {
-  return addSources(tabId, [source]);
-}
-
-async function addSources(
-  tabId: number,
-  sources: DetectedSource[],
-): Promise<void> {
-  await enqueueTabStorageUpdate(tabId, async () => {
-    const existing = await loadTabSources(tabId);
-    const next = sources.reduce(mergeSniffedSource, existing);
-    await saveTabSources(tabId, next);
-    await updateBadge(tabId, next.length);
-  });
-}
-
-async function clearSources(tabId: number): Promise<void> {
-  await enqueueTabStorageUpdate(tabId, async () => {
-    await clearTabSources(tabId);
-    await updateBadge(tabId, 0);
-  });
-}
-
 const pendingInspections = new Map<number, Map<string, DetectedSource>>();
 const inspectionTimers = new Map<number, ReturnType<typeof setTimeout>>();
 const tabGenerations = new Map<number, number>();
@@ -97,7 +74,12 @@ function resetPendingInspections(tabId: number): void {
   inspectionTimers.delete(tabId);
 }
 
-function queueInspection(tabId: number, source: DetectedSource): void {
+function queueInspection(
+  tabId: number,
+  source: DetectedSource,
+  sources: TabSourceService,
+  reportError: SnifferErrorReporter,
+): void {
   const pending = pendingInspections.get(tabId) ?? new Map();
   pending.set(source.url, source);
   pendingInspections.set(tabId, pending);
@@ -106,12 +88,19 @@ function queueInspection(tabId: number, source: DetectedSource): void {
     tabId,
     setTimeout(() => {
       inspectionTimers.delete(tabId);
-      void flushInspections(tabId);
+      reportAsyncFailure(
+        "inspection flush",
+        flushInspections(tabId, sources),
+        reportError,
+      );
     }, 150),
   );
 }
 
-async function flushInspections(tabId: number): Promise<void> {
+async function flushInspections(
+  tabId: number,
+  sources: TabSourceService,
+): Promise<void> {
   const pending = [...(pendingInspections.get(tabId)?.values() ?? [])];
   pendingInspections.delete(tabId);
   if (pending.length === 0) return;
@@ -120,7 +109,7 @@ async function flushInspections(tabId: number): Promise<void> {
   const settings = await loadSettings();
   const inspected = await inspectSources(settings, pending);
   if ((tabGenerations.get(tabId) ?? 0) !== generation) return;
-  await addSources(tabId, inspected);
+  await sources.addSources(tabId, inspected);
 }
 
 /* --------------------- request-level (m3u8 / mp4) --------------------- */
@@ -135,6 +124,8 @@ async function flushInspections(tabId: number): Promise<void> {
  */
 async function handleRequest(
   details: chrome.webRequest.OnSendHeadersDetails,
+  sources: TabSourceService,
+  reportError: SnifferErrorReporter,
 ): Promise<void> {
   // tabId -1 means the request isn't tied to a tab (e.g. extension
   // itself, background fetch). Ignore — the user can't act on these.
@@ -172,9 +163,9 @@ async function handleRequest(
           }
         : undefined,
   };
-  await addSource(details.tabId, source);
+  await sources.addSource(details.tabId, source);
   if (filter.type === DownloadType.m3u8) {
-    queueInspection(details.tabId, source);
+    queueInspection(details.tabId, source, sources, reportError);
   }
 }
 
@@ -193,13 +184,14 @@ async function handleRequest(
 async function checkPageInfo(
   tabId: number,
   tab: chrome.tabs.Tab,
+  sources: TabSourceService,
 ): Promise<void> {
   const pageUrl = tab.url;
   if (!pageUrl) return;
   const filter = matchPageUrl(pageUrl);
   if (!filter) return;
 
-  await addSource(tabId, {
+  await sources.addSource(tabId, {
     id: `page-${tabId}-${Date.now()}`,
     url: pageUrl,
     documentURL: pageUrl,
@@ -209,6 +201,47 @@ async function checkPageInfo(
   });
 }
 
+async function handleTabUpdated(
+  tabId: number,
+  changeInfo: chrome.tabs.OnUpdatedInfo,
+  tab: chrome.tabs.Tab,
+  sources: TabSourceService,
+): Promise<void> {
+  let generation = tabGenerations.get(tabId) ?? 0;
+  // A top-level URL change = new page. Clear stale sources first so
+  // sites with client-side routing (YouTube SPA navigation!) don't
+  // leak detections from the previous video into the next one.
+  if (changeInfo.url) {
+    resetPendingInspections(tabId);
+    generation = tabGenerations.get(tabId) ?? 0;
+    await sources.clear(tabId);
+    const message = {
+      type: "PAGE_CONTEXT_CHANGED",
+    } satisfies PageContextChangedMessage;
+    try {
+      await chrome.tabs.sendMessage(tabId, message);
+    } catch {
+      // Content scripts are not injected on every page. A missing
+      // receiver must not prevent page-level detection after navigation.
+    }
+  }
+  if ((tabGenerations.get(tabId) ?? 0) !== generation) return;
+  // Emit the page-level detection when the title is known — waiting
+  // for `status === "complete"` avoids capturing the empty title
+  // shown during the initial navigation.
+  if (changeInfo.status === "complete" || changeInfo.title) {
+    await checkPageInfo(tabId, tab, sources);
+  }
+}
+
+async function handleTabRemoved(
+  tabId: number,
+  sources: TabSourceService,
+): Promise<void> {
+  resetPendingInspections(tabId);
+  await sources.remove(tabId);
+}
+
 /* --------------------------------------------------------------------- */
 
 /**
@@ -216,35 +249,36 @@ async function checkPageInfo(
  * MV3 service workers are re-spawned aggressively so we register at the
  * top level of background/index.ts, not lazily.
  */
-export function registerSniffer(): void {
+export function registerSniffer(
+  sources: TabSourceService = tabSourceService,
+  reportError: SnifferErrorReporter = defaultErrorReporter,
+): void {
   chrome.webRequest.onSendHeaders.addListener(
     (details) => {
-      // Fire-and-forget; webRequest doesn't care about async returns.
-      void handleRequest(details);
+      reportAsyncFailure(
+        "request detection",
+        handleRequest(details, sources, reportError),
+        reportError,
+      );
     },
     { urls: ["<all_urls>"] },
     ["requestHeaders", "extraHeaders"],
   );
 
-  chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-    // A top-level URL change = new page. Clear stale sources first so
-    // sites with client-side routing (YouTube SPA navigation!) don't
-    // leak detections from the previous video into the next one.
-    if (changeInfo.url) {
-      resetPendingInspections(tabId);
-      await clearSources(tabId);
-    }
-    // Emit the page-level detection when the title is known — waiting
-    // for `status === "complete"` avoids capturing the empty title
-    // shown during the initial navigation.
-    if (changeInfo.status === "complete" || changeInfo.title) {
-      await checkPageInfo(tabId, tab);
-    }
+  chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    reportAsyncFailure(
+      "tab update",
+      handleTabUpdated(tabId, changeInfo, tab, sources),
+      reportError,
+    );
   });
 
   // Tab closed → drop its entry so we don't accumulate stale data.
-  chrome.tabs.onRemoved.addListener(async (tabId) => {
-    resetPendingInspections(tabId);
-    await clearSources(tabId);
+  chrome.tabs.onRemoved.addListener((tabId) => {
+    reportAsyncFailure(
+      "tab removal",
+      handleTabRemoved(tabId, sources),
+      reportError,
+    );
   });
 }

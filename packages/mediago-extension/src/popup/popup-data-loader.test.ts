@@ -25,6 +25,7 @@ const settings: ExtensionSettings = {
   apiKey: "",
   downloadNow: false,
   language: "en",
+  pageQuickActionEnabled: true,
 };
 const status: ServerStatus = { ok: true, message: "Connected" };
 

@@ -209,7 +209,7 @@ export async function openControlledBilibiliPopup(
     .getByRole("listitem")
     .filter({ hasText: BILIBILI_TASK_NAME });
   await expect(sourceRow).toBeVisible();
-  await expect(sourceRow.getByText("bilibili", { exact: true })).toBeVisible();
+  await expect(sourceRow.getByText("BILI", { exact: true })).toBeVisible();
   return { popupPage, sourceRow };
 }
 

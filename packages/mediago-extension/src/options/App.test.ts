@@ -35,6 +35,7 @@ interface OptionsViewProps {
   onTest: () => void;
   onSaveConnection: () => void;
   onDownloadNowChange: (checked: boolean) => void;
+  onPageQuickActionEnabledChange: (checked: boolean) => void;
   onLanguageChange: (language: ExtensionLanguage) => void;
 }
 
@@ -51,6 +52,7 @@ const settings: ExtensionSettings = {
   apiKey: "",
   downloadNow: false,
   language: "en",
+  pageQuickActionEnabled: true,
 };
 
 const actions = {
@@ -61,6 +63,7 @@ const actions = {
   onTest: vi.fn(),
   onSaveConnection: vi.fn(),
   onDownloadNowChange: vi.fn(),
+  onPageQuickActionEnabledChange: vi.fn(),
   onLanguageChange: vi.fn(),
 };
 
@@ -140,6 +143,7 @@ describe("OptionsView workspace", () => {
     );
     expect(html).toContain('data-card="connection"');
     expect(html).toContain('data-card="import-behaviour"');
+    expect(html).toContain('data-card="page-quick-action"');
     expect(html).toContain('data-card="language"');
     expect(html).toContain('data-card="rules"');
   });
@@ -284,6 +288,7 @@ describe("OptionsView workspace", () => {
     const cardHeadings = [
       "Dispatch Mode",
       "Sniffing Rules",
+      "Page shortcut",
       "Import Behaviour",
       "Interface Language",
       "About",

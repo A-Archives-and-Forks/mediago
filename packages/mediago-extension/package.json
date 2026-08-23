@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "verify:build-artifacts": "node scripts/verify-build-artifacts.mjs",
     "lint": "oxlint .",
     "type:check": "tsc --noEmit"
   },
@@ -14,6 +15,7 @@
     "@fontsource-variable/geist": "^5.2.6",
     "@fontsource-variable/jetbrains-mono": "^5.2.6",
     "@fontsource-variable/source-serif-4": "^5.2.6",
+    "@mediago/browser-extension": "workspace:*",
     "@mediago/shared-common": "workspace:*",
     "@radix-ui/react-label": "^2.1.7",
     "@radix-ui/react-slot": "^1.2.3",

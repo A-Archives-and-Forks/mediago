@@ -6,6 +6,7 @@
     "dev": "tsdown --watch ./src",
     "build": "tsdown",
     "lint": "oxlint .",
+    "test:public-types": "tsc --noEmit -p test-dts/tsconfig.json && node test-dts/verify-declaration.mjs",
     "type:check": "tsc --noEmit"
   },
   "dependencies": {
@@ -19,6 +20,8 @@
   "types": "./build/index.d.ts",
   "exports": {
     ".": "./build/index.js",
+    "./site-adapter-matches": "./build/site-adapter-matches.js",
+    "./site-adapters": "./build/site-adapters.js",
     "./package.json": "./package.json"
   },
   "author": "caorushizi",

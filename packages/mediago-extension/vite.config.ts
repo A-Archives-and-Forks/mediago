@@ -18,6 +18,14 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         "@": resolve(__dirname, "src"),
+        "@mediago/browser-extension/site-adapter-matches": resolve(
+          __dirname,
+          "../browser-extension/src/site-adapters/bilibili-match.ts",
+        ),
+        "@mediago/browser-extension/site-adapters": resolve(
+          __dirname,
+          "../browser-extension/src/site-adapters/index.ts",
+        ),
       },
     },
     // Order matters: react first to transform JSX, tailwindcss second to

@@ -120,6 +120,14 @@ const resource: ExtensionResources = {
       downloadNowDesc:
         "On: the task is queued and started. Off: it is only added to the list. Applies to HTTP modes only.",
     },
+    pageQuickAction: {
+      title: "Page shortcut",
+      description:
+        "Show “Add to MediaGo” in the top-right corner of supported pages.",
+      enabledLabel: "Show the page shortcut",
+      enabledDescription:
+        "Clicking adds the current page to the extension popup list and opens it.",
+    },
     rules: {
       title: "Sniffing Rules",
       description:

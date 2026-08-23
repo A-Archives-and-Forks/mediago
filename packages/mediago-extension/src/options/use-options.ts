@@ -178,7 +178,10 @@ export function useOptions(transport: OptionsTransport = runtimeTransport) {
 
   const persistPreference = useCallback(
     async (
-      patch: Pick<Partial<ExtensionSettings>, "downloadNow" | "language">,
+      patch: Pick<
+        Partial<ExtensionSettings>,
+        "downloadNow" | "language" | "pageQuickActionEnabled"
+      >,
     ): Promise<boolean> => {
       const coordinator = coordinatorRef.current;
       if (!coordinator) return false;
@@ -206,6 +209,12 @@ export function useOptions(transport: OptionsTransport = runtimeTransport) {
 
   const changeLanguage = useCallback(
     (language: ExtensionLanguage) => persistPreference({ language }),
+    [persistPreference],
+  );
+
+  const changePageQuickActionEnabled = useCallback(
+    (pageQuickActionEnabled: boolean) =>
+      persistPreference({ pageQuickActionEnabled }),
     [persistPreference],
   );
 
@@ -289,6 +298,7 @@ export function useOptions(transport: OptionsTransport = runtimeTransport) {
     test,
     saveConnection,
     changeDownloadNow,
+    changePageQuickActionEnabled,
     changeLanguage,
   };
 }

@@ -1,6 +1,7 @@
 import en from "./en";
 import it from "./it";
-import zh from "./zh";
+import zh, { type ExtensionResources } from "./zh";
+import type { SupportedLanguage } from "../language";
 
 export { type ExtensionResources } from "./zh";
 
@@ -8,6 +9,9 @@ export const resources = {
   en: { translation: en },
   it: { translation: it },
   zh: { translation: zh },
-} as const;
+} as const satisfies Record<
+  SupportedLanguage,
+  { translation: ExtensionResources }
+>;
 
-export type SupportedLanguage = keyof typeof resources;
+export type { SupportedLanguage } from "../language";

@@ -6,6 +6,12 @@
     "jsx": "react-jsx",
     "jsxImportSource": "react",
     "paths": {
+      "@mediago/browser-extension/site-adapter-matches": [
+        "../browser-extension/src/site-adapters/bilibili-match.ts"
+      ],
+      "@mediago/browser-extension/site-adapters": [
+        "../browser-extension/src/site-adapters/index.ts"
+      ],
       "@/*": ["./src/*"]
     },
     "skipLibCheck": true

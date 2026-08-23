@@ -7,6 +7,8 @@ import {
   expect,
   test as base,
   type BrowserContext,
+  type CDPSession,
+  type Locator,
   type Page,
   type TestInfo,
   type Worker,
@@ -64,6 +66,15 @@ const EXTENSION_DIRECTORY = path.join(
 );
 const CORE_PORT = 39_719;
 const TASK_NAME = "MediaGo E2E Fixture";
+const PAGE_ACTION_BILIBILI_URL = "https://www.bilibili.com/";
+const PAGE_ACTION_TITLE = "MediaGo Bilibili Homepage Fixture";
+const PAGE_ACTION_CARD_URL =
+  "https://www.bilibili.com/video/BV1PageActionFixture";
+const PAGE_ACTION_CARD_TITLE = "MediaGo Bilibili Card Fixture";
+const PAGE_ACTION_UNSUPPORTED_URL =
+  "https://www.youtube.com/feed/subscriptions";
+const PAGE_ACTION_ACCESSIBLE_NAME = "Add current page to MediaGo";
+const CDP_COMMAND_TIMEOUT_MS = 5_000;
 const DOWNLOAD_DEADLINE_MS = 30_000;
 const EXTENSION_FIXTURE_TIMEOUT_MS = 60_000;
 const GRACEFUL_CLOSE_TIMEOUT_MS = 3_000;
@@ -360,7 +371,31 @@ async function waitForProcessExit(
 }
 
 async function waitForWorker(context: BrowserContext): Promise<Worker> {
-  return context.serviceWorkers()[0] ?? context.waitForEvent("serviceworker");
+  const worker =
+    context.serviceWorkers()[0] ??
+    (await context.waitForEvent("serviceworker"));
+  await expect
+    .poll(
+      () =>
+        worker.evaluate(() => {
+          const extensionChrome = (
+            globalThis as typeof globalThis & {
+              chrome: {
+                runtime: {
+                  onMessage: { hasListeners(): boolean };
+                };
+              };
+            }
+          ).chrome;
+          return extensionChrome.runtime.onMessage.hasListeners();
+        }),
+      {
+        timeout: 10_000,
+        intervals: [50, 100],
+      },
+    )
+    .toBe(true);
+  return worker;
 }
 
 async function waitForSuccessfulDownload(
@@ -393,6 +428,464 @@ async function waitForSuccessfulDownload(
     // oxlint-disable-next-line no-await-in-loop -- Backoff respects the shared download deadline.
     await delay(Math.min(100, remaining));
   }
+}
+
+interface InspectedTabState {
+  badge: string;
+  sourceCount: number;
+  sources: Array<{
+    documentURL: string;
+    name: string;
+    type: string;
+    url: string;
+  }>;
+  storageEntryPresent: boolean;
+}
+
+interface CdpTargetInfo {
+  attached: boolean;
+  targetId: string;
+  title: string;
+  type: string;
+  url: string;
+}
+
+interface CdpTargetCommandResponse<T> {
+  error?: { code: number; message: string };
+  id: number;
+  result?: T;
+}
+
+interface ActionPopupSnapshot {
+  bodyText: string;
+  detectedText: string;
+  href: string;
+  importButtonLabels: string[];
+  pageTitle: string;
+  pageUrl: string;
+  popupState: string;
+  sourceCount: number;
+  sourceNames: string[];
+  sourceTypes: string[];
+}
+
+interface ActionPopupTarget {
+  close(): Promise<void>;
+  clickImport(): Promise<void>;
+  snapshot(): Promise<ActionPopupSnapshot>;
+}
+
+async function findTabIdByUrl(worker: Worker, url: string): Promise<number> {
+  const tabId = await worker.evaluate(async (expectedUrl) => {
+    const extensionChrome = (
+      globalThis as typeof globalThis & {
+        chrome: {
+          tabs: {
+            query(
+              options: Record<string, never>,
+            ): Promise<Array<{ id?: number; url?: string }>>;
+          };
+        };
+      }
+    ).chrome;
+    const tabs = await extensionChrome.tabs.query({});
+    return tabs.find((tab) => tab.url === expectedUrl)?.id;
+  }, url);
+  if (tabId === undefined) throw new Error(`Missing extension tab for ${url}`);
+  return tabId;
+}
+
+async function inspectTabState(
+  worker: Worker,
+  tabId: number,
+): Promise<InspectedTabState> {
+  return worker.evaluate(async (targetTabId) => {
+    const extensionChrome = (
+      globalThis as typeof globalThis & {
+        chrome: {
+          action: {
+            getBadgeText(options: { tabId: number }): Promise<string>;
+          };
+          storage: {
+            session: {
+              get(key: string): Promise<Record<string, unknown>>;
+            };
+          };
+        };
+      }
+    ).chrome;
+    const key = `mediago.tab.${targetTabId}`;
+    const stored = await extensionChrome.storage.session.get(key);
+    const sources = stored[key];
+    const sourceList = Array.isArray(sources)
+      ? sources.map((source) => {
+          const item = source as Record<string, unknown>;
+          return {
+            documentURL: String(item.documentURL ?? ""),
+            name: String(item.name ?? ""),
+            type: String(item.type ?? ""),
+            url: String(item.url ?? ""),
+          };
+        })
+      : [];
+    return {
+      badge: await extensionChrome.action.getBadgeText({ tabId: targetTabId }),
+      sourceCount: sourceList.length,
+      sources: sourceList,
+      storageEntryPresent: Object.hasOwn(stored, key),
+    };
+  }, tabId);
+}
+
+async function cdpTargetCommand<T>(
+  browserSession: CDPSession,
+  targetId: string,
+  targetSessionId: string,
+  id: number,
+  method: string,
+  params: Record<string, unknown> = {},
+): Promise<T> {
+  const commandLabel = `CDP ${method} for target ${targetId}`;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const onMessage = (event: { message: string; sessionId: string }) => {
+    if (event.sessionId !== targetSessionId) return;
+    let parsed: CdpTargetCommandResponse<T>;
+    try {
+      parsed = JSON.parse(event.message) as CdpTargetCommandResponse<T>;
+    } catch (error) {
+      rejectCommand(
+        new Error(
+          `${commandLabel} received invalid JSON: ${error instanceof Error ? error.message : String(error)}`,
+        ),
+      );
+      return;
+    }
+    if (parsed.id !== id) return;
+    if (parsed.error) {
+      rejectCommand(
+        new Error(
+          `${commandLabel} failed (${parsed.error.code}): ${parsed.error.message}`,
+        ),
+      );
+      return;
+    }
+    if (parsed.result === undefined) {
+      rejectCommand(new Error(`${commandLabel} returned no result`));
+      return;
+    }
+    resolveCommand(parsed.result);
+  };
+  const onDetached = (event: { sessionId: string }) => {
+    if (event.sessionId === targetSessionId) {
+      rejectCommand(new Error(`${commandLabel} target session detached`));
+    }
+  };
+  const onTargetDestroyed = (event: { targetId: string }) => {
+    if (event.targetId === targetId) {
+      rejectCommand(new Error(`${commandLabel} target was destroyed`));
+    }
+  };
+  let resolveCommand!: (value: T) => void;
+  let rejectCommand!: (reason: unknown) => void;
+
+  try {
+    return await new Promise<T>((resolve, reject) => {
+      resolveCommand = resolve;
+      rejectCommand = reject;
+      browserSession.on("Target.receivedMessageFromTarget", onMessage);
+      browserSession.on("Target.detachedFromTarget", onDetached);
+      browserSession.on("Target.targetDestroyed", onTargetDestroyed);
+      timer = setTimeout(() => {
+        reject(
+          new Error(
+            `${commandLabel} timed out after ${CDP_COMMAND_TIMEOUT_MS}ms`,
+          ),
+        );
+      }, CDP_COMMAND_TIMEOUT_MS);
+      try {
+        void browserSession
+          .send("Target.sendMessageToTarget", {
+            sessionId: targetSessionId,
+            message: JSON.stringify({ id, method, params }),
+          })
+          .catch((error: unknown) => {
+            reject(
+              new Error(
+                `${commandLabel} could not be sent: ${error instanceof Error ? error.message : String(error)}`,
+              ),
+            );
+          });
+      } catch (error) {
+        reject(
+          new Error(
+            `${commandLabel} could not be sent: ${error instanceof Error ? error.message : String(error)}`,
+          ),
+        );
+      }
+    });
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+    browserSession.off("Target.receivedMessageFromTarget", onMessage);
+    browserSession.off("Target.detachedFromTarget", onDetached);
+    browserSession.off("Target.targetDestroyed", onTargetDestroyed);
+  }
+}
+
+async function useActionPopup<T>(
+  popup: ActionPopupTarget,
+  operation: (popup: ActionPopupTarget) => Promise<T>,
+): Promise<T> {
+  let operationResult!: T;
+  let operationError: unknown;
+  let operationFailed = false;
+  let cleanupError: unknown;
+  let cleanupFailed = false;
+  try {
+    operationResult = await operation(popup);
+  } catch (error) {
+    operationError = error;
+    operationFailed = true;
+  } finally {
+    try {
+      await popup.close();
+    } catch (error) {
+      cleanupError = error;
+      cleanupFailed = true;
+    }
+  }
+  if (operationFailed && cleanupFailed) {
+    throw new AggregateError(
+      [operationError, cleanupError],
+      "Action popup operation and cleanup both failed",
+      { cause: operationError },
+    );
+  }
+  if (operationFailed) throw operationError;
+  if (cleanupFailed) throw cleanupError;
+  return operationResult;
+}
+
+function actionPopupCleanupError(
+  primaryError: unknown,
+  cleanupError: unknown,
+  message: string,
+): AggregateError {
+  return new AggregateError([primaryError, cleanupError], message, {
+    cause: primaryError,
+  });
+}
+
+async function clickAndCaptureActionPopup(
+  context: BrowserContext,
+  sourceButton: Locator,
+  expectedUrl: string,
+  activation: "click" | "keyboard" = "click",
+): Promise<ActionPopupTarget> {
+  const browser = context.browser();
+  if (!browser) throw new Error("Chromium browser is unavailable");
+  const browserSession = await browser.newBrowserCDPSession();
+  let actionTargetId: string | undefined;
+  let targetClosePromise: Promise<void> | undefined;
+  let browserDetachPromise: Promise<void> | undefined;
+  let resourceClosePromise: Promise<void> | undefined;
+  const closeDiscoveredTarget = (): Promise<void> => {
+    if (actionTargetId === undefined) return Promise.resolve();
+    targetClosePromise ??= browserSession
+      .send("Target.closeTarget", { targetId: actionTargetId })
+      .then((response) => {
+        const { success } = response as { success: boolean };
+        if (!success) {
+          throw new Error(
+            `Failed to close action popup target ${actionTargetId}`,
+          );
+        }
+      });
+    return targetClosePromise;
+  };
+  const detachBrowserSession = (): Promise<void> => {
+    browserDetachPromise ??= browserSession.detach();
+    return browserDetachPromise;
+  };
+  const closeResources = (): Promise<void> => {
+    resourceClosePromise ??= (async () => {
+      let targetCloseError: unknown;
+      let targetCloseFailed = false;
+      let detachError: unknown;
+      let detachFailed = false;
+      try {
+        await closeDiscoveredTarget();
+      } catch (error) {
+        targetCloseError = error;
+        targetCloseFailed = true;
+      } finally {
+        try {
+          await detachBrowserSession();
+        } catch (error) {
+          detachError = error;
+          detachFailed = true;
+        }
+      }
+      if (targetCloseFailed && detachFailed) {
+        throw new AggregateError(
+          [targetCloseError, detachError],
+          "Action popup target close and CDP detach both failed",
+          { cause: targetCloseError },
+        );
+      }
+      if (targetCloseFailed) throw targetCloseError;
+      if (detachFailed) throw detachError;
+    })();
+    return resourceClosePromise;
+  };
+
+  try {
+    await browserSession.send("Target.setDiscoverTargets", { discover: true });
+    const before = (await browserSession.send("Target.getTargets")) as {
+      targetInfos: CdpTargetInfo[];
+    };
+    const existingTargetIds = new Set(
+      before.targetInfos.map((target) => target.targetId),
+    );
+    if (activation === "keyboard") {
+      await sourceButton.focus();
+      await sourceButton.press("Enter");
+    } else {
+      await sourceButton.click();
+    }
+
+    let targetInfo: CdpTargetInfo | undefined;
+    await expect
+      .poll(
+        async () => {
+          const targets = (await browserSession.send("Target.getTargets")) as {
+            targetInfos: CdpTargetInfo[];
+          };
+          targetInfo = targets.targetInfos.find(
+            (target) =>
+              !existingTargetIds.has(target.targetId) &&
+              target.url === expectedUrl,
+          );
+          if (targetInfo) actionTargetId = targetInfo.targetId;
+          return targetInfo
+            ? {
+                title: targetInfo.title,
+                type: targetInfo.type,
+                url: targetInfo.url,
+              }
+            : null;
+        },
+        { timeout: 10_000, intervals: [50, 100] },
+      )
+      .toEqual({ title: "MediaGo", type: "page", url: expectedUrl });
+    if (!targetInfo) throw new Error("Action popup target was not created");
+    const actionTargetInfo = targetInfo;
+
+    const attached = (await browserSession.send("Target.attachToTarget", {
+      targetId: actionTargetInfo.targetId,
+      flatten: false,
+    })) as { sessionId: string };
+    let commandId = 0;
+    const evaluate = async <T>(expression: string): Promise<T> => {
+      commandId += 1;
+      const response = await cdpTargetCommand<{
+        exceptionDetails?: { text?: string };
+        result: { value?: T };
+      }>(
+        browserSession,
+        actionTargetInfo.targetId,
+        attached.sessionId,
+        commandId,
+        "Runtime.evaluate",
+        {
+          expression,
+          awaitPromise: true,
+          returnByValue: true,
+        },
+      );
+      if (response.exceptionDetails) {
+        throw new Error(
+          `Action popup evaluation failed for target ${actionTargetInfo.targetId}: ${response.exceptionDetails.text ?? "unknown exception"}`,
+        );
+      }
+      return response.result.value as T;
+    };
+    await expect
+      .poll(() => evaluate<string>("document.readyState"), {
+        timeout: 10_000,
+        intervals: [50, 100],
+      })
+      .toBe("complete");
+
+    return {
+      close: closeResources,
+      clickImport() {
+        return evaluate<void>(`(() => {
+        const button = document.querySelector('button[data-action="import-source"]');
+        if (!(button instanceof HTMLButtonElement)) {
+          throw new Error("Import button is unavailable");
+        }
+        button.click();
+      })()`);
+      },
+      snapshot() {
+        return evaluate<ActionPopupSnapshot>(`(() => {
+        const root = document.querySelector("[data-popup-state]");
+        const pageContext = document.querySelector('section[aria-label="Current page"]');
+        const pageLines = pageContext ? Array.from(pageContext.querySelectorAll("p")) : [];
+        const sourceRows = Array.from(document.querySelectorAll('ul[aria-label="Detected resources"] > li'));
+        return {
+          bodyText: document.body.innerText,
+          detectedText: pageContext?.querySelector("span")?.textContent?.trim() ?? "",
+          href: location.href,
+          importButtonLabels: sourceRows.map((row) => row.querySelector('button[data-action="import-source"]')?.getAttribute("aria-label") ?? ""),
+          pageTitle: pageLines[0]?.textContent?.trim() ?? "",
+          pageUrl: pageLines[1]?.textContent?.trim() ?? "",
+          popupState: root?.getAttribute("data-popup-state") ?? "",
+          sourceCount: sourceRows.length,
+          sourceNames: sourceRows.map((row) => row.querySelector("p")?.textContent?.trim() ?? ""),
+          sourceTypes: sourceRows.map((row) => row.querySelector('div[aria-hidden="true"]')?.textContent?.trim() ?? ""),
+        };
+      })()`);
+      },
+    };
+  } catch (error) {
+    let cleanupError: unknown;
+    let cleanupFailed = false;
+    try {
+      await closeResources();
+    } catch (caughtCleanupError) {
+      cleanupError = caughtCleanupError;
+      cleanupFailed = true;
+    }
+    if (cleanupFailed) {
+      throw actionPopupCleanupError(
+        error,
+        cleanupError,
+        "Action popup initialization and cleanup both failed",
+      );
+    }
+    throw error;
+  }
+}
+
+async function expectSinglePageActionSource(
+  popup: ActionPopupTarget,
+): Promise<void> {
+  await expect
+    .poll(() => popup.snapshot(), {
+      timeout: 10_000,
+      intervals: [50, 100],
+    })
+    .toMatchObject({
+      detectedText: "1 resource detected",
+      importButtonLabels: [`Import ${PAGE_ACTION_CARD_TITLE}`],
+      pageTitle: PAGE_ACTION_TITLE,
+      pageUrl: PAGE_ACTION_BILIBILI_URL,
+      popupState: "ready",
+      sourceCount: 1,
+      sourceNames: [PAGE_ACTION_CARD_TITLE],
+      sourceTypes: ["BILI"],
+    });
 }
 
 const test = base.extend<{ extensionRuntime: ExtensionRuntime }>({
@@ -457,10 +950,10 @@ const test = base.extend<{ extensionRuntime: ExtensionRuntime }>({
         await optionsPage.goto(extensionURL("src/options/index.html"));
 
         const desktopRadio = optionsPage.getByRole("radio", {
-          name: /^Desktop · HTTP local/,
+          name: /^Desktop \/ HTTP local/,
         });
         const schemaRadio = optionsPage.getByRole("radio", {
-          name: /^Desktop · Schema protocol/,
+          name: /^Desktop \/ Schema protocol/,
         });
         await expect(desktopRadio).toBeChecked();
         await schemaRadio.check();
@@ -779,6 +1272,182 @@ const test = base.extend<{ extensionRuntime: ExtensionRuntime }>({
 
 test.use({ screenshot: "off", trace: "off", video: "off" });
 
+test("adds a supported page from the in-page shortcut and opens the real action popup", async ({
+  extensionRuntime,
+}, testInfo) => {
+  testInfo.setTimeout(90_000);
+  await extensionRuntime.context.route(
+    PAGE_ACTION_BILIBILI_URL,
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "text/html; charset=utf-8",
+        body: `<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8"><title>${PAGE_ACTION_TITLE}</title></head>
+  <body>
+    <main class="bili-feed4-layout">
+      <h1>${PAGE_ACTION_TITLE}</h1>
+      <article class="bili-video-card__wrap">
+        <a class="bili-video-card__image--link" href="${PAGE_ACTION_CARD_URL}"></a>
+        <h3 class="bili-video-card__info--tit">${PAGE_ACTION_CARD_TITLE}</h3>
+      </article>
+    </main>
+  </body>
+</html>`,
+      });
+    },
+  );
+  await extensionRuntime.context.route(
+    PAGE_ACTION_UNSUPPORTED_URL,
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "text/html; charset=utf-8",
+        body: `<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8"><title>Unsupported YouTube Feed</title></head>
+  <body><main><h1>Unsupported YouTube Feed</h1></main></body>
+</html>`,
+      });
+    },
+  );
+
+  const bilibiliPage = await extensionRuntime.context.newPage();
+  extensionRuntime.trackPage(bilibiliPage);
+  await bilibiliPage.goto(PAGE_ACTION_BILIBILI_URL, {
+    waitUntil: "load",
+  });
+  const cardButton = bilibiliPage.getByRole("button", { name: "下载" });
+  await expect(cardButton).toBeVisible();
+
+  const bilibiliTabId = await findTabIdByUrl(
+    extensionRuntime.worker,
+    PAGE_ACTION_BILIBILI_URL,
+  );
+  await expect
+    .poll(() => inspectTabState(extensionRuntime.worker, bilibiliTabId), {
+      timeout: 10_000,
+      intervals: [100],
+    })
+    .toEqual({
+      badge: "",
+      sourceCount: 0,
+      sources: [],
+      storageEntryPresent: false,
+    });
+
+  const emptyPopup = await extensionRuntime.context.newPage();
+  await emptyPopup.goto(extensionRuntime.extensionURL("src/popup/index.html"));
+  await bilibiliPage.bringToFront();
+  await emptyPopup.reload();
+  await expect(emptyPopup.locator('[data-popup-state="empty"]')).toBeVisible();
+  await expect(emptyPopup.getByRole("listitem")).toHaveCount(0);
+  await emptyPopup.close();
+
+  const shortcutSwitch = extensionRuntime.optionsPage.getByRole("switch", {
+    name: "Show the page shortcut",
+  });
+  await expect(shortcutSwitch).toHaveAttribute("aria-checked", "true");
+  await shortcutSwitch.click();
+  await expect(shortcutSwitch).toHaveAttribute("aria-checked", "false");
+  await expect(cardButton).toHaveCount(0);
+  await shortcutSwitch.click();
+  await expect(shortcutSwitch).toHaveAttribute("aria-checked", "true");
+  await expect(cardButton).toHaveText("下载");
+
+  await bilibiliPage.bringToFront();
+  const firstActionPopup = await clickAndCaptureActionPopup(
+    extensionRuntime.context,
+    cardButton,
+    extensionRuntime.extensionURL("src/popup/index.html"),
+    "keyboard",
+  );
+  await useActionPopup(firstActionPopup, expectSinglePageActionSource);
+
+  await expect
+    .poll(() => inspectTabState(extensionRuntime.worker, bilibiliTabId), {
+      timeout: 10_000,
+      intervals: [100],
+    })
+    .toEqual({
+      badge: "1",
+      sourceCount: 1,
+      sources: [
+        {
+          documentURL: PAGE_ACTION_BILIBILI_URL,
+          name: PAGE_ACTION_CARD_TITLE,
+          type: "bilibili",
+          url: PAGE_ACTION_CARD_URL,
+        },
+      ],
+      storageEntryPresent: true,
+    });
+
+  await bilibiliPage.bringToFront();
+  const secondActionPopup = await clickAndCaptureActionPopup(
+    extensionRuntime.context,
+    cardButton,
+    extensionRuntime.extensionURL("src/popup/index.html"),
+  );
+  await useActionPopup(secondActionPopup, async (popup) => {
+    await expectSinglePageActionSource(popup);
+
+    await expect(
+      extensionRuntime.optionsPage.getByRole("switch", {
+        name: "Start downloading immediately",
+      }),
+    ).toHaveAttribute("aria-checked", "false");
+    const readCoreTaskSummaries = async () => {
+      const tasks = await extensionRuntime.core.client.getDownloadTasks({
+        current: 1,
+        pageSize: 20,
+      });
+      return tasks.data.list.map((task) => ({
+        name: task.name,
+        url: task.url,
+      }));
+    };
+    await expect
+      .poll(readCoreTaskSummaries, {
+        timeout: 3_000,
+        intervals: [100],
+      })
+      .toEqual([]);
+    await popup.clickImport();
+    await expect
+      .poll(async () => (await popup.snapshot()).bodyText, {
+        timeout: 10_000,
+        intervals: [50, 100],
+      })
+      .toContain("Imported 1 task(s)");
+    await expect
+      .poll(readCoreTaskSummaries, {
+        timeout: 10_000,
+        intervals: [100],
+      })
+      .toEqual([{ name: PAGE_ACTION_CARD_TITLE, url: PAGE_ACTION_CARD_URL }]);
+  });
+
+  const unsupportedPage = await extensionRuntime.context.newPage();
+  extensionRuntime.trackPage(unsupportedPage);
+  await unsupportedPage.goto(PAGE_ACTION_UNSUPPORTED_URL, {
+    waitUntil: "load",
+  });
+  const unsupportedButton = unsupportedPage.getByRole("button", {
+    name: PAGE_ACTION_ACCESSIBLE_NAME,
+  });
+  await expect(unsupportedButton).toHaveCount(0);
+  await unsupportedPage.evaluate(() => {
+    window.history.pushState(null, "", "/watch?v=PageActionFixture");
+  });
+  await expect(unsupportedButton).toBeVisible();
+  await unsupportedPage.evaluate(() => {
+    window.history.pushState(null, "", "/feed/subscriptions");
+  });
+  await expect(unsupportedButton).toHaveCount(0);
+});
+
 test("captures a direct MP4 and downloads it through the MV3 popup", async ({
   extensionRuntime,
 }, testInfo) => {
@@ -800,7 +1469,7 @@ test("captures a direct MP4 and downloads it through the MV3 popup", async ({
   await extensionRuntime.optionsPage.reload();
   await expect(
     extensionRuntime.optionsPage.getByRole("radio", {
-      name: /^Desktop · HTTP local/,
+      name: /^Desktop \/ HTTP local/,
     }),
   ).toBeChecked();
   await expect(
@@ -835,7 +1504,7 @@ test("captures a direct MP4 and downloads it through the MV3 popup", async ({
   await expect(
     popupPage.getByText(TASK_NAME, { exact: true }).first(),
   ).toBeVisible();
-  await expect(popupPage.getByText("direct", { exact: true })).toBeVisible();
+  await expect(popupPage.getByText("FILE", { exact: true })).toBeVisible();
 
   const sourceRow = popupPage
     .getByRole("listitem")

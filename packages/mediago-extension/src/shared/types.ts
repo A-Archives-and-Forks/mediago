@@ -1,3 +1,4 @@
+import type { PageCandidate } from "@mediago/browser-extension/site-adapters";
 import type { DownloadType, HLSMediaInfo } from "@mediago/shared-common";
 
 /**
@@ -94,6 +95,8 @@ export interface ExtensionSettings {
    * the behaviour of the main app (`apps/ui`'s AppStore.language).
    */
   language: ExtensionLanguage;
+  /** Show the add-to-MediaGo shortcut on directly supported pages. */
+  pageQuickActionEnabled: boolean;
 }
 
 /** Reachability probe result for the configured MediaGo server. */
@@ -118,6 +121,8 @@ export interface ServerStatus {
 export type ExtensionMessage =
   | { type: "GET_SOURCES"; tabId: number }
   | { type: "CLEAR_SOURCES"; tabId: number }
+  | { type: "ADD_CURRENT_PAGE_TO_POPUP" }
+  | { type: "ADD_PAGE_CANDIDATE_TO_POPUP"; candidate: PageCandidate }
   | { type: "IMPORT_SOURCES"; sources: DetectedSource[] }
   | { type: "GET_SETTINGS" }
   | { type: "SAVE_SETTINGS"; settings: ExtensionSettings }
@@ -126,6 +131,30 @@ export type ExtensionMessage =
       mode: InvocationMode;
       serverUrl: string;
       apiKey: string;
+    };
+
+/** Notification sent to a supported page after its top-level URL changes. */
+export interface PageContextChangedMessage {
+  type: "PAGE_CONTEXT_CHANGED";
+}
+
+export type PageActionErrorCode =
+  | "INVALID_SENDER"
+  | "TAB_UNAVAILABLE"
+  | "UNSUPPORTED_PAGE"
+  | "SOURCE_UPDATE_FAILED"
+  | "PAGE_CHANGED"
+  | "TAB_INACTIVE"
+  | "WINDOW_UNAVAILABLE"
+  | "POPUP_OPEN_FAILED"
+  | "INTERNAL_ERROR";
+
+export type PageActionResult =
+  | { type: "PAGE_ACTION_RESULT"; ok: true }
+  | {
+      type: "PAGE_ACTION_RESULT";
+      ok: false;
+      error: PageActionErrorCode;
     };
 
 export type ExtensionResponse =
@@ -138,4 +167,5 @@ export type ExtensionResponse =
       count: number;
       error?: LocalizedMessage | string;
     }
+  | PageActionResult
   | { type: "OK" };

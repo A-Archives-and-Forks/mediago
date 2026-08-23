@@ -20,8 +20,19 @@ function toManifestVersion(v: string): string {
   return v.split(/[-+]/)[0];
 }
 
+const PAGE_ACTION_MATCHES = [
+  "*://bilibili.com/*",
+  "*://www.bilibili.com/*",
+  "*://youtube.com/*",
+  "*://www.youtube.com/*",
+  "*://m.youtube.com/*",
+  "*://music.youtube.com/*",
+  "*://youtu.be/*",
+];
+
 export default defineManifest({
   manifest_version: 3,
+  minimum_chrome_version: "127",
   // `__MSG_*__` references are resolved by Chrome against
   // `public/_locales/<lang>/messages.json` at install time, picking the
   // entry matching the browser UI language (fallback: `default_locale`).
@@ -58,6 +69,20 @@ export default defineManifest({
     service_worker: "src/background/index.ts",
     type: "module",
   },
+  content_scripts: [
+    {
+      matches: PAGE_ACTION_MATCHES,
+      js: ["src/content/page-action-entry.ts"],
+      run_at: "document_idle",
+      all_frames: false,
+    },
+  ],
+  web_accessible_resources: [
+    {
+      resources: ["public/icons/mediago-16.png"],
+      matches: PAGE_ACTION_MATCHES,
+    },
+  ],
   permissions: ["webRequest", "tabs", "storage"],
   host_permissions: ["<all_urls>"],
 });

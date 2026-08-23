@@ -8,6 +8,20 @@ export default defineConfig({
   resolve: {
     alias: [
       {
+        find: "@mediago/browser-extension/site-adapter-matches",
+        replacement: path.resolve(
+          repositoryRoot,
+          "packages/browser-extension/src/site-adapters/bilibili-match.ts",
+        ),
+      },
+      {
+        find: "@mediago/browser-extension/site-adapters",
+        replacement: path.resolve(
+          repositoryRoot,
+          "packages/browser-extension/src/site-adapters/index.ts",
+        ),
+      },
+      {
         find: "@mediago/shared-common",
         replacement: path.resolve(
           repositoryRoot,

@@ -1,11 +1,8 @@
-import type { ExtensionMessage, ExtensionResponse } from "@/shared/types";
+import type { ExtensionMessage, ExtensionResponse } from "../shared/types";
 import { importSources, probe } from "./mediago-client";
-import {
-  clearTabSources,
-  loadSettings,
-  loadTabSources,
-  saveSettings,
-} from "./storage";
+import { createPageActionHandler, type PageActionHandler } from "./page-action";
+import { loadSettings, loadTabSources, saveSettings } from "./storage";
+import { tabSourceService, type TabSourceService } from "./tab-sources";
 
 /**
  * Central message router used by the popup and options page.
@@ -14,16 +11,26 @@ import {
  * `chrome.runtime.onMessage`'s `sendResponse` with `return true`
  * semantics cleanly via an async wrapper.
  */
-async function handle(message: ExtensionMessage): Promise<ExtensionResponse> {
+async function handle(
+  message: ExtensionMessage,
+  sender: chrome.runtime.MessageSender,
+  sourceService: TabSourceService,
+  pageActionHandler: PageActionHandler,
+): Promise<ExtensionResponse> {
   switch (message.type) {
     case "GET_SOURCES": {
       const sources = await loadTabSources(message.tabId);
       return { type: "SOURCES", sources };
     }
     case "CLEAR_SOURCES": {
-      await clearTabSources(message.tabId);
-      await chrome.action.setBadgeText({ tabId: message.tabId, text: "" });
+      await sourceService.clear(message.tabId);
       return { type: "OK" };
+    }
+    case "ADD_CURRENT_PAGE_TO_POPUP": {
+      return pageActionHandler(sender, message);
+    }
+    case "ADD_PAGE_CANDIDATE_TO_POPUP": {
+      return pageActionHandler(sender, message);
     }
     case "GET_SETTINGS": {
       const settings = await loadSettings();
@@ -54,13 +61,33 @@ async function handle(message: ExtensionMessage): Promise<ExtensionResponse> {
   }
 }
 
-export function registerMessageRouter(): void {
-  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+export function registerMessageRouter(
+  sourceService: TabSourceService = tabSourceService,
+  pageActionHandler: PageActionHandler = createPageActionHandler(sourceService),
+): void {
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // `handle` returns a promise; we funnel it into sendResponse and
     // return `true` to keep the channel open (MV3 requirement).
-    void handle(message as ExtensionMessage)
+    void handle(
+      message as ExtensionMessage,
+      sender,
+      sourceService,
+      pageActionHandler,
+    )
       .then(sendResponse)
       .catch((err) => {
+        const messageType = (message as { type?: unknown } | null)?.type;
+        if (
+          messageType === "ADD_CURRENT_PAGE_TO_POPUP" ||
+          messageType === "ADD_PAGE_CANDIDATE_TO_POPUP"
+        ) {
+          sendResponse({
+            type: "PAGE_ACTION_RESULT",
+            ok: false,
+            error: "INTERNAL_ERROR",
+          });
+          return;
+        }
         sendResponse({
           type: "IMPORT_RESULT",
           ok: false,

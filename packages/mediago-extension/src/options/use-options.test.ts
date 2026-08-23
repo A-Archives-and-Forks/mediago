@@ -60,6 +60,7 @@ const settings: ExtensionSettings = {
   apiKey: "",
   downloadNow: false,
   language: "system",
+  pageQuickActionEnabled: true,
 };
 
 describe("loadOptionsSettings", () => {

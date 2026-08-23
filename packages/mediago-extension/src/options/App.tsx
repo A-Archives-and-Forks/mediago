@@ -16,6 +16,7 @@ import type {
 import { AboutCard } from "./components/AboutCard";
 import { ImportBehaviourCard } from "./components/ImportBehaviourCard";
 import { LanguageCard } from "./components/LanguageCard";
+import { PageQuickActionCard } from "./components/PageQuickActionCard";
 import { RuleListCard } from "./components/RuleListCard";
 import { ServerCard } from "./components/ServerCard";
 import type { ConnectionDraft } from "./settings-model";
@@ -44,6 +45,7 @@ export interface OptionsViewProps {
   onTest: () => void;
   onSaveConnection: () => void;
   onDownloadNowChange: (checked: boolean) => void;
+  onPageQuickActionEnabledChange: (checked: boolean) => void;
   onLanguageChange: (language: ExtensionLanguage) => void;
 }
 
@@ -162,6 +164,7 @@ export function OptionsView({
   onTest,
   onSaveConnection,
   onDownloadNowChange,
+  onPageQuickActionEnabledChange,
   onLanguageChange,
 }: OptionsViewProps) {
   const { t } = useTranslation();
@@ -209,6 +212,11 @@ export function OptionsView({
               aria-label={t("options.preferencesLabel")}
               className="min-w-0 space-y-5 md:sticky md:top-5"
             >
+              <PageQuickActionCard
+                enabled={settings.pageQuickActionEnabled}
+                saving={savingPreference}
+                onEnabledChange={onPageQuickActionEnabledChange}
+              />
               <ImportBehaviourCard
                 settings={settings}
                 mode={draft.mode}
@@ -261,6 +269,12 @@ export function App() {
     toast.success(t("common.saved"));
   };
 
+  const handlePageQuickActionEnabledChange = async (checked: boolean) => {
+    const ok = await options.changePageQuickActionEnabled(checked);
+    if (ok) toast.success(t("common.saved"));
+    else toast.error(t("common.saveFailed"));
+  };
+
   const version =
     typeof chrome === "undefined"
       ? "0.0.0"
@@ -284,6 +298,9 @@ export function App() {
       onTest={() => void options.test()}
       onSaveConnection={() => void handleSaveConnection()}
       onDownloadNowChange={(checked) => void handleDownloadNowChange(checked)}
+      onPageQuickActionEnabledChange={(checked) =>
+        void handlePageQuickActionEnabledChange(checked)
+      }
       onLanguageChange={(language) => void handleLanguageChange(language)}
     />
   );

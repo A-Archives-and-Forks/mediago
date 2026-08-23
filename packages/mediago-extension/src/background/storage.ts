@@ -2,8 +2,8 @@ import {
   DEFAULT_SETTINGS,
   STORAGE_KEY_SETTINGS,
   storageKeyTab,
-} from "@/shared/constants";
-import type { DetectedSource, ExtensionSettings } from "@/shared/types";
+} from "../shared/constants";
+import type { DetectedSource, ExtensionSettings } from "../shared/types";
 
 /* ---------------- settings ---------------- */
 
