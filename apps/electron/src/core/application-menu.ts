@@ -1,4 +1,5 @@
 import { app, Menu, type MenuItemConstructorOptions } from "electron";
+import { i18n } from "./i18n";
 
 const separator = (): MenuItemConstructorOptions => ({ type: "separator" });
 
@@ -11,54 +12,67 @@ export const createApplicationMenuTemplate = (
 ): MenuItemConstructorOptions[] => {
   const isMac = platform === "darwin";
   const template: MenuItemConstructorOptions[] = [];
+  const label = (key: string) =>
+    i18n.t(`applicationMenu.${key}`, { applicationName });
 
   if (isMac) {
     template.push({
       label: applicationName,
       submenu: [
-        { label: `关于 ${applicationName}`, role: "about" },
+        { label: label("about"), role: "about" },
         separator(),
-        { label: "服务", role: "services" },
+        { label: label("services"), role: "services" },
         separator(),
-        { label: `隐藏 ${applicationName}`, role: "hide" },
-        { label: "隐藏其他应用", role: "hideOthers" },
-        { label: "全部显示", role: "unhide" },
+        { label: label("hide"), role: "hide" },
+        { label: label("hideOthers"), role: "hideOthers" },
+        { label: label("showAll"), role: "unhide" },
         separator(),
-        { label: `退出 ${applicationName}`, role: "quit" },
+        { label: label("quit"), role: "quit" },
       ],
     });
   }
 
   template.push(
     {
-      label: topLevelLabel("文件", "F", isMac),
+      label: topLevelLabel(label("file"), "F", isMac),
       submenu: isMac
-        ? [{ label: "关闭窗口", role: "close" }]
-        : [{ label: `退出 ${applicationName}`, role: "quit" }],
+        ? [{ label: label("closeWindow"), role: "close" }]
+        : [{ label: label("quit"), role: "quit" }],
     },
     {
-      label: topLevelLabel("编辑", "E", isMac),
+      label: topLevelLabel(label("edit"), "E", isMac),
       submenu: [
-        { label: "撤销", role: "undo" },
-        { label: "重做", role: "redo" },
+        { label: label("undo"), role: "undo" },
+        { label: label("redo"), role: "redo" },
         separator(),
-        { label: "剪切", role: "cut" },
-        { label: "复制", role: "copy" },
-        { label: "粘贴", role: "paste" },
+        { label: label("cut"), role: "cut" },
+        { label: label("copy"), role: "copy" },
+        { label: label("paste"), role: "paste" },
         ...(isMac
-          ? [{ label: "粘贴并匹配样式", role: "pasteAndMatchStyle" as const }]
+          ? [
+              {
+                label: label("pasteAndMatchStyle"),
+                role: "pasteAndMatchStyle" as const,
+              },
+            ]
           : []),
-        { label: "删除", role: "delete" },
+        { label: label("delete"), role: "delete" },
         separator(),
-        { label: "全选", role: "selectAll" },
+        { label: label("selectAll"), role: "selectAll" },
         ...(isMac
           ? [
               separator(),
               {
-                label: "语音",
+                label: label("speech"),
                 submenu: [
-                  { label: "开始朗读", role: "startSpeaking" as const },
-                  { label: "停止朗读", role: "stopSpeaking" as const },
+                  {
+                    label: label("startSpeaking"),
+                    role: "startSpeaking" as const,
+                  },
+                  {
+                    label: label("stopSpeaking"),
+                    role: "stopSpeaking" as const,
+                  },
                 ],
               },
             ]
@@ -66,40 +80,40 @@ export const createApplicationMenuTemplate = (
       ],
     },
     {
-      label: topLevelLabel("查看", "V", isMac),
+      label: topLevelLabel(label("view"), "V", isMac),
       submenu: [
-        { label: "重新加载", role: "reload" },
-        { label: "强制重新加载", role: "forceReload" },
-        { label: "切换开发者工具", role: "toggleDevTools" },
+        { label: label("reload"), role: "reload" },
+        { label: label("forceReload"), role: "forceReload" },
+        { label: label("toggleDeveloperTools"), role: "toggleDevTools" },
         separator(),
-        { label: "重置缩放", role: "resetZoom" },
-        { label: "放大", role: "zoomIn" },
-        { label: "缩小", role: "zoomOut" },
+        { label: label("resetZoom"), role: "resetZoom" },
+        { label: label("zoomIn"), role: "zoomIn" },
+        { label: label("zoomOut"), role: "zoomOut" },
         separator(),
-        { label: "切换全屏", role: "togglefullscreen" },
+        { label: label("toggleFullScreen"), role: "togglefullscreen" },
       ],
     },
     {
-      label: topLevelLabel("窗口", "W", isMac),
+      label: topLevelLabel(label("window"), "W", isMac),
       submenu: isMac
         ? [
-            { label: "最小化", role: "minimize" },
-            { label: "缩放", role: "zoom" },
+            { label: label("minimize"), role: "minimize" },
+            { label: label("zoom"), role: "zoom" },
             separator(),
-            { label: "前置全部窗口", role: "front" },
+            { label: label("bringAllToFront"), role: "front" },
             separator(),
-            { label: "窗口", role: "window" },
+            { label: label("window"), role: "window" },
           ]
         : [
-            { label: "最小化", role: "minimize" },
-            { label: "缩放", role: "zoom" },
-            { label: "关闭窗口", role: "close" },
+            { label: label("minimize"), role: "minimize" },
+            { label: label("zoom"), role: "zoom" },
+            { label: label("closeWindow"), role: "close" },
           ],
     },
     {
-      label: topLevelLabel("帮助", "H", isMac),
+      label: topLevelLabel(label("help"), "H", isMac),
       role: "help",
-      submenu: [{ label: `关于 ${applicationName}`, role: "about" }],
+      submenu: [{ label: label("about"), role: "about" }],
     },
   );
 

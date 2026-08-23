@@ -114,6 +114,10 @@ export default class ElectronApp {
     });
 
     this.initTray();
+    i18n.on("languageChanged", () => {
+      installApplicationMenu();
+      this.refreshTrayMenu();
+    });
 
     // 2. Start Go download service in the background; errors are non-fatal
     let updaterConfig = { allowBeta: false, autoUpgrade: true };
@@ -229,10 +233,6 @@ export default class ElectronApp {
     });
     this.tray = tray;
     this.refreshTrayMenu();
-
-    // Rebuild the tray menu whenever the app language changes so the
-    // labels stay in sync with user settings and the OS locale.
-    i18n.on("languageChanged", () => this.refreshTrayMenu());
   }
 
   private refreshTrayMenu() {

@@ -8,6 +8,16 @@ const electronMocks = vi.hoisted(() => ({
   nativeTheme: { themeSource: "system" },
 }));
 
+const i18nMocks = vi.hoisted(() => ({
+  changeLanguage: vi.fn(),
+  on: vi.fn(),
+  t: vi.fn((key: string) => key),
+}));
+
+const applicationMenuMocks = vi.hoisted(() => ({
+  installApplicationMenu: vi.fn(),
+}));
+
 vi.mock("electron", () => ({
   app: electronMocks.app,
   BrowserWindow: { getAllWindows: vi.fn(() => []) },
@@ -18,11 +28,7 @@ vi.mock("electron", () => ({
 }));
 
 vi.mock("./core/i18n", () => ({
-  i18n: {
-    changeLanguage: vi.fn(),
-    on: vi.fn(),
-    t: vi.fn((key: string) => key),
-  },
+  i18n: i18nMocks,
 }));
 
 vi.mock("@mediago/shared-common", () => ({
@@ -34,7 +40,7 @@ vi.mock("../assets/icon.ico", () => ({ default: "icon.ico" }));
 vi.mock("../assets/trayTemplate.png", () => ({ default: "tray.png" }));
 vi.mock("./controller", () => ({}));
 vi.mock("./core/application-menu", () => ({
-  installApplicationMenu: vi.fn(),
+  installApplicationMenu: applicationMenuMocks.installApplicationMenu,
 }));
 vi.mock("./constants", () => ({ db: "/db", isMac: false, logDir: "/log" }));
 
@@ -100,6 +106,26 @@ test("does not apply unrelated initial webview config when ad blocking is off", 
   expect(webviewService.setUserAgent).not.toHaveBeenCalled();
   expect(webviewService.setDefaultSession).not.toHaveBeenCalled();
   expect(webviewService.setAudioMuted).not.toHaveBeenCalled();
+});
+
+test("rebuilds the application menu when the resolved language changes", async () => {
+  const { app } = createApp({ blockAds: false, language: "system" });
+
+  await app.init();
+
+  const languageListener = i18nMocks.on.mock.calls.find(
+    ([event]) => event === "languageChanged",
+  )?.[1] as (() => void) | undefined;
+
+  expect(languageListener).toBeTypeOf("function");
+  expect(i18nMocks.on.mock.invocationCallOrder[0]).toBeLessThan(
+    i18nMocks.changeLanguage.mock.invocationCallOrder[0],
+  );
+  expect(applicationMenuMocks.installApplicationMenu).toHaveBeenCalledOnce();
+
+  languageListener?.();
+
+  expect(applicationMenuMocks.installApplicationMenu).toHaveBeenCalledTimes(2);
 });
 
 function createApp(config: Record<string, unknown>) {
