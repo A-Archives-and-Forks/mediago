@@ -1,6 +1,6 @@
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, type HeadConfig } from "vitepress";
-import { baiduAnalytics, googleAnalytics } from "./plugins";
+import { baiduAnalytics, googleAnalytics } from "./plugins.ts";
 
 const isDev = process.env.NODE_ENV === "development";
 const siteUrl = "https://downloader.caorushizi.cn";

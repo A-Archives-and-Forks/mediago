@@ -1,50 +1,25 @@
 <script setup lang="ts">
-import { onMounted, watch, ref, watchEffect } from "vue";
-import { init, WalineInstance } from "@waline/client";
-import "@waline/client/waline.css";
+import Giscus from "@giscus/vue";
+import { computed } from "vue";
 import { useData, useRoute } from "vitepress";
+import { getGiscusProps } from "./giscus-config";
 
 const route = useRoute();
-const { isDark } = useData();
+const { isDark, lang } = useData();
 
-const commentsRef = ref<WalineInstance | null>(null);
-
-watchEffect(() => {
-  commentsRef.value?.update({
-    dark: isDark.value,
-  });
-});
-
-watch(
-  () => route.path,
-  () => {
-    commentsRef.value?.destroy();
-    initWaline();
-  },
-);
-
-function initWaline() {
-  commentsRef.value = init({
-    el: "#waline",
-    serverURL: "https://comments.ziying.site",
-    dark: isDark.value,
-    lang: "zh-CN",
-    pageview: true,
-    reaction: true,
-  });
-}
-
-onMounted(() => {
-  initWaline();
-});
+const giscusProps = computed(() => getGiscusProps(lang.value, isDark.value));
 </script>
 
 <template>
-  <div id="waline">hello world</div>
+  <div class="giscus-comments">
+    <ClientOnly>
+      <Giscus :key="route.path" v-bind="giscusProps" />
+    </ClientOnly>
+  </div>
 </template>
 
 <style scoped>
-#waline {
+.giscus-comments {
   margin-top: 20px;
 }
 </style>

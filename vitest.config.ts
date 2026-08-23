@@ -42,6 +42,7 @@ export default defineConfig({
     reporters: ["default"],
     include: [
       "apps/**/*.test.ts",
+      "docs/**/*.test.ts",
       "packages/**/*.test.ts",
       "scripts/**/*.test.ts",
       "tests/e2e/support/**/*.test.ts",
