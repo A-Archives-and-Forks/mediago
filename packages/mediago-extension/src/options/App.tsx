@@ -21,6 +21,12 @@ import { ServerCard } from "./components/ServerCard";
 import type { ConnectionDraft } from "./settings-model";
 import { useOptions } from "./use-options";
 
+export function resolveExtensionVersion(
+  manifest: Pick<chrome.runtime.Manifest, "version" | "version_name">,
+): string {
+  return manifest.version_name ?? manifest.version;
+}
+
 export interface OptionsViewProps {
   settings: ExtensionSettings | null;
   draft: ConnectionDraft;
@@ -258,7 +264,7 @@ export function App() {
   const version =
     typeof chrome === "undefined"
       ? "0.0.0"
-      : chrome.runtime.getManifest().version;
+      : resolveExtensionVersion(chrome.runtime.getManifest());
 
   return (
     <OptionsView

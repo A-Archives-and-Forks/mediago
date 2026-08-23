@@ -40,6 +40,11 @@ interface OptionsViewProps {
 
 type OptionsViewComponent = (props: OptionsViewProps) => React.ReactNode;
 
+type ResolveExtensionVersion = (manifest: {
+  version: string;
+  version_name?: string;
+}) => string;
+
 const settings: ExtensionSettings = {
   mode: "desktop-http",
   serverUrl: "",
@@ -80,6 +85,17 @@ function optionsView(): OptionsViewComponent {
   expect(View).toBeTypeOf("function");
   if (!View) throw new Error("OptionsView is not available");
   return View;
+}
+
+function extensionVersionResolver(): ResolveExtensionVersion {
+  const resolver = (
+    optionsApp as typeof optionsApp & {
+      resolveExtensionVersion?: ResolveExtensionVersion;
+    }
+  ).resolveExtensionVersion;
+  expect(resolver).toBeTypeOf("function");
+  if (!resolver) throw new Error("Extension version resolver is not available");
+  return resolver;
 }
 
 function renderOptions(overrides: Partial<OptionsViewProps> = {}): string {
@@ -319,5 +335,24 @@ describe("Options copy", () => {
     expect(resources.it.translation.options.server.desktopHttpNoteTail).toMatch(
       /^\.\s/,
     );
+  });
+});
+
+describe("extension version display", () => {
+  it("prefers the full manifest version name", () => {
+    const resolveExtensionVersion = extensionVersionResolver();
+
+    expect(
+      resolveExtensionVersion({
+        version: "3.5.0",
+        version_name: "3.5.0-test.4",
+      }),
+    ).toBe("3.5.0-test.4");
+  });
+
+  it("falls back to the numeric manifest version", () => {
+    const resolveExtensionVersion = extensionVersionResolver();
+
+    expect(resolveExtensionVersion({ version: "3.5.0" })).toBe("3.5.0");
   });
 });
