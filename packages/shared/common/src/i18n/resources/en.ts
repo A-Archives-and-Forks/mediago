@@ -426,6 +426,8 @@ export const en = {
   mcpApplying: "Applying",
   mcpRunning: "Running",
   mcpStopped: "Stopped",
+  mcpUrl: "MCP URL",
+  mcpToken: "Token",
   mcpAgentConfig: "Agent configuration",
   mcpRegenerateToken: "Regenerate token",
   mcpConfigCopied: "MCP configuration copied",

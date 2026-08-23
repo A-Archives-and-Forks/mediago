@@ -413,6 +413,8 @@ export const zh = {
   mcpApplying: "应用中",
   mcpRunning: "运行中",
   mcpStopped: "未运行",
+  mcpUrl: "MCP URL",
+  mcpToken: "令牌",
   mcpAgentConfig: "Agent 配置",
   mcpRegenerateToken: "重新生成令牌",
   mcpConfigCopied: "MCP 配置已复制",

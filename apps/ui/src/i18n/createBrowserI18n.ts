@@ -18,7 +18,7 @@ export interface CreateBrowserI18nOptions extends BrowserResourceOptions {
 const buildTranslationBundle = (
   language: (typeof SUPPORTED_LANGUAGES)[number],
 ) => {
-  const translation: Record<string, string> = { ...i18nResources[language] };
+  const translation = { ...i18nResources[language] };
 
   Object.assign(translation, i18nResources[language]);
 

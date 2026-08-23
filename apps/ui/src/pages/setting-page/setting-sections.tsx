@@ -23,7 +23,6 @@ import {
 import { getMCPStatus, getMCPStatusKey } from "@/api/config";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { useEnvPath } from "@/hooks/use-config";
 import { usePlatform } from "@/hooks/use-platform";
 import { useAppStore } from "@/store/app";
@@ -611,15 +610,30 @@ export const MCPSettingsCard = memo(function MCPSettingsCard() {
           ) : null}
         </div>
       </SettingRow>
+      <SettingRow label={t("mcpUrl")} htmlFor="mcp-url">
+        <Input
+          id="mcp-url"
+          value={endpoint}
+          readOnly
+          aria-readonly="true"
+          className="h-8 font-mono text-xs"
+        />
+      </SettingRow>
+      <SettingRow label={t("mcpToken")} htmlFor="mcp-token">
+        <Input
+          id="mcp-token"
+          value={token}
+          readOnly
+          aria-readonly="true"
+          className="h-8 font-mono text-xs"
+        />
+      </SettingRow>
       <SettingRow label={t("mcpAgentConfig")}>
         <div className="w-full space-y-2">
-          <Textarea
-            value={agentConfig}
-            readOnly
-            rows={10}
-            className="min-h-52 font-mono text-xs"
-          />
-          <div className="flex flex-wrap justify-end gap-2">
+          <div
+            data-mcp-actions="true"
+            className="flex w-full flex-nowrap justify-end gap-2"
+          >
             <Button type="button" variant="outline" onClick={regenerateToken}>
               <RefreshCw className="size-4" />
               {t("mcpRegenerateToken")}
@@ -628,7 +642,7 @@ export const MCPSettingsCard = memo(function MCPSettingsCard() {
               type="button"
               variant="outline"
               onClick={copyConfig}
-              disabled={!endpoint}
+              disabled={!endpoint || !token}
             >
               <Copy className="size-4" />
               {t("copy")}

@@ -430,6 +430,8 @@ export const it = {
   mcpApplying: "Applicazione in corso",
   mcpRunning: "In esecuzione",
   mcpStopped: "Arrestato",
+  mcpUrl: "URL MCP",
+  mcpToken: "Token",
   mcpAgentConfig: "Configurazione Agent",
   mcpRegenerateToken: "Rigenera token",
   mcpConfigCopied: "Configurazione MCP copiata",

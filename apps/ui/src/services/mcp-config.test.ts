@@ -17,15 +17,7 @@ describe("buildMCPEndpoint", () => {
 });
 
 it("builds the copied agent configuration", () => {
-  expect(
-    JSON.parse(buildMCPAgentConfig("http://server:8899", "secret")),
-  ).toStrictEqual({
-    mcpServers: {
-      mediago: {
-        type: "http",
-        url: "http://server:8899/mcp",
-        headers: { Authorization: "Bearer secret" },
-      },
-    },
-  });
+  expect(buildMCPAgentConfig("http://server:8899", "secret")).toBe(
+    "MCP URL: http://server:8899/mcp\nMCP Token: secret",
+  );
 });
