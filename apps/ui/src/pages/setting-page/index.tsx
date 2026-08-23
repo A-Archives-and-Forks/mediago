@@ -68,7 +68,7 @@ const SettingsCards = memo(function SettingsCards({
   }, []);
 
   return (
-    <div className="mx-auto grid w-full max-w-[1280px] grid-cols-[repeat(auto-fit,minmax(min(100%,430px),1fr))] items-start gap-4">
+    <div className="mx-auto grid w-full max-w-[1280px] grid-cols-[repeat(auto-fit,minmax(min(100%,400px),1fr))] items-start gap-4">
       <div className="flex min-w-0 flex-col gap-4">
         <StableBasicSettingsCard />
         {!isWeb && visibleStep >= 2 ? <StableBrowserSettingsCard /> : null}
