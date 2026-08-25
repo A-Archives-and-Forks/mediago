@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export type DockerRunMode = "test" | "release";
-export type DockerReleaseChannel = "alpha" | "beta" | "latest";
+export type DockerReleaseChannel = "test" | "beta" | "latest";
 
 export interface DockerWorkflowInputs {
   runMode: string;
@@ -67,11 +67,17 @@ export function validateDockerWorkflowInputs(
 
   if (
     inputs.releaseChannel !== "latest" &&
-    inputs.releaseChannel !== "alpha" &&
+    inputs.releaseChannel !== "test" &&
     inputs.releaseChannel !== "beta"
   ) {
     throw new Error(
-      `release_channel must be 'latest', 'alpha', or 'beta' (received '${inputs.releaseChannel}').`,
+      `release_channel must be 'test', 'beta', or 'latest' (received '${inputs.releaseChannel}').`,
+    );
+  }
+  const expectedMode = inputs.releaseChannel === "test" ? "test" : "release";
+  if (inputs.runMode !== expectedMode) {
+    throw new Error(
+      `release_channel '${inputs.releaseChannel}' requires run_mode '${expectedMode}'.`,
     );
   }
 
@@ -148,10 +154,7 @@ export function resolveDockerParameters(
     input.runMode === "test"
       ? `ghcr.io/${owner}/mediago-preview`
       : `ghcr.io/${owner}/mediago`;
-  const tag =
-    input.runMode === "test"
-      ? `test-${input.runId}-${input.resolvedSha.slice(0, 12)}`
-      : input.version;
+  const tag = input.version;
 
   return {
     image,

@@ -1,16 +1,25 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import {
+  appendFileSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export type DesktopRunMode = "test" | "release";
-export type DesktopReleaseChannel = "alpha" | "beta" | "latest";
+export type DesktopReleaseChannel = "test" | "beta" | "latest";
 
 export interface DesktopBuildRequest {
   runMode: string;
   version: string;
   releaseChannel: string;
   sourceSha: string;
+  testReleaseId?: string;
+  testBuildTarget?: string;
 }
 
 export interface VerifySourceOptions {
@@ -49,7 +58,7 @@ export function validateDesktopBuildRequest(
     throw new Error(`Unsupported run_mode: ${request.runMode}`);
   }
   if (
-    request.releaseChannel !== "alpha" &&
+    request.releaseChannel !== "test" &&
     request.releaseChannel !== "beta" &&
     request.releaseChannel !== "latest"
   ) {
@@ -74,6 +83,181 @@ export function validateDesktopBuildRequest(
         `version ${request.version} does not match release channel ${request.releaseChannel}`,
       );
     }
+    if (request.releaseChannel === "test") {
+      throw new Error("release mode cannot use the test channel");
+    }
+  } else {
+    if (request.releaseChannel !== "test") {
+      throw new Error("test mode requires release_channel test");
+    }
+    const testPattern = new RegExp(
+      `^${CORE_PATTERN}\\.${CORE_PATTERN}\\.${CORE_PATTERN}-test\\.${CORE_PATTERN}$`,
+    );
+    if (!testPattern.test(request.version)) {
+      throw new Error(`version ${request.version} does not match test.N`);
+    }
+    if (!/^[1-9]\d*$/.test(request.testReleaseId ?? "")) {
+      throw new Error(
+        "test_release_id must be a positive integer in test mode",
+      );
+    }
+    if (
+      request.testBuildTarget !== "all" &&
+      request.testBuildTarget !== "desktop"
+    ) {
+      throw new Error("test_build_target must be all or desktop");
+    }
+  }
+}
+
+const DESKTOP_RUNNERS = [
+  "windows-latest",
+  "macos-15",
+  "macos-15-intel",
+  "ubuntu-latest",
+] as const;
+
+export function testStageAssetName(runId: string, runner: string): string {
+  if (!/^[1-9]\d*$/.test(runId)) {
+    throw new Error("run ID must be a positive integer");
+  }
+  if (!DESKTOP_RUNNERS.includes(runner as (typeof DESKTOP_RUNNERS)[number])) {
+    throw new Error(`Unsupported desktop runner: ${runner}`);
+  }
+  return `test-stage-${runId}-${runner}.tar.gz`;
+}
+
+export function createTestStageArchive(options: {
+  runId: string;
+  runner: string;
+  releaseDirectory?: string;
+  outputDirectory?: string;
+}): string {
+  const releaseDirectory = resolve(
+    options.releaseDirectory ?? "apps/electron/release",
+  );
+  const outputDirectory = resolve(options.outputDirectory ?? "test-stage");
+  const name = testStageAssetName(options.runId, options.runner);
+  const files = readdirSync(releaseDirectory, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && !/^builder-/i.test(entry.name))
+    .map((entry) => entry.name)
+    .filter((file) => /\.(?:exe|dmg|zip|deb|blockmap|ya?ml)$/i.test(file))
+    .filter((file) => statSync(join(releaseDirectory, file)).isFile());
+  if (files.length === 0) {
+    throw new Error("No desktop files were produced for the test stage");
+  }
+  mkdirSync(outputDirectory, { recursive: true });
+  const archive = join(outputDirectory, name);
+  const result = spawnSync("tar", ["-czf", archive, "--", ...files], {
+    cwd: releaseDirectory,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(
+      `Could not create test stage archive: ${(result.stderr || result.stdout).trim()}`,
+    );
+  }
+  return archive;
+}
+
+export function uploadTestStageAsset(options: {
+  repository: string;
+  releaseId: string;
+  archive: string;
+  runId: string;
+  sourceSha: string;
+  version: string;
+  buildTarget: string;
+}): void {
+  if (!/^[1-9]\d*$/.test(options.releaseId)) {
+    throw new Error("test Release ID must be a positive integer");
+  }
+  if (!/^[^/\s]+\/[^/\s]+$/.test(options.repository)) {
+    throw new Error("repository must use owner/name format");
+  }
+  const archive = resolve(options.archive);
+  const assetName = basename(archive);
+  validateTestReleaseForUpload(options);
+  const assets = runGh([
+    "api",
+    "--paginate",
+    `repos/${options.repository}/releases/${options.releaseId}/assets?per_page=100`,
+    "--jq",
+    ".[] | [.id, .name] | @tsv",
+  ]);
+  for (const line of assets.split(/\r?\n/).filter(Boolean)) {
+    const [id, name] = line.split("\t");
+    if (name === assetName && /^[1-9]\d*$/.test(id)) {
+      runGh([
+        "api",
+        "--method",
+        "DELETE",
+        `repos/${options.repository}/releases/assets/${id}`,
+      ]);
+    }
+  }
+  const uploadTemplate = runGh([
+    "api",
+    `repos/${options.repository}/releases/${options.releaseId}`,
+    "--jq",
+    ".upload_url",
+  ]);
+  const uploadUrl = uploadTemplate.replace(/\{\?name,label\}$/, "");
+  runGh([
+    "api",
+    "--method",
+    "POST",
+    `${uploadUrl}?name=${encodeURIComponent(assetName)}`,
+    "-H",
+    "Content-Type: application/gzip",
+    "--input",
+    archive,
+  ]);
+}
+
+function validateTestReleaseForUpload(options: {
+  repository: string;
+  releaseId: string;
+  runId: string;
+  sourceSha: string;
+  version: string;
+  buildTarget: string;
+}): void {
+  const release = JSON.parse(
+    runGh(["api", `repos/${options.repository}/releases/${options.releaseId}`]),
+  ) as Record<string, unknown>;
+  const body = typeof release.body === "string" ? release.body : "";
+  const markerPrefixes = body.match(/<!-- mediago-test-reservation:/g) ?? [];
+  const markerMatches = [
+    ...body.matchAll(/<!-- mediago-test-reservation:(\{[^\r\n]*\}) -->/g),
+  ];
+  if (markerPrefixes.length !== 1 || markerMatches.length !== 1) {
+    throw new Error("Test Release has an invalid ownership marker");
+  }
+  let marker: unknown;
+  try {
+    marker = JSON.parse(markerMatches[0][1]);
+  } catch {
+    throw new Error("Test Release has invalid ownership JSON");
+  }
+  const expected = {
+    schema: 1,
+    runId: options.runId,
+    sourceSha: options.sourceSha,
+    buildTarget: options.buildTarget,
+    version: options.version,
+  };
+  if (
+    release.tag_name !== `test-run-${options.runId}` ||
+    release.name !== options.version ||
+    release.target_commitish !== options.sourceSha ||
+    release.draft !== true ||
+    release.prerelease !== true ||
+    JSON.stringify(marker) !== JSON.stringify(expected)
+  ) {
+    throw new Error("Test Release does not match this desktop build request");
   }
 }
 
@@ -216,6 +400,19 @@ function runGit(
   }
 }
 
+function runGh(args: string[]): string {
+  try {
+    return execFileSync("gh", args, {
+      encoding: "utf8",
+      env: process.env,
+      stdio: ["ignore", "pipe", "pipe"],
+    }).trim();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`GitHub command failed: ${message}`, { cause: error });
+  }
+}
+
 function isGitAncestor(
   workspaceRoot: string,
   ancestor: string,
@@ -260,6 +457,8 @@ function requestFromEnvironment(): DesktopBuildRequest {
     version: requiredEnvironment("REQUESTED_VERSION"),
     releaseChannel: requiredEnvironment("REQUESTED_CHANNEL"),
     sourceSha: requiredEnvironment("REQUESTED_SOURCE_SHA"),
+    testReleaseId: process.env.REQUESTED_TEST_RELEASE_ID,
+    testBuildTarget: process.env.REQUESTED_TEST_BUILD_TARGET,
   };
 }
 
@@ -310,9 +509,35 @@ function runCommand(command: string | undefined): void {
     return;
   }
 
+  if (command === "create-test-stage") {
+    const archive = createTestStageArchive({
+      runId: requiredEnvironment("GITHUB_RUN_ID"),
+      runner: requiredEnvironment("RUNNER_NAME"),
+    });
+    appendGithubOutput(
+      "archive",
+      archive,
+      requiredEnvironment("GITHUB_OUTPUT"),
+    );
+    return;
+  }
+
+  if (command === "upload-test-stage") {
+    uploadTestStageAsset({
+      repository: requiredEnvironment("REPOSITORY"),
+      releaseId: requiredEnvironment("TEST_RELEASE_ID"),
+      archive: requiredEnvironment("STAGE_ARCHIVE"),
+      runId: requiredEnvironment("GITHUB_RUN_ID"),
+      sourceSha: requiredEnvironment("SOURCE_SHA"),
+      version: requiredEnvironment("VERSION"),
+      buildTarget: requiredEnvironment("BUILD_TARGET"),
+    });
+    return;
+  }
+
   throw new Error(
     "Usage: node scripts/ci/desktop-workflow.ts " +
-      "<validate-request|verify-source|artifact-prefix|apply-version>",
+      "<validate-request|verify-source|artifact-prefix|apply-version|create-test-stage|upload-test-stage>",
   );
 }
 

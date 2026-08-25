@@ -8,6 +8,7 @@ import type {
 import {
   compareSemVer,
   formatSemVer,
+  hasSameSemVerCore,
   isNumericIdentifier,
   parseSemVer,
 } from "./semver.ts";
@@ -18,7 +19,7 @@ import {
   parseVersionTags,
 } from "./tags.ts";
 
-function bumpCore(
+export function bumpCore(
   base: ParsedSemVer,
   increment: VersionIncrement,
 ): ParsedSemVer {
@@ -79,119 +80,112 @@ export function planRelease(input: ReleasePlanInput): ReleasePlan {
   const current = parseSemVer(input.currentVersion);
   const currentVersion = formatSemVer(current);
   const parsedTags = parseVersionTags(input.tags);
-  const highestTag = findHighestTag(parsedTags);
   const latestStableTag = findHighestTag(
     parsedTags,
     (tag) => tag.version.prerelease.length === 0,
   );
-
-  if (highestTag !== null && compareSemVer(current, highestTag.version) < 0) {
-    throw new Error(
-      `Product version ${currentVersion} is behind highest tag ${highestTag.name}`,
-    );
-  }
-
-  const currentTag = parsedTags.find(
-    (tag) => compareSemVer(current, tag.version) === 0,
-  );
-  if (currentTag === undefined) {
-    if (
-      highestTag !== null &&
-      compareSemVer(current, highestTag.version) <= 0
-    ) {
-      throw new Error(
-        `Product version ${currentVersion} is not uniquely ahead of existing tags`,
-      );
-    }
-    validateChannelVersion(current, input.channel);
-    assertTagAvailable(currentVersion, input.tags);
-    return {
-      currentVersion,
-      version: currentVersion,
-      tag: `v${currentVersion}`,
-      baseVersion:
-        latestStableTag === null ? null : formatSemVer(latestStableTag.version),
-      changed: false,
-      pending: true,
-    };
-  }
 
   if (latestStableTag === null) {
     throw new Error(
       "No stable SemVer tag found; set the initial product version before releasing",
     );
   }
+  assertNoDuplicateVersions(parsedTags.map((tag) => formatSemVer(tag.version)));
+  const requestedCore = bumpCore(latestStableTag.version, input.increment);
+  assertSupportedOfficialPrereleases(parsedTags, requestedCore);
 
-  let candidate: ParsedSemVer;
-  if (current.prerelease.length > 0) {
-    const [currentChannel, currentNumber] = current.prerelease;
-    if (
-      current.prerelease.length !== 2 ||
-      (currentChannel !== "alpha" && currentChannel !== "beta") ||
-      !isNumericIdentifier(currentNumber)
-    ) {
-      throw new Error(
-        `Unsupported current prerelease ${currentVersion}; expected alpha.N or beta.N`,
-      );
-    }
-
-    const continuesCurrentCore =
-      input.channel === "latest" ||
-      input.channel === currentChannel ||
-      (currentChannel === "alpha" && input.channel === "beta");
-    candidate = continuesCurrentCore
-      ? { ...current, prerelease: [], build: [] }
-      : bumpCore(latestStableTag.version, input.increment);
-  } else {
-    candidate = bumpCore(latestStableTag.version, input.increment);
+  if (input.channel === "test") {
+    const testVersions = (input.testVersions ?? []).map((version) => {
+      const parsed = parseSemVer(version);
+      validateChannelVersion(parsed, "test");
+      if (parsed.build.length !== 0) {
+        throw new Error(
+          `Private test version cannot use build metadata: ${version}`,
+        );
+      }
+      return parsed;
+    });
+    assertNoDuplicateVersions(testVersions.map(formatSemVer));
+    const next = nextPrivateTestNumber(testVersions, requestedCore);
+    const candidate = {
+      ...requestedCore,
+      prerelease: ["test", String(next)],
+    } satisfies ParsedSemVer;
+    const version = formatSemVer(candidate);
+    return {
+      currentVersion,
+      version,
+      tag: "",
+      baseVersion: formatSemVer(latestStableTag.version),
+      changed: false,
+      pending: false,
+      resumed: false,
+    };
   }
 
-  if (input.channel !== "latest") {
+  if (compareSemVer(current, latestStableTag.version) < 0) {
+    throw new Error(
+      `Product version ${currentVersion} is behind latest stable tag ${latestStableTag.name}`,
+    );
+  }
+
+  const currentOfficialTag = parsedTags.find(
+    (tag) => compareSemVer(current, tag.version) === 0,
+  );
+  const locked = resolveLockedOfficialCore(
+    current,
+    latestStableTag.version,
+    currentOfficialTag !== undefined,
+  );
+  if (locked && !hasSameSemVerCore(locked.core, requestedCore)) {
+    const requiredIncrement = matchingIncrement(
+      latestStableTag.version,
+      locked.core,
+    );
+    throw new Error(
+      `version_increment '${input.increment}' selects ${formatCore(requestedCore)}, ` +
+        `but committed version ${currentVersion} locks the official core to ${formatCore(locked.core)}` +
+        (requiredIncrement
+          ? `; select version_increment '${requiredIncrement}'`
+          : ""),
+    );
+  }
+
+  if (locked?.kind === "stable") {
+    if (input.channel !== "latest") {
+      throw new Error(
+        `Committed stable version ${currentVersion} can only be resumed with channel latest`,
+      );
+    }
+    assertTagAvailable(currentVersion, input.tags);
+    return releasePlan(currentVersion, currentVersion, latestStableTag, true);
+  }
+
+  const targetCore = locked?.core ?? requestedCore;
+  assertSupportedOfficialPrereleases(parsedTags, targetCore);
+  if (
+    locked?.kind === "beta" &&
+    currentOfficialTag === undefined &&
+    input.channel === "beta"
+  ) {
+    assertTagAvailable(currentVersion, input.tags);
+    return releasePlan(currentVersion, currentVersion, latestStableTag, true);
+  }
+
+  const candidate: ParsedSemVer = {
+    ...targetCore,
+    prerelease: [],
+    build: [],
+  };
+  if (input.channel === "beta") {
     candidate.prerelease = [
-      input.channel,
-      String(nextPrereleaseNumber(parsedTags, candidate, input.channel)),
+      "beta",
+      String(nextPrereleaseNumber(parsedTags, candidate, "beta")),
     ];
   }
   const version = formatSemVer(candidate);
   assertTagAvailable(version, input.tags);
-  if (
-    highestTag !== null &&
-    compareSemVer(candidate, highestTag.version) <= 0
-  ) {
-    throw new Error(
-      `Calculated version ${version} is not newer than highest tag ${highestTag.name}`,
-    );
-  }
-  return {
-    currentVersion,
-    version,
-    tag: `v${version}`,
-    baseVersion: formatSemVer(latestStableTag.version),
-    changed: version !== currentVersion,
-    pending: false,
-  };
-}
-
-export function planTestRelease(
-  currentVersion: string,
-  runNumber: string | undefined,
-): ReleasePlan {
-  if (!runNumber || !/^[1-9]\d*$/.test(runNumber)) {
-    throw new Error(
-      "Test mode requires --run-number (or GITHUB_RUN_NUMBER) as a positive integer",
-    );
-  }
-  const current = parseSemVer(currentVersion);
-  const core = `${current.major}.${current.minor}.${current.patch}`;
-  const version = `${core}-test.${runNumber}`;
-  return {
-    currentVersion,
-    version,
-    tag: `v${version}`,
-    baseVersion: core,
-    changed: false,
-    pending: false,
-  };
+  return releasePlan(currentVersion, version, latestStableTag, false);
 }
 
 export function planResumedRelease(
@@ -207,5 +201,116 @@ export function planResumedRelease(
     baseVersion: `${current.major}.${current.minor}.${current.patch}`,
     changed: false,
     pending: true,
+    resumed: true,
+  };
+}
+
+function resolveLockedOfficialCore(
+  current: ParsedSemVer,
+  latestStable: ParsedSemVer,
+  currentTagExists: boolean,
+): { core: ParsedSemVer; kind: "beta" | "stable" } | undefined {
+  if (current.prerelease.length === 0) {
+    if (compareSemVer(current, latestStable) > 0 && !currentTagExists) {
+      return { core: current, kind: "stable" };
+    }
+    return undefined;
+  }
+  validateChannelVersion(current, "beta");
+  if (compareCore(current, latestStable) <= 0) {
+    throw new Error(
+      `Committed prerelease ${formatSemVer(current)} is not ahead of latest stable ${formatSemVer(latestStable)}`,
+    );
+  }
+  return { core: { ...current, prerelease: [], build: [] }, kind: "beta" };
+}
+
+function assertSupportedOfficialPrereleases(
+  tags: ReturnType<typeof parseVersionTags>,
+  targetCore: ParsedSemVer,
+): void {
+  for (const tag of tags) {
+    if (!hasSameSemVerCore(tag.version, targetCore)) continue;
+    if (tag.version.prerelease.length === 0) continue;
+    const [channel, number] = tag.version.prerelease;
+    if (
+      tag.version.prerelease.length !== 2 ||
+      channel !== "beta" ||
+      !isNumericIdentifier(number) ||
+      !Number.isSafeInteger(Number(number))
+    ) {
+      throw new Error(
+        `Unsupported official prerelease on requested core ${formatCore(targetCore)}: ${tag.name}`,
+      );
+    }
+  }
+}
+
+function nextPrivateTestNumber(
+  versions: readonly ParsedSemVer[],
+  targetCore: ParsedSemVer,
+): number {
+  let highest = -1;
+  for (const version of versions) {
+    if (!hasSameSemVerCore(version, targetCore)) continue;
+    const value = Number(version.prerelease[1]);
+    highest = Math.max(highest, value);
+  }
+  const next = highest + 1;
+  if (!Number.isSafeInteger(next)) {
+    throw new Error("Calculated test number exceeds the safe integer range");
+  }
+  return next;
+}
+
+function assertNoDuplicateVersions(versions: readonly string[]): void {
+  const seen: ParsedSemVer[] = [];
+  for (const version of versions) {
+    const parsed = parseSemVer(version);
+    if (seen.some((entry) => compareSemVer(entry, parsed) === 0)) {
+      throw new Error(`Duplicate version record: ${version}`);
+    }
+    seen.push(parsed);
+  }
+}
+
+function compareCore(left: ParsedSemVer, right: ParsedSemVer): number {
+  for (const key of ["major", "minor", "patch"] as const) {
+    if (left[key] !== right[key]) return left[key] < right[key] ? -1 : 1;
+  }
+  return 0;
+}
+
+function formatCore(version: ParsedSemVer): string {
+  return `${version.major}.${version.minor}.${version.patch}`;
+}
+
+function matchingIncrement(
+  stable: ParsedSemVer,
+  target: ParsedSemVer,
+): VersionIncrement | undefined {
+  for (const increment of VERSION_INCREMENT_ORDER) {
+    if (hasSameSemVerCore(bumpCore(stable, increment), target))
+      return increment;
+  }
+  return undefined;
+}
+
+const VERSION_INCREMENT_ORDER = ["patch", "minor", "major"] as const;
+
+function releasePlan(
+  currentVersion: string,
+  version: string,
+  latestStableTag: NonNullable<ReturnType<typeof findHighestTag>>,
+  pending: boolean,
+): ReleasePlan {
+  return {
+    currentVersion,
+    version,
+    tag: `v${version}`,
+    baseVersion: formatSemVer(latestStableTag.version),
+    changed: version !== currentVersion,
+    pending,
+    resumed: pending,
   };
 }

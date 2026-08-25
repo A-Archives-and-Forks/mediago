@@ -252,6 +252,18 @@ tasks:
       - task: internal:require-task-version
       - task: internal:ci:desktop:apply-version
 
+  ci:desktop:create-test-stage:
+    desc: Create a private desktop test staging archive
+    cmds:
+      - task: internal:require-task-version
+      - task: internal:ci:desktop:create-test-stage
+
+  ci:desktop:upload-test-stage:
+    desc: Upload a desktop test stage to its private draft
+    cmds:
+      - task: internal:require-task-version
+      - task: internal:ci:desktop:upload-test-stage
+
   ci:desktop:release:
     desc: Build desktop workflow release artifacts
     cmds:
@@ -306,6 +318,12 @@ tasks:
       - task: internal:require-task-version
       - task: internal:ci:release:detect-release-state
 
+  ci:release:reserve-test-version:
+    desc: Reserve or recover a private test version
+    cmds:
+      - task: internal:require-task-version
+      - task: internal:ci:release:reserve-test-version
+
   ci:release:calculate-version:
     desc: Calculate the release workflow version
     cmds:
@@ -336,6 +354,12 @@ tasks:
       - task: internal:require-task-version
       - task: internal:ci:release:collect-electron-artifacts
 
+  ci:release:download-test-stages:
+    desc: Download private desktop stages from the owned draft
+    cmds:
+      - task: internal:require-task-version
+      - task: internal:ci:release:download-test-stages
+
   ci:release:publish-desktop:
     desc: Publish the desktop GitHub Release
     cmds:
@@ -347,6 +371,12 @@ tasks:
     cmds:
       - task: internal:require-task-version
       - task: internal:ci:release:write-desktop-summary
+
+  ci:release:record-test-docker:
+    desc: Record the private preview image on its test reservation
+    cmds:
+      - task: internal:require-task-version
+      - task: internal:ci:release:record-test-docker
 
   ci:release:tag-docker-release:
     desc: Tag a Docker-only release
@@ -904,6 +934,16 @@ tasks:
     cmds:
       - node scripts/ci/desktop-workflow.ts apply-version
 
+  internal:ci:desktop:create-test-stage:
+    internal: true
+    cmds:
+      - node scripts/ci/desktop-workflow.ts create-test-stage
+
+  internal:ci:desktop:upload-test-stage:
+    internal: true
+    cmds:
+      - node scripts/ci/desktop-workflow.ts upload-test-stage
+
   internal:ci:desktop:release:
     internal: true
     vars: *production-runtime-vars
@@ -955,6 +995,11 @@ tasks:
     cmds:
       - node scripts/ci/release-workflow.ts detect-release-state
 
+  internal:ci:release:reserve-test-version:
+    internal: true
+    cmds:
+      - node scripts/ci/release-workflow.ts reserve-test-version
+
   internal:ci:release:calculate-version:
     internal: true
     cmds:
@@ -980,6 +1025,11 @@ tasks:
     cmds:
       - 'node scripts/collect-electron-artifacts.ts electron-artifacts release-files "$VERSION" "$UPDATER_CHANNEL"'
 
+  internal:ci:release:download-test-stages:
+    internal: true
+    cmds:
+      - node scripts/ci/release-workflow.ts download-test-stages
+
   internal:ci:release:publish-desktop:
     internal: true
     cmds:
@@ -989,6 +1039,11 @@ tasks:
     internal: true
     cmds:
       - node scripts/ci/release-workflow.ts write-desktop-summary
+
+  internal:ci:release:record-test-docker:
+    internal: true
+    cmds:
+      - node scripts/ci/release-workflow.ts record-test-docker
 
   internal:ci:release:tag-docker-release:
     internal: true

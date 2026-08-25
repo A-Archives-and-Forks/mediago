@@ -12,7 +12,7 @@ on:
         required: true
         type: string
       release_channel:
-        description: "Release channel: latest, alpha, or beta."
+        description: "Release channel: test, beta, or latest."
         required: true
         type: string
       source_sha:

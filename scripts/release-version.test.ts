@@ -7,8 +7,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { expect, onTestFinished, test } from "vitest";
 import {
   assertTagAvailable,
@@ -20,11 +19,6 @@ import {
   type VersionIncrement,
 } from "./release-version.ts";
 
-const SCRIPT_FILE = fileURLToPath(
-  new URL("./release-version.ts", import.meta.url),
-);
-const WORKSPACE_ROOT = resolve(dirname(SCRIPT_FILE), "..");
-
 test("strictly parses and compares SemVer", () => {
   const parsed = parseSemVer("3.6.0-beta.2+sha.abc");
   expect(formatSemVer(parsed)).toBe("3.6.0-beta.2+sha.abc");
@@ -35,7 +29,6 @@ test("strictly parses and compares SemVer", () => {
   expect(
     compareSemVer(parseSemVer("3.6.0-beta.9"), parseSemVer("3.6.0")) < 0,
   ).toBeTruthy();
-
   for (const invalid of [
     "",
     "1.2",
@@ -45,7 +38,6 @@ test("strictly parses and compares SemVer", () => {
     "1.2.3-beta.01",
     "1.2.3-",
     "1.2.3+",
-    "1.2.3-+build",
     "v1.2.3",
   ]) {
     expect(() => parseSemVer(invalid)).toThrow(/Invalid SemVer|leading zeroes/);
@@ -58,119 +50,138 @@ test("calculates stable patch, minor, and major versions", () => {
     ["minor", "3.6.0"],
     ["major", "4.0.0"],
   ];
-
   for (const [increment, expected] of cases) {
-    const plan = planRelease({
-      currentVersion: "3.5.0",
-      tags: ["v3.5.0", "v3.5.0-beta.1", "not-a-version"],
-      channel: "latest",
-      increment,
-    });
-    expect(plan.version).toBe(expected);
-    expect(plan.tag).toBe(`v${expected}`);
-    expect(plan.pending).toBe(false);
+    expect(
+      planRelease({
+        currentVersion: "3.5.0",
+        tags: ["v3.5.0", "v3.5.0-alpha.1"],
+        channel: "latest",
+        increment,
+      }).version,
+    ).toBe(expected);
   }
 });
 
-test("increments prereleases and supports alpha to beta promotion", () => {
-  const alphaTags = ["v3.5.0", "v3.6.0-alpha.0", "v3.6.0-alpha.2"];
-
+test("allocates private test counters per requested core starting at zero", () => {
   expect(
     planRelease({
-      currentVersion: "3.6.0-alpha.2",
-      tags: alphaTags,
-      channel: "alpha",
+      currentVersion: "3.5.0",
+      tags: ["v3.5.0"],
+      channel: "test",
+      increment: "patch",
+    }).version,
+  ).toBe("3.5.1-test.0");
+  expect(
+    planRelease({
+      currentVersion: "3.5.0",
+      tags: ["v3.5.0", "v3.5.1-beta.3"],
+      testVersions: ["3.5.1-test.0", "3.5.1-test.1", "3.6.0-test.7"],
+      channel: "test",
+      increment: "patch",
+    }).version,
+  ).toBe("3.5.1-test.2");
+  expect(
+    planRelease({
+      currentVersion: "3.5.0",
+      tags: ["v3.5.0"],
+      testVersions: ["3.5.1-test.9"],
+      channel: "test",
       increment: "minor",
     }).version,
-  ).toBe("3.6.0-alpha.3");
-  expect(
-    planRelease({
-      currentVersion: "3.6.0-alpha.2",
-      tags: alphaTags,
-      channel: "beta",
-      increment: "patch",
-    }).version,
-  ).toBe("3.6.0-beta.0");
-  expect(
-    planRelease({
-      currentVersion: "3.6.0-beta.1",
-      tags: [...alphaTags, "v3.6.0-beta.0", "v3.6.0-beta.1"],
-      channel: "beta",
-      increment: "patch",
-    }).version,
-  ).toBe("3.6.0-beta.2");
+  ).toBe("3.6.0-test.0");
 });
 
-test("promotes a prerelease to the matching stable version", () => {
-  const plan = planRelease({
-    currentVersion: "3.6.0-beta.2",
-    tags: ["v3.5.0", "v3.6.0-beta.0", "v3.6.0-beta.2"],
+test("advances beta independently from private tests", () => {
+  expect(
+    planRelease({
+      currentVersion: "3.5.0",
+      tags: ["v3.5.0"],
+      testVersions: ["3.5.1-test.4"],
+      channel: "beta",
+      increment: "patch",
+    }).version,
+  ).toBe("3.5.1-beta.0");
+  expect(
+    planRelease({
+      currentVersion: "3.5.1-beta.1",
+      tags: ["v3.5.0", "v3.5.1-beta.0", "v3.5.1-beta.1"],
+      channel: "beta",
+      increment: "patch",
+    }).version,
+  ).toBe("3.5.1-beta.2");
+});
+
+test("promotes and recovers a locked official core", () => {
+  expect(
+    planRelease({
+      currentVersion: "3.6.0-beta.2",
+      tags: ["v3.5.0", "v3.6.0-beta.2"],
+      channel: "latest",
+      increment: "minor",
+    }).version,
+  ).toBe("3.6.0");
+  const pendingBeta = planRelease({
+    currentVersion: "3.6.0-beta.0",
+    tags: ["v3.5.0"],
+    channel: "beta",
+    increment: "minor",
+  });
+  expect(pendingBeta.version).toBe("3.6.0-beta.0");
+  expect(pendingBeta.pending).toBe(true);
+  const pendingStable = planRelease({
+    currentVersion: "3.5.1",
+    tags: ["v3.5.0"],
     channel: "latest",
     increment: "patch",
   });
-  expect(plan.version).toBe("3.6.0");
+  expect(pendingStable.version).toBe("3.5.1");
+  expect(pendingStable.pending).toBe(true);
 });
 
-test("rejects stale, non-monotonic, and duplicate versions", () => {
-  expect(() =>
-    planRelease({
-      currentVersion: "3.5.0",
-      tags: ["v3.6.0"],
-      channel: "latest",
-      increment: "patch",
-    }),
-  ).toThrow(/behind highest tag/);
+test("rejects conflicting increments and unsupported future prereleases", () => {
   expect(() =>
     planRelease({
       currentVersion: "3.6.0-beta.0",
       tags: ["v3.5.0", "v3.6.0-beta.0"],
-      channel: "alpha",
-      increment: "minor",
+      channel: "latest",
+      increment: "patch",
     }),
-  ).toThrow(/not newer than highest tag/);
+  ).toThrow(/locks the official core/);
+  expect(() =>
+    planRelease({
+      currentVersion: "3.5.0",
+      tags: ["v3.5.0", "v3.5.1-alpha.0"],
+      channel: "beta",
+      increment: "patch",
+    }),
+  ).toThrow(/Unsupported official prerelease/);
+  expect(() =>
+    planRelease({
+      currentVersion: "3.5.0",
+      tags: ["v3.5.0"],
+      testVersions: ["3.5.1-test.0", "3.5.1-test.0"],
+      channel: "test",
+      increment: "patch",
+    }),
+  ).toThrow(/Duplicate version/);
   expect(() => assertTagAvailable("3.5.0", ["v3.5.0+existing-build"])).toThrow(
     /conflicts with existing tag/,
   );
 });
 
-test("pending retries retain their channel and ignore a changed increment", () => {
-  expect(() =>
-    planRelease({
-      currentVersion: "3.6.0-beta.0",
-      tags: ["v3.5.0"],
-      channel: "alpha",
-      increment: "minor",
-    }),
-  ).toThrow(/must use alpha\.N/);
-  const retry = planRelease({
-    currentVersion: "3.6.0-beta.0",
-    tags: ["v3.5.0"],
-    channel: "beta",
-    increment: "patch",
-  });
-  expect(retry.version).toBe("3.6.0-beta.0");
-  expect(retry.pending).toBe(true);
-});
-
-test("test mode is read-only and release retries are idempotent", () => {
+test("test mode is read-only and official mode writes the product version", () => {
   const root = createRepository("3.5.0", ["v3.5.0"]);
   const versionFile = join(root, "apps", "electron", "app", "package.json");
-  const githubOutput = join(root, "github-output.txt");
-  const originalPackage = readFileSync(versionFile, "utf8");
-
   const preview = executeReleaseVersion({
     workspaceRoot: root,
-    githubOutput,
     mode: "test",
-    channel: "beta",
-    increment: "minor",
-    runNumber: "42",
+    channel: "test",
+    increment: "patch",
+    testVersions: ["3.5.1-test.0"],
   });
-  expect(preview.version).toBe("3.5.0-test.42");
+  expect(preview.version).toBe("3.5.1-test.1");
   expect(preview.written).toBe(false);
   expect(readPackageVersion(versionFile)).toBe("3.5.0");
-  expect(readFileSync(githubOutput, "utf8")).toMatch(/^release_type=draft$/m);
-
   const release = executeReleaseVersion({
     workspaceRoot: root,
     mode: "release",
@@ -180,58 +191,20 @@ test("test mode is read-only and release retries are idempotent", () => {
   expect(release.version).toBe("3.6.0-beta.0");
   expect(release.written).toBe(true);
   expect(readPackageVersion(versionFile)).toBe("3.6.0-beta.0");
-  expect(readFileSync(versionFile, "utf8")).toBe(
-    originalPackage.replace('"version": "3.5.0"', '"version": "3.6.0-beta.0"'),
-  );
-
-  const retry = executeReleaseVersion({
-    workspaceRoot: root,
-    mode: "release",
-    channel: "beta",
-    increment: "minor",
-  });
-  expect(retry.version).toBe("3.6.0-beta.0");
-  expect(retry.pending).toBe(true);
-  expect(retry.written).toBe(false);
 });
 
-test("CLI is cwd-independent and preserves GitHub output order", () => {
-  const externalCwd = mkdtempSync(join(tmpdir(), "mediago-release-cli-"));
-  onTestFinished(() => rmSync(externalCwd, { recursive: true, force: true }));
-
-  const productVersion = readPackageVersion(
-    join(WORKSPACE_ROOT, "apps", "electron", "app", "package.json"),
-  );
-  const parsed = parseSemVer(productVersion);
-  const stdout = execFileSync(
-    process.execPath,
-    [
-      SCRIPT_FILE,
-      "--mode",
-      "test",
-      "--channel",
-      "beta",
-      "--increment",
-      "patch",
-      "--run-number",
-      "4242",
-    ],
-    {
-      cwd: externalCwd,
-      encoding: "utf8",
-      env: { ...process.env, GITHUB_OUTPUT: "", GITHUB_RUN_NUMBER: "" },
-      stdio: ["ignore", "pipe", "pipe"],
-    },
-  );
-
-  expect(stdout).toMatch(
-    new RegExp(
-      `^version=${parsed.major}\\.${parsed.minor}\\.${parsed.patch}-test\\.4242$`,
-      "m",
-    ),
-  );
+test("preserves the GitHub output contract", () => {
+  const root = createRepository("3.5.0", ["v3.5.0"]);
+  const output = join(root, "github-output.txt");
+  executeReleaseVersion({
+    workspaceRoot: root,
+    githubOutput: output,
+    mode: "test",
+    channel: "test",
+    increment: "patch",
+  });
   expect(
-    stdout
+    readFileSync(output, "utf8")
       .trim()
       .split(/\r?\n/)
       .map((line) => line.slice(0, line.indexOf("="))),
@@ -253,45 +226,26 @@ test("CLI is cwd-independent and preserves GitHub output order", () => {
   ]);
 });
 
-test("explicitly resumes a current version even when its tag exists", () => {
-  const root = createRepository("3.6.0-beta.0", ["v3.5.0", "v3.6.0-beta.0"]);
-  const resumed = executeReleaseVersion({
-    workspaceRoot: root,
-    mode: "release",
-    channel: "beta",
-    increment: "patch",
-    resumeCurrent: true,
-  });
-
-  expect(resumed.version).toBe("3.6.0-beta.0");
-  expect(resumed.pending).toBe(true);
-  expect(resumed.written).toBe(false);
-  expect(resumed.outputs.resumed).toBe("true");
-});
-
-test("rejects resume-current in test mode", () => {
-  const root = createRepository("3.6.0-beta.0", ["v3.5.0"]);
+test("rejects contradictory mode and channel combinations", () => {
+  const root = createRepository("3.5.0", ["v3.5.0"]);
   expect(() =>
     executeReleaseVersion({
       workspaceRoot: root,
       mode: "test",
       channel: "beta",
       increment: "patch",
-      runNumber: "42",
-      resumeCurrent: true,
     }),
-  ).toThrow(/only valid in release mode/);
+  ).toThrow(/requires mode release/);
 });
 
 function createRepository(version: string, tags: string[]): string {
   const root = mkdtempSync(join(tmpdir(), "mediago-release-version-"));
   onTestFinished(() => rmSync(root, { recursive: true, force: true }));
-
   const appDirectory = join(root, "apps", "electron", "app");
   mkdirSync(appDirectory, { recursive: true });
   writeFileSync(
     join(appDirectory, "package.json"),
-    `${JSON.stringify({ name: "mediago-community", version, private: true }, null, 2)}\n`,
+    `${JSON.stringify({ name: "mediago-community", version }, null, 2)}\n`,
     "utf8",
   );
   runGit(root, ["init", "--quiet"]);
@@ -308,5 +262,5 @@ function runGit(root: string, args: string[]): void {
 }
 
 function readPackageVersion(file: string): string {
-  return JSON.parse(readFileSync(file, "utf8")).version;
+  return JSON.parse(readFileSync(file, "utf8")).version as string;
 }

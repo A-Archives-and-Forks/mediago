@@ -77,6 +77,8 @@ const desktopRunAllowlist = {
         REQUESTED_VERSION: "${{ inputs.version }}",
         REQUESTED_CHANNEL: "${{ inputs.release_channel }}",
         REQUESTED_SOURCE_SHA: "${{ inputs.source_sha }}",
+        REQUESTED_TEST_RELEASE_ID: "${{ inputs.test_release_id }}",
+        REQUESTED_TEST_BUILD_TARGET: "${{ inputs.test_build_target }}",
       },
       run: "task ci:desktop:validate-request",
     },
@@ -89,6 +91,8 @@ const desktopRunAllowlist = {
         REQUESTED_VERSION: "${{ inputs.version }}",
         REQUESTED_CHANNEL: "${{ inputs.release_channel }}",
         REQUESTED_SOURCE_SHA: "${{ inputs.source_sha }}",
+        REQUESTED_TEST_RELEASE_ID: "${{ inputs.test_release_id }}",
+        REQUESTED_TEST_BUILD_TARGET: "${{ inputs.test_build_target }}",
       },
       run: "task ci:desktop:verify-source",
     },
@@ -103,7 +107,7 @@ const desktopRunAllowlist = {
       run: "task ci:desktop:artifact-prefix",
     },
   ],
-  build: [
+  build_release: [
     {
       name: "Apply build version",
       env: {
@@ -132,6 +136,52 @@ const desktopRunAllowlist = {
         APPLE_TEAM_ID:
           "${{ runner.os == 'macOS' && secrets.APPLE_TEAM_ID || '' }}",
       },
+    },
+  ],
+  build_test: [
+    {
+      name: "Apply private build version",
+      env: { BUILD_VERSION: "${{ inputs.version }}", RUN_MODE: "test" },
+      run: "task ci:desktop:apply-version",
+    },
+    { name: "Install dependencies", run: "task deps:node" },
+    {
+      name: "Download third-party dependencies",
+      run: "task deps:runtime",
+    },
+    {
+      name: "Build private desktop artifacts",
+      run: "task ci:desktop:release",
+      env: {
+        APP_TD_APPID: "",
+        CSC_LINK: "${{ runner.os == 'macOS' && secrets.CSC_LINK || '' }}",
+        CSC_KEY_PASSWORD:
+          "${{ runner.os == 'macOS' && secrets.CSC_KEY_PASSWORD || '' }}",
+        APPLE_ID: "${{ runner.os == 'macOS' && secrets.APPLE_ID || '' }}",
+        APPLE_APP_SPECIFIC_PASSWORD:
+          "${{ runner.os == 'macOS' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}",
+        APPLE_TEAM_ID:
+          "${{ runner.os == 'macOS' && secrets.APPLE_TEAM_ID || '' }}",
+      },
+    },
+    {
+      name: "Create private staging archive",
+      id: "stage",
+      env: { RUNNER_NAME: "${{ matrix.runner }}" },
+      run: "task ci:desktop:create-test-stage",
+    },
+    {
+      name: "Upload stage directly to private draft",
+      env: {
+        GH_TOKEN: "${{ github.token }}",
+        REPOSITORY: "${{ github.repository }}",
+        TEST_RELEASE_ID: "${{ inputs.test_release_id }}",
+        STAGE_ARCHIVE: "${{ steps.stage.outputs.archive }}",
+        SOURCE_SHA: "${{ needs.prepare.outputs.source_sha }}",
+        VERSION: "${{ inputs.version }}",
+        BUILD_TARGET: "${{ inputs.test_build_target }}",
+      },
+      run: "task ci:desktop:upload-test-stage",
     },
   ],
 } as const;
@@ -213,7 +263,9 @@ const releaseRunAllowlist = {
       shell: "bash",
       env: {
         GH_TOKEN: "${{ github.token }}",
-        RUN_MODE: "${{ inputs.run_mode }}",
+        RUN_MODE:
+          "${{ inputs.release_channel == 'test' && 'test' || 'release' }}",
+        RELEASE_CHANNEL: "${{ inputs.release_channel }}",
         BUILD_TARGET: "${{ inputs.build_target }}",
         SELECTED_REF: "${{ github.ref }}",
         SELECTED_SHA: "${{ github.sha }}",
@@ -224,7 +276,7 @@ const releaseRunAllowlist = {
     {
       name: "Detect unfinished GitHub Release",
       id: "release_state",
-      if: "inputs.run_mode == 'release'",
+      if: "inputs.release_channel != 'test'",
       shell: "bash",
       env: {
         GH_TOKEN: "${{ github.token }}",
@@ -235,11 +287,27 @@ const releaseRunAllowlist = {
       run: "task ci:release:detect-release-state",
     },
     {
-      name: "Calculate version",
-      id: "version",
+      name: "Reserve private test version",
+      id: "test_reservation",
+      if: "inputs.release_channel == 'test'",
       shell: "bash",
       env: {
-        RUN_MODE: "${{ inputs.run_mode }}",
+        GH_TOKEN: "${{ github.token }}",
+        RELEASE_CHANNEL: "${{ inputs.release_channel }}",
+        VERSION_INCREMENT: "${{ inputs.version_increment }}",
+        BUILD_TARGET: "${{ inputs.build_target }}",
+        SELECTED_SHA: "${{ github.sha }}",
+        REPOSITORY: "${{ github.repository }}",
+      },
+      run: "task ci:release:reserve-test-version",
+    },
+    {
+      name: "Calculate version",
+      id: "version",
+      if: "inputs.release_channel != 'test'",
+      shell: "bash",
+      env: {
+        RUN_MODE: "release",
         RELEASE_CHANNEL: "${{ inputs.release_channel }}",
         VERSION_INCREMENT: "${{ inputs.version_increment }}",
         RESUME_CURRENT: "${{ steps.release_state.outputs.resume || 'false' }}",
@@ -248,7 +316,7 @@ const releaseRunAllowlist = {
     },
     {
       name: "Commit official version",
-      if: "inputs.run_mode == 'release' && steps.version.outputs.written == 'true'",
+      if: "inputs.release_channel != 'test' && steps.version.outputs.written == 'true'",
       shell: "bash",
       env: {
         GH_TOKEN: "${{ github.token }}",
@@ -261,9 +329,10 @@ const releaseRunAllowlist = {
     {
       name: "Resolve build commit",
       id: "source",
+      if: "inputs.release_channel != 'test'",
       shell: "bash",
       env: {
-        RUN_MODE: "${{ inputs.run_mode }}",
+        RUN_MODE: "release",
         BUILD_TARGET: "${{ inputs.build_target }}",
         VERSION: "${{ steps.version.outputs.version }}",
         VERSION_FILE: "${{ steps.version.outputs.version_file }}",
@@ -278,23 +347,42 @@ const releaseRunAllowlist = {
       name: "Version summary",
       shell: "bash",
       env: {
-        RUN_MODE: "${{ inputs.run_mode }}",
+        RUN_MODE:
+          "${{ inputs.release_channel == 'test' && 'test' || 'release' }}",
         BUILD_TARGET: "${{ inputs.build_target }}",
-        VERSION: "${{ steps.version.outputs.version }}",
+        VERSION:
+          "${{ steps.test_reservation.outputs.version || steps.version.outputs.version }}",
         RELEASE_CHANNEL: "${{ inputs.release_channel }}",
-        SOURCE_SHA: "${{ steps.source.outputs.source_sha }}",
-        PENDING: "${{ steps.version.outputs.pending }}",
+        SOURCE_SHA:
+          "${{ steps.test_reservation.outputs.source_sha || steps.source.outputs.source_sha }}",
+        PENDING:
+          "${{ steps.test_reservation.outputs.pending || steps.version.outputs.pending }}",
       },
       run: "task ci:release:write-prepare-summary",
     },
   ],
   publish_desktop: [
     {
+      name: "Download private test stages",
+      id: "test_stages",
+      if: "inputs.release_channel == 'test'",
+      shell: "bash",
+      env: {
+        GH_TOKEN: "${{ github.token }}",
+        REPOSITORY: "${{ github.repository }}",
+        TEST_RELEASE_ID: "${{ needs.prepare.outputs.release_id }}",
+        VERSION: "${{ needs.prepare.outputs.version }}",
+        SOURCE_SHA: "${{ needs.prepare.outputs.source_sha }}",
+        BUILD_TARGET: "${{ inputs.build_target }}",
+      },
+      run: "task ci:release:download-test-stages",
+    },
+    {
       name: "Collect and validate release files",
+      if: "inputs.release_channel != 'test' || steps.test_stages.outputs.complete != 'true'",
       env: {
         VERSION: "${{ needs.prepare.outputs.version }}",
-        UPDATER_CHANNEL:
-          "${{ inputs.run_mode == 'test' && 'test' || inputs.release_channel }}",
+        UPDATER_CHANNEL: "${{ inputs.release_channel }}",
       },
       run: "task ci:release:collect-electron-artifacts",
     },
@@ -304,13 +392,16 @@ const releaseRunAllowlist = {
       shell: "bash",
       env: {
         GH_TOKEN: "${{ github.token }}",
-        RUN_MODE: "${{ inputs.run_mode }}",
+        RUN_MODE:
+          "${{ inputs.release_channel == 'test' && 'test' || 'release' }}",
         RELEASE_CHANNEL: "${{ inputs.release_channel }}",
         VERSION: "${{ needs.prepare.outputs.version }}",
         OFFICIAL_TAG: "${{ needs.prepare.outputs.tag }}",
         REPOSITORY: "${{ github.repository }}",
         SOURCE_SHA: "${{ needs.prepare.outputs.source_sha }}",
         SERVER_URL: "${{ github.server_url }}",
+        TEST_RELEASE_ID: "${{ needs.prepare.outputs.release_id }}",
+        BUILD_TARGET: "${{ inputs.build_target }}",
       },
       run: "task ci:release:publish-desktop",
     },
@@ -318,7 +409,8 @@ const releaseRunAllowlist = {
       name: "Release summary",
       shell: "bash",
       env: {
-        RUN_MODE: "${{ inputs.run_mode }}",
+        RUN_MODE:
+          "${{ inputs.release_channel == 'test' && 'test' || 'release' }}",
         VERSION: "${{ needs.prepare.outputs.version }}",
         TAG: "${{ steps.release.outputs.tag }}",
         URL: "${{ steps.release.outputs.url }}",
@@ -337,6 +429,22 @@ const releaseRunAllowlist = {
         SOURCE_SHA: "${{ needs.prepare.outputs.source_sha }}",
       },
       run: "task ci:release:tag-docker-release",
+    },
+  ],
+  record_test_docker: [
+    {
+      name: "Update private reservation",
+      env: {
+        GH_TOKEN: "${{ github.token }}",
+        REPOSITORY: "${{ github.repository }}",
+        TEST_RELEASE_ID: "${{ needs.prepare.outputs.release_id }}",
+        VERSION: "${{ needs.prepare.outputs.version }}",
+        SOURCE_SHA: "${{ needs.prepare.outputs.source_sha }}",
+        BUILD_TARGET: "${{ inputs.build_target }}",
+        IMAGE_REF: "${{ needs.docker.outputs.image_ref }}",
+        DIGEST: "${{ needs.docker.outputs.digest }}",
+      },
+      run: "task ci:release:record-test-docker",
     },
   ],
 } as const;
@@ -449,6 +557,29 @@ describe("build-electron.yml Task workflow contract", () => {
     });
   });
 
+  it("keeps private test stages out of GitHub Actions artifacts", () => {
+    const official = asRecord(
+      workflow.jobs.build_release,
+      "official desktop build",
+    );
+    const testBuild = asRecord(
+      workflow.jobs.build_test,
+      "private desktop build",
+    );
+    expect(JSON.stringify(official.steps)).toContain(
+      "actions/upload-artifact@v7",
+    );
+    expect(JSON.stringify(testBuild.steps)).not.toContain(
+      "actions/upload-artifact",
+    );
+    expect(JSON.stringify(testBuild.steps)).toContain(
+      "task ci:desktop:upload-test-stage",
+    );
+    expect(asRecord(testBuild.permissions, "test permissions").contents).toBe(
+      "write",
+    );
+  });
+
   it("routes desktop metadata and the install/download/release sequence through exact public Tasks", () => {
     expectTaskEntries(workflow, {
       prepare: [
@@ -456,11 +587,19 @@ describe("build-electron.yml Task workflow contract", () => {
         "task ci:desktop:verify-source",
         "task ci:desktop:artifact-prefix",
       ],
-      build: [
+      build_release: [
         "task ci:desktop:apply-version",
         "task deps:node",
         "task deps:runtime",
         "task ci:desktop:release",
+      ],
+      build_test: [
+        "task ci:desktop:apply-version",
+        "task deps:node",
+        "task deps:runtime",
+        "task ci:desktop:release",
+        "task ci:desktop:create-test-stage",
+        "task ci:desktop:upload-test-stage",
       ],
     });
   });
@@ -473,7 +612,7 @@ describe("build-electron.yml Task workflow contract", () => {
     expectRejectedRunMutations(
       workflow,
       desktopRunAllowlist,
-      "build",
+      "build_release",
       "task ci:desktop:release",
     );
   });
@@ -512,6 +651,21 @@ describe("build-server.yml Task workflow contract", () => {
 describe("release.yml Task workflow contract", () => {
   const workflow = loadWorkflow("release.yml");
 
+  it("exposes one channel input with exactly test, beta, and latest", () => {
+    const workflowDispatch = asRecord(
+      asRecord(workflow.definition.on, "release on").workflow_dispatch,
+      "release workflow_dispatch",
+    );
+    const inputs = asRecord(workflowDispatch.inputs, "release inputs");
+    expect(inputs).not.toHaveProperty("run_mode");
+    expect(
+      asRecord(inputs.release_channel, "release_channel").options,
+    ).toStrictEqual(["test", "beta", "latest"]);
+    expect(asRecord(inputs.release_channel, "release_channel").default).toBe(
+      "test",
+    );
+  });
+
   it("passes the standard macOS signing secrets to desktop builds", () => {
     const desktop = asRecord(workflow.jobs.desktop, "release desktop job");
     expect(asRecord(desktop.secrets, "release desktop secrets")).toMatchObject({
@@ -528,17 +682,20 @@ describe("release.yml Task workflow contract", () => {
       prepare: [
         "task ci:release:validate-request",
         "task ci:release:detect-release-state",
+        "task ci:release:reserve-test-version",
         "task ci:release:calculate-version",
         "task ci:release:commit-version",
         "task ci:release:resolve-source",
         "task ci:release:write-prepare-summary",
       ],
       publish_desktop: [
+        "task ci:release:download-test-stages",
         "task ci:release:collect-electron-artifacts",
         "task ci:release:publish-desktop",
         "task ci:release:write-desktop-summary",
       ],
       tag_docker_release: ["task ci:release:tag-docker-release"],
+      record_test_docker: ["task ci:release:record-test-docker"],
     });
   });
 

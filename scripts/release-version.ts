@@ -16,7 +16,7 @@ export {
   executeReleaseVersion,
   readGitTags,
 } from "./release-version/execute.ts";
-export { planRelease } from "./release-version/planning.ts";
+export { bumpCore, planRelease } from "./release-version/planning.ts";
 export {
   compareSemVer,
   formatSemVer,

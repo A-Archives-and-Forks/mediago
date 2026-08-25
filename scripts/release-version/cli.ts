@@ -23,7 +23,6 @@ function parseCliOptions(args: string[]): ExecuteReleaseVersionOptions {
     "channel",
     "increment",
     "resume-current",
-    "run-number",
     "workspace-root",
     "github-output",
   ]);
@@ -65,7 +64,6 @@ function parseCliOptions(args: string[]): ExecuteReleaseVersionOptions {
     channel: parseChoice("channel", values.channel, RELEASE_CHANNELS),
     increment: parseChoice("increment", values.increment, VERSION_INCREMENTS),
     resumeCurrent: resumeCurrent === "true",
-    runNumber: values["run-number"],
     workspaceRoot: values["workspace-root"],
     githubOutput: values["github-output"],
   };
@@ -73,10 +71,9 @@ function parseCliOptions(args: string[]): ExecuteReleaseVersionOptions {
 
 function printUsage(): void {
   process.stdout.write(`Usage:
-  node scripts/release-version.ts --mode <test|release> --channel <alpha|beta|latest> --increment <patch|minor|major>
+  node scripts/release-version.ts --mode <test|release> --channel <test|beta|latest> --increment <patch|minor|major>
 
 Options:
-  --run-number <number>    Required in test mode outside GitHub Actions
   --resume-current <bool>  Resume the current version after a draft failure
   --workspace-root <path>  Override repository root
   --github-output <path>   Append key=value outputs to this file

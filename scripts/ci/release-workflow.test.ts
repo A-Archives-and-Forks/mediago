@@ -2,8 +2,12 @@ import { expect, test } from "vitest";
 import {
   buildDesktopReleasePlan,
   chooseReleaseSource,
+  decideTestReservation,
   decideReleaseRecovery,
+  expectedTestStageAssets,
   findUniqueRelease,
+  formatTestReservationMarker,
+  parseTestReservation,
   resolveBuildTargets,
   selectOwnedRerunCommit,
   type GitHubReleaseRecord,
@@ -38,26 +42,136 @@ test("finds one Release by tag and rejects ambiguous state", () => {
 });
 
 test("builds an isolated draft plan for desktop tests", () => {
-  const version = "3.5.0-test.42";
+  const version = "3.5.1-test.0";
   const plan = buildDesktopReleasePlan({
     mode: "test",
-    channel: "beta",
+    channel: "test",
     version,
     officialTag: "unused",
     sourceSha: "a".repeat(40),
     runId: "1234",
   });
-  expect(plan.tag).toBe("desktop-test-1234");
+  expect(plan.tag).toBe("test-run-1234");
   expect(plan.title).toBe(version);
+  expect(plan.createArguments).toStrictEqual([]);
+});
+
+test("parses strict private test reservations and allocates per-core counters", () => {
+  const sourceSha = "a".repeat(40);
+  const first = {
+    schema: 1,
+    runId: "100",
+    sourceSha,
+    buildTarget: "all",
+    version: "3.5.1-test.0",
+  } as const;
+  const release: GitHubReleaseRecord = {
+    id: 10,
+    tag_name: "test-run-100",
+    name: first.version,
+    body: formatTestReservationMarker(first),
+    draft: true,
+    prerelease: true,
+    target_commitish: sourceSha,
+  };
+  expect(parseTestReservation(release)).toStrictEqual(first);
+  const decision = decideTestReservation({
+    releases: [release],
+    officialTags: ["v3.5.0"],
+    currentVersion: "3.5.0",
+    increment: "patch",
+    runId: "101",
+    sourceSha,
+    currentMasterSha: sourceSha,
+    buildTarget: "desktop",
+  });
+  expect(decision.action).toBe("create");
+  expect(decision.reservation.version).toBe("3.5.1-test.1");
+});
+
+test("reuses reservations and rejects changed rerun identity", () => {
+  const sourceSha = "b".repeat(40);
+  const reservation = {
+    schema: 1,
+    runId: "200",
+    sourceSha,
+    buildTarget: "docker",
+    version: "3.6.0-test.0",
+  } as const;
+  const release: GitHubReleaseRecord = {
+    id: 20,
+    tag_name: "test-run-200",
+    name: reservation.version,
+    body: formatTestReservationMarker(reservation),
+    draft: true,
+    prerelease: true,
+    target_commitish: sourceSha,
+  };
   expect(
-    plan.createArguments.filter((argument) => argument === "--title"),
-  ).toHaveLength(1);
-  expect(
-    plan.createArguments[plan.createArguments.indexOf("--title") + 1],
-  ).toBe(version);
-  expect(plan.createArguments.includes("--draft")).toBeTruthy();
-  expect(plan.createArguments.includes("--prerelease")).toBeTruthy();
-  expect(!plan.createArguments.includes("--generate-notes")).toBeTruthy();
+    decideTestReservation({
+      releases: [release],
+      officialTags: ["v3.5.0"],
+      currentVersion: "3.5.0",
+      increment: "minor",
+      runId: "200",
+      sourceSha,
+      currentMasterSha: "c".repeat(40),
+      buildTarget: "docker",
+      tagTarget: sourceSha,
+    }).action,
+  ).toBe("reuse");
+  expect(() =>
+    decideTestReservation({
+      releases: [release],
+      officialTags: ["v3.5.0"],
+      currentVersion: "3.5.0",
+      increment: "minor",
+      runId: "200",
+      sourceSha,
+      currentMasterSha: sourceSha,
+      buildTarget: "all",
+      tagTarget: sourceSha,
+    }),
+  ).toThrow(/build target changed/);
+  expect(() =>
+    decideTestReservation({
+      releases: [],
+      officialTags: ["v3.5.0"],
+      currentVersion: "3.5.0",
+      increment: "minor",
+      runId: "201",
+      sourceSha,
+      currentMasterSha: "c".repeat(40),
+      buildTarget: "all",
+    }),
+  ).toThrow(/Master advanced/);
+  const duplicate = {
+    ...release,
+    id: 21,
+    tag_name: "test-run-201",
+    body: formatTestReservationMarker({ ...reservation, runId: "201" }),
+  };
+  expect(() =>
+    decideTestReservation({
+      releases: [release, duplicate],
+      officialTags: ["v3.5.0"],
+      currentVersion: "3.5.0",
+      increment: "minor",
+      runId: "200",
+      sourceSha,
+      currentMasterSha: sourceSha,
+      buildTarget: "docker",
+      tagTarget: sourceSha,
+    }),
+  ).toThrow(/Duplicate test version/);
+});
+
+test("uses four unique private stage names", () => {
+  const names = expectedTestStageAssets("123");
+  expect(names).toHaveLength(4);
+  expect(new Set(names).size).toBe(4);
+  expect(names).toContain("test-stage-123-macos-15.tar.gz");
+  expect(names).toContain("test-stage-123-macos-15-intel.tar.gz");
 });
 
 test("marks only prerelease channels as prereleases", () => {

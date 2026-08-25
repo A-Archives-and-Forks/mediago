@@ -1,17 +1,9 @@
 name: Build & Release MediaGo
-run-name: ${{ inputs.run_mode == 'release' && 'Release' || 'Test' }} ${{ inputs.build_target }} (${{ inputs.release_channel }}, ${{ inputs.version_increment }})
+run-name: ${{ inputs.release_channel }} ${{ inputs.build_target }} (${{ inputs.version_increment }})
 
 on:
   workflow_dispatch:
     inputs:
-      run_mode:
-        description: "Test creates private/downloadable outputs; release publishes an official version"
-        required: true
-        type: choice
-        options:
-          - test
-          - release
-        default: test
       build_target:
         description: "What to build"
         required: true
@@ -22,14 +14,14 @@ on:
           - docker
         default: all
       release_channel:
-        description: "Official release channel (ignored when run mode is test)"
+        description: "Release channel and publication policy"
         required: true
         type: choice
         options:
-          - alpha
+          - test
           - beta
           - latest
-        default: beta
+        default: test
       version_increment:
         description: "Base version increment for a new official release line"
         required: true
@@ -54,19 +46,20 @@ jobs:
     permissions:
       contents: write
     outputs:
-      version: ${{ steps.version.outputs.version }}
-      tag: ${{ steps.version.outputs.tag }}
-      source_sha: ${{ steps.source.outputs.source_sha }}
-      release_type: ${{ steps.version.outputs.release_type }}
-      prerelease: ${{ steps.version.outputs.prerelease }}
-      pending: ${{ steps.version.outputs.pending }}
+      version: ${{ steps.test_reservation.outputs.version || steps.version.outputs.version }}
+      tag: ${{ steps.test_reservation.outputs.tag || steps.version.outputs.tag }}
+      source_sha: ${{ steps.test_reservation.outputs.source_sha || steps.source.outputs.source_sha }}
+      release_id: ${{ steps.test_reservation.outputs.release_id }}
+      release_type: ${{ steps.test_reservation.outputs.release_type || steps.version.outputs.release_type }}
+      prerelease: ${{ steps.test_reservation.outputs.prerelease || steps.version.outputs.prerelease }}
+      pending: ${{ steps.test_reservation.outputs.pending || steps.version.outputs.pending }}
       build_desktop: ${{ steps.targets.outputs.build_desktop }}
       build_docker: ${{ steps.targets.outputs.build_docker }}
     steps:
       - name: Check out selected source
         uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.run_mode == 'release' && 'master' || github.sha }}
+          ref: ${{ inputs.release_channel == 'test' && github.sha || 'master' }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -84,7 +77,8 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          RUN_MODE: ${{ inputs.run_mode }}
+          RUN_MODE: ${{ inputs.release_channel == 'test' && 'test' || 'release' }}
+          RELEASE_CHANNEL: ${{ inputs.release_channel }}
           BUILD_TARGET: ${{ inputs.build_target }}
           SELECTED_REF: ${{ github.ref }}
           SELECTED_SHA: ${{ github.sha }}
@@ -93,7 +87,7 @@ jobs:
 
       - name: Detect unfinished GitHub Release
         id: release_state
-        if: inputs.run_mode == 'release'
+        if: inputs.release_channel != 'test'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -102,18 +96,32 @@ jobs:
           REPOSITORY: ${{ github.repository }}
         run: task ci:release:detect-release-state
 
-      - name: Calculate version
-        id: version
+      - name: Reserve private test version
+        id: test_reservation
+        if: inputs.release_channel == 'test'
         shell: bash
         env:
-          RUN_MODE: ${{ inputs.run_mode }}
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_CHANNEL: ${{ inputs.release_channel }}
+          VERSION_INCREMENT: ${{ inputs.version_increment }}
+          BUILD_TARGET: ${{ inputs.build_target }}
+          SELECTED_SHA: ${{ github.sha }}
+          REPOSITORY: ${{ github.repository }}
+        run: task ci:release:reserve-test-version
+
+      - name: Calculate version
+        id: version
+        if: inputs.release_channel != 'test'
+        shell: bash
+        env:
+          RUN_MODE: release
           RELEASE_CHANNEL: ${{ inputs.release_channel }}
           VERSION_INCREMENT: ${{ inputs.version_increment }}
           RESUME_CURRENT: ${{ steps.release_state.outputs.resume || 'false' }}
         run: task ci:release:calculate-version
 
       - name: Commit official version
-        if: inputs.run_mode == 'release' && steps.version.outputs.written == 'true'
+        if: inputs.release_channel != 'test' && steps.version.outputs.written == 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -124,9 +132,10 @@ jobs:
 
       - name: Resolve build commit
         id: source
+        if: inputs.release_channel != 'test'
         shell: bash
         env:
-          RUN_MODE: ${{ inputs.run_mode }}
+          RUN_MODE: release
           BUILD_TARGET: ${{ inputs.build_target }}
           VERSION: ${{ steps.version.outputs.version }}
           VERSION_FILE: ${{ steps.version.outputs.version_file }}
@@ -139,12 +148,12 @@ jobs:
       - name: Version summary
         shell: bash
         env:
-          RUN_MODE: ${{ inputs.run_mode }}
+          RUN_MODE: ${{ inputs.release_channel == 'test' && 'test' || 'release' }}
           BUILD_TARGET: ${{ inputs.build_target }}
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ steps.test_reservation.outputs.version || steps.version.outputs.version }}
           RELEASE_CHANNEL: ${{ inputs.release_channel }}
-          SOURCE_SHA: ${{ steps.source.outputs.source_sha }}
-          PENDING: ${{ steps.version.outputs.pending }}
+          SOURCE_SHA: ${{ steps.test_reservation.outputs.source_sha || steps.source.outputs.source_sha }}
+          PENDING: ${{ steps.test_reservation.outputs.pending || steps.version.outputs.pending }}
         run: task ci:release:write-prepare-summary
 
   desktop:
@@ -152,13 +161,15 @@ jobs:
     needs: prepare
     if: needs.prepare.outputs.build_desktop == 'true'
     permissions:
-      contents: read
+      contents: write
     uses: ./.github/workflows/build-electron.yml
     with:
-      run_mode: ${{ inputs.run_mode }}
+      run_mode: ${{ inputs.release_channel == 'test' && 'test' || 'release' }}
       version: ${{ needs.prepare.outputs.version }}
       release_channel: ${{ inputs.release_channel }}
       source_sha: ${{ needs.prepare.outputs.source_sha }}
+      test_release_id: ${{ needs.prepare.outputs.release_id }}
+      test_build_target: ${{ inputs.build_target }}
     secrets:
       APP_TD_APPID: ${{ secrets.APP_TD_APPID }}
       CSC_LINK: ${{ secrets.CSC_LINK }}
@@ -176,7 +187,7 @@ jobs:
       packages: write
     uses: ./.github/workflows/build-server.yml
     with:
-      run_mode: ${{ inputs.run_mode }}
+      run_mode: ${{ inputs.release_channel == 'test' && 'test' || 'release' }}
       version: ${{ needs.prepare.outputs.version }}
       release_channel: ${{ inputs.release_channel }}
       source_sha: ${{ needs.prepare.outputs.source_sha }}
@@ -218,15 +229,30 @@ jobs:
           node-version: "24.14.0"
 
       - name: Download platform artifacts
+        if: inputs.release_channel != 'test'
         uses: actions/download-artifact@v8
         with:
           pattern: ${{ needs.desktop.outputs.artifact_prefix }}-*
           path: electron-artifacts
 
+      - name: Download private test stages
+        id: test_stages
+        if: inputs.release_channel == 'test'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          TEST_RELEASE_ID: ${{ needs.prepare.outputs.release_id }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          SOURCE_SHA: ${{ needs.prepare.outputs.source_sha }}
+          BUILD_TARGET: ${{ inputs.build_target }}
+        run: task ci:release:download-test-stages
+
       - name: Collect and validate release files
+        if: inputs.release_channel != 'test' || steps.test_stages.outputs.complete != 'true'
         env:
           VERSION: ${{ needs.prepare.outputs.version }}
-          UPDATER_CHANNEL: ${{ inputs.run_mode == 'test' && 'test' || inputs.release_channel }}
+          UPDATER_CHANNEL: ${{ inputs.release_channel }}
         run: task ci:release:collect-electron-artifacts
 
       - name: Create or update GitHub Release
@@ -234,19 +260,21 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          RUN_MODE: ${{ inputs.run_mode }}
+          RUN_MODE: ${{ inputs.release_channel == 'test' && 'test' || 'release' }}
           RELEASE_CHANNEL: ${{ inputs.release_channel }}
           VERSION: ${{ needs.prepare.outputs.version }}
           OFFICIAL_TAG: ${{ needs.prepare.outputs.tag }}
           REPOSITORY: ${{ github.repository }}
           SOURCE_SHA: ${{ needs.prepare.outputs.source_sha }}
           SERVER_URL: ${{ github.server_url }}
+          TEST_RELEASE_ID: ${{ needs.prepare.outputs.release_id }}
+          BUILD_TARGET: ${{ inputs.build_target }}
         run: task ci:release:publish-desktop
 
       - name: Release summary
         shell: bash
         env:
-          RUN_MODE: ${{ inputs.run_mode }}
+          RUN_MODE: ${{ inputs.release_channel == 'test' && 'test' || 'release' }}
           VERSION: ${{ needs.prepare.outputs.version }}
           TAG: ${{ steps.release.outputs.tag }}
           URL: ${{ steps.release.outputs.url }}
@@ -258,7 +286,7 @@ jobs:
       - prepare
       - docker
     if: >-
-      inputs.run_mode == 'release' &&
+      inputs.release_channel != 'test' &&
       inputs.build_target == 'docker' &&
       needs.prepare.result == 'success' &&
       needs.docker.result == 'success'
@@ -291,3 +319,45 @@ jobs:
           VERSION: ${{ needs.prepare.outputs.version }}
           SOURCE_SHA: ${{ needs.prepare.outputs.source_sha }}
         run: task ci:release:tag-docker-release
+
+  record_test_docker:
+    name: Record private Docker result
+    needs:
+      - prepare
+      - docker
+    if: >-
+      inputs.release_channel == 'test' &&
+      needs.prepare.result == 'success' &&
+      needs.docker.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Check out test source
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare.outputs.source_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: go-task/setup-task@v1
+        with:
+          version: "3.51.1"
+
+      - name: Install Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24.14.0"
+
+      - name: Update private reservation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          TEST_RELEASE_ID: ${{ needs.prepare.outputs.release_id }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          SOURCE_SHA: ${{ needs.prepare.outputs.source_sha }}
+          BUILD_TARGET: ${{ inputs.build_target }}
+          IMAGE_REF: ${{ needs.docker.outputs.image_ref }}
+          DIGEST: ${{ needs.docker.outputs.digest }}
+        run: task ci:release:record-test-docker

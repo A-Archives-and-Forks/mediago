@@ -16,8 +16,8 @@ test("validates versions against the selected Docker release mode and channel", 
   for (const input of [
     {
       runMode: "test",
-      version: "3.6.0-test.123",
-      releaseChannel: "beta",
+      version: "3.6.0-test.0",
+      releaseChannel: "test",
       sourceSha: SHA,
     },
     {
@@ -28,8 +28,8 @@ test("validates versions against the selected Docker release mode and channel", 
     },
     {
       runMode: "release",
-      version: "3.6.0-alpha.1",
-      releaseChannel: "alpha",
+      version: "3.6.0-beta.1",
+      releaseChannel: "beta",
       sourceSha: SHA.toUpperCase(),
     },
   ]) {
@@ -48,7 +48,7 @@ test("validates versions against the selected Docker release mode and channel", 
     validateDockerWorkflowInputs({
       runMode: "test",
       version: "3.6.0",
-      releaseChannel: "beta",
+      releaseChannel: "test",
       sourceSha: "short",
     }),
   ).toThrow(/source_sha must be a full 40-character commit SHA/);
@@ -58,8 +58,8 @@ test("resolves isolated test and versioned release image parameters", () => {
   expect(
     resolveDockerParameters({
       runMode: "test",
-      version: "3.6.0-test.123",
-      releaseChannel: "beta",
+      version: "3.6.0-test.0",
+      releaseChannel: "test",
       sourceSha: SHA.toUpperCase(),
       repositoryOwner: "MediaGo-Dev",
       runId: "98765",
@@ -69,8 +69,8 @@ test("resolves isolated test and versioned release image parameters", () => {
     }),
   ).toStrictEqual({
     image: "ghcr.io/mediago-dev/mediago-preview",
-    tag: "test-98765-0123456789ab",
-    imageRef: "ghcr.io/mediago-dev/mediago-preview:test-98765-0123456789ab",
+    tag: "3.6.0-test.0",
+    imageRef: "ghcr.io/mediago-dev/mediago-preview:3.6.0-test.0",
     sourceSha: SHA,
     dockerHubImage: "docker.io/caorushizi/mediago",
   });
@@ -171,16 +171,16 @@ test("accepts only a private or explicitly missing preview package", async () =>
 test("renders the Docker job summary including all published tags", () => {
   const summary = buildDockerSummary({
     runMode: "test",
-    releaseChannel: "beta",
-    version: "3.6.0-test.123",
+    releaseChannel: "test",
+    version: "3.6.0-test.0",
     sourceSha: SHA,
     digest: "sha256:abc",
-    tags: ["ghcr.io/mediago-dev/mediago-preview:test-1-0123456789ab", ""],
-    imageRef: "ghcr.io/mediago-dev/mediago-preview:test-1-0123456789ab",
+    tags: ["ghcr.io/mediago-dev/mediago-preview:3.6.0-test.0", ""],
+    imageRef: "ghcr.io/mediago-dev/mediago-preview:3.6.0-test.0",
   });
   expect(summary).toMatch(/Docker image published/);
   expect(summary).toMatch(/sha256:abc/);
-  expect(summary).toMatch(/mediago-preview:test-1-0123456789ab/);
+  expect(summary).toMatch(/mediago-preview:3\.6\.0-test\.0/);
   expect(summary).toMatch(/Keep the `mediago-preview` GHCR package private/);
 });
 

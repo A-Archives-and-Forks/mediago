@@ -1,5 +1,5 @@
 export const RELEASE_MODES = ["test", "release"] as const;
-export const RELEASE_CHANNELS = ["alpha", "beta", "latest"] as const;
+export const RELEASE_CHANNELS = ["test", "beta", "latest"] as const;
 export const VERSION_INCREMENTS = ["patch", "minor", "major"] as const;
 
 export type ReleaseMode = (typeof RELEASE_MODES)[number];
@@ -17,6 +17,7 @@ export interface ParsedSemVer {
 export interface ReleasePlanInput {
   currentVersion: string;
   tags: readonly string[];
+  testVersions?: readonly string[];
   channel: ReleaseChannel;
   increment: VersionIncrement;
 }
@@ -28,6 +29,7 @@ export interface ReleasePlan {
   baseVersion: string | null;
   changed: boolean;
   pending: boolean;
+  resumed: boolean;
 }
 
 export interface ExecuteReleaseVersionOptions {
@@ -35,10 +37,10 @@ export interface ExecuteReleaseVersionOptions {
   channel: ReleaseChannel;
   increment: VersionIncrement;
   resumeCurrent?: boolean;
-  runNumber?: string;
   workspaceRoot?: string;
   githubOutput?: string;
   tags?: readonly string[];
+  testVersions?: readonly string[];
 }
 
 export interface ReleaseVersionResult extends ReleasePlan {

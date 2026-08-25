@@ -6,11 +6,7 @@ import type {
   ExecuteReleaseVersionOptions,
   ReleaseVersionResult,
 } from "./contracts.ts";
-import {
-  planRelease,
-  planResumedRelease,
-  planTestRelease,
-} from "./planning.ts";
+import { planRelease, planResumedRelease } from "./planning.ts";
 import { parseSemVer } from "./semver.ts";
 
 const PRODUCT_VERSION_FILE = "apps/electron/app/package.json";
@@ -114,6 +110,12 @@ export function executeReleaseVersion(
   if (options.resumeCurrent && options.mode !== "release") {
     throw new Error("resume-current is only valid in release mode");
   }
+  const expectedMode = options.channel === "test" ? "test" : "release";
+  if (options.mode !== expectedMode) {
+    throw new Error(
+      `Channel ${options.channel} requires mode ${expectedMode}; received ${options.mode}`,
+    );
+  }
 
   const workspaceRoot = resolve(
     options.workspaceRoot ?? DEFAULT_WORKSPACE_ROOT,
@@ -123,17 +125,13 @@ export function executeReleaseVersion(
   const currentVersion = readProductVersion(source, versionFile);
   const plan = options.resumeCurrent
     ? planResumedRelease(currentVersion, options.channel)
-    : options.mode === "test"
-      ? planTestRelease(
-          currentVersion,
-          options.runNumber ?? process.env.GITHUB_RUN_NUMBER,
-        )
-      : planRelease({
-          currentVersion,
-          tags: options.tags ? [...options.tags] : readGitTags(workspaceRoot),
-          channel: options.channel,
-          increment: options.increment,
-        });
+    : planRelease({
+        currentVersion,
+        tags: options.tags ? [...options.tags] : readGitTags(workspaceRoot),
+        testVersions: options.testVersions,
+        channel: options.channel,
+        increment: options.increment,
+      });
 
   let written = false;
   if (options.mode === "release" && plan.changed) {
@@ -168,7 +166,7 @@ export function executeReleaseVersion(
     changed: String(plan.changed),
     written: String(written),
     pending: String(plan.pending),
-    resumed: String(options.resumeCurrent === true),
+    resumed: String(options.resumeCurrent === true || plan.resumed),
     version_file: PRODUCT_VERSION_FILE,
   };
 

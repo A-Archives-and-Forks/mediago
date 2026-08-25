@@ -136,6 +136,8 @@ const publicTasks = [
   "ci:desktop:verify-source",
   "ci:desktop:artifact-prefix",
   "ci:desktop:apply-version",
+  "ci:desktop:create-test-stage",
+  "ci:desktop:upload-test-stage",
   "ci:desktop:release",
   "ci:docker:validate-inputs",
   "ci:docker:resolve-parameters",
@@ -145,12 +147,15 @@ const publicTasks = [
   "ci:docker:write-summary",
   "ci:release:validate-request",
   "ci:release:detect-release-state",
+  "ci:release:reserve-test-version",
   "ci:release:calculate-version",
   "ci:release:commit-version",
   "ci:release:resolve-source",
   "ci:release:write-prepare-summary",
   "ci:release:collect-electron-artifacts",
+  "ci:release:download-test-stages",
   "ci:release:publish-desktop",
+  "ci:release:record-test-docker",
   "ci:release:write-desktop-summary",
   "ci:release:tag-docker-release",
 ] as const;
@@ -393,6 +398,14 @@ const implementationGraph = {
     deps: [],
     leaves: ["node scripts/ci/desktop-workflow.ts apply-version"],
   },
+  "internal:ci:desktop:create-test-stage": {
+    deps: [],
+    leaves: ["node scripts/ci/desktop-workflow.ts create-test-stage"],
+  },
+  "internal:ci:desktop:upload-test-stage": {
+    deps: [],
+    leaves: ["node scripts/ci/desktop-workflow.ts upload-test-stage"],
+  },
   "internal:ci:desktop:release": {
     deps: [
       "internal:deps:node",
@@ -433,6 +446,10 @@ const implementationGraph = {
     deps: [],
     leaves: ["node scripts/ci/release-workflow.ts detect-release-state"],
   },
+  "internal:ci:release:reserve-test-version": {
+    deps: [],
+    leaves: ["node scripts/ci/release-workflow.ts reserve-test-version"],
+  },
   "internal:ci:release:calculate-version": {
     deps: [],
     leaves: ["node scripts/ci/release-workflow.ts calculate-version"],
@@ -455,9 +472,17 @@ const implementationGraph = {
       'node scripts/collect-electron-artifacts.ts electron-artifacts release-files "$VERSION" "$UPDATER_CHANNEL"',
     ],
   },
+  "internal:ci:release:download-test-stages": {
+    deps: [],
+    leaves: ["node scripts/ci/release-workflow.ts download-test-stages"],
+  },
   "internal:ci:release:publish-desktop": {
     deps: [],
     leaves: ["node scripts/ci/release-workflow.ts publish-desktop"],
+  },
+  "internal:ci:release:record-test-docker": {
+    deps: [],
+    leaves: ["node scripts/ci/release-workflow.ts record-test-docker"],
   },
   "internal:ci:release:write-desktop-summary": {
     deps: [],
@@ -522,6 +547,8 @@ const metadataWorkflowTasks = [
   "internal:ci:desktop:verify-source",
   "internal:ci:desktop:artifact-prefix",
   "internal:ci:desktop:apply-version",
+  "internal:ci:desktop:create-test-stage",
+  "internal:ci:desktop:upload-test-stage",
   "internal:ci:docker:validate-inputs",
   "internal:ci:docker:resolve-parameters",
   "internal:ci:docker:verify-preview-private",
@@ -530,12 +557,15 @@ const metadataWorkflowTasks = [
   "internal:ci:docker:write-summary",
   "internal:ci:release:validate-request",
   "internal:ci:release:detect-release-state",
+  "internal:ci:release:reserve-test-version",
   "internal:ci:release:calculate-version",
   "internal:ci:release:commit-version",
   "internal:ci:release:resolve-source",
   "internal:ci:release:write-prepare-summary",
   "internal:ci:release:collect-electron-artifacts",
+  "internal:ci:release:download-test-stages",
   "internal:ci:release:publish-desktop",
+  "internal:ci:release:record-test-docker",
   "internal:ci:release:write-desktop-summary",
   "internal:ci:release:tag-docker-release",
 ] as const;
