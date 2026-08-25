@@ -7,6 +7,7 @@ import {
   expectedTestStageAssets,
   findUniqueRelease,
   formatTestReservationMarker,
+  mergeCreatedRelease,
   parseTestReservation,
   resolveBuildTargets,
   selectOwnedRerunCommit,
@@ -87,6 +88,40 @@ test("parses strict private test reservations and allocates per-core counters", 
   });
   expect(decision.action).toBe("create");
   expect(decision.reservation.version).toBe("3.5.1-test.1");
+});
+
+test("uses the create response while the Release listing is temporarily stale", () => {
+  const sourceSha = "a".repeat(40);
+  const reservation = {
+    schema: 1,
+    runId: "102",
+    sourceSha,
+    buildTarget: "all",
+    version: "3.5.1-test.0",
+  } as const;
+  const created: GitHubReleaseRecord = {
+    id: 102,
+    tag_name: "test-run-102",
+    name: reservation.version,
+    body: formatTestReservationMarker(reservation),
+    draft: true,
+    prerelease: true,
+    target_commitish: sourceSha,
+  };
+
+  const releases = mergeCreatedRelease([], created);
+  expect(
+    decideTestReservation({
+      releases,
+      officialTags: ["v3.5.0"],
+      currentVersion: "3.5.0",
+      increment: "patch",
+      runId: reservation.runId,
+      sourceSha,
+      currentMasterSha: sourceSha,
+      buildTarget: reservation.buildTarget,
+    }),
+  ).toMatchObject({ action: "reuse", release: created, reservation });
 });
 
 test("reuses reservations and rejects changed rerun identity", () => {

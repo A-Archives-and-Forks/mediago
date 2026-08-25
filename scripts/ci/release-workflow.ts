@@ -319,51 +319,65 @@ function listGitHubReleases(repository: string): GitHubReleaseRecord[] {
     "--jq",
     ".[] | {id, tag_name, name, body, draft, prerelease, target_commitish, upload_url, html_url}",
   ]);
-  const releases: GitHubReleaseRecord[] = [];
-  for (const line of response.split(/\r?\n/).filter(Boolean)) {
-    let entry: unknown;
-    try {
-      entry = JSON.parse(line);
-    } catch {
-      throw new Error("GitHub returned invalid JSON while listing Releases");
-    }
-    if (
-      typeof entry !== "object" ||
-      entry === null ||
-      !("id" in entry) ||
-      typeof entry.id !== "number" ||
-      !("tag_name" in entry) ||
-      typeof entry.tag_name !== "string" ||
-      !("draft" in entry) ||
-      typeof entry.draft !== "boolean" ||
-      !("target_commitish" in entry) ||
-      typeof entry.target_commitish !== "string" ||
-      !("prerelease" in entry) ||
-      typeof entry.prerelease !== "boolean"
-    ) {
-      throw new Error("GitHub Release listing contained an invalid record");
-    }
-    releases.push({
-      id: entry.id,
-      tag_name: entry.tag_name,
-      name:
-        "name" in entry && typeof entry.name === "string" ? entry.name : null,
-      body:
-        "body" in entry && typeof entry.body === "string" ? entry.body : null,
-      draft: entry.draft,
-      prerelease: entry.prerelease,
-      target_commitish: entry.target_commitish,
-      upload_url:
-        "upload_url" in entry && typeof entry.upload_url === "string"
-          ? entry.upload_url
-          : undefined,
-      html_url:
-        "html_url" in entry && typeof entry.html_url === "string"
-          ? entry.html_url
-          : undefined,
-    });
+  return response
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((line) => parseGitHubReleaseResponse(line, "Release listing"));
+}
+
+function parseGitHubReleaseResponse(
+  response: string,
+  context: string,
+): GitHubReleaseRecord {
+  let entry: unknown;
+  try {
+    entry = JSON.parse(response);
+  } catch {
+    throw new Error(`GitHub returned invalid JSON for ${context}`);
   }
-  return releases;
+  if (
+    typeof entry !== "object" ||
+    entry === null ||
+    !("id" in entry) ||
+    typeof entry.id !== "number" ||
+    !("tag_name" in entry) ||
+    typeof entry.tag_name !== "string" ||
+    !("draft" in entry) ||
+    typeof entry.draft !== "boolean" ||
+    !("target_commitish" in entry) ||
+    typeof entry.target_commitish !== "string" ||
+    !("prerelease" in entry) ||
+    typeof entry.prerelease !== "boolean"
+  ) {
+    throw new Error(`GitHub ${context} contained an invalid Release record`);
+  }
+  return {
+    id: entry.id,
+    tag_name: entry.tag_name,
+    name: "name" in entry && typeof entry.name === "string" ? entry.name : null,
+    body: "body" in entry && typeof entry.body === "string" ? entry.body : null,
+    draft: entry.draft,
+    prerelease: entry.prerelease,
+    target_commitish: entry.target_commitish,
+    upload_url:
+      "upload_url" in entry && typeof entry.upload_url === "string"
+        ? entry.upload_url
+        : undefined,
+    html_url:
+      "html_url" in entry && typeof entry.html_url === "string"
+        ? entry.html_url
+        : undefined,
+  };
+}
+
+export function mergeCreatedRelease(
+  releases: readonly GitHubReleaseRecord[],
+  created: GitHubReleaseRecord,
+): GitHubReleaseRecord[] {
+  if (created.id === undefined) {
+    throw new Error("Created GitHub Release has no ID");
+  }
+  return [...releases.filter((release) => release.id !== created.id), created];
 }
 
 export function resolveBuildTargets(target: BuildTarget): {
@@ -874,8 +888,9 @@ function reserveTestVersion(): void {
   });
 
   if (decision.action === "create") {
+    let createdRelease: GitHubReleaseRecord | undefined;
     try {
-      createTestDraftRelease(
+      createdRelease = createTestDraftRelease(
         repository,
         technicalTag,
         sourceSha,
@@ -896,7 +911,10 @@ function reserveTestVersion(): void {
         );
       }
     }
-    releases = listGitHubReleases(repository);
+    const listedReleases = listGitHubReleases(repository);
+    releases = createdRelease
+      ? mergeCreatedRelease(listedReleases, createdRelease)
+      : listedReleases;
     tagTarget = resolveRemoteTagTarget(technicalTag, token);
     decision = decideTestReservation({
       releases,
@@ -910,8 +928,9 @@ function reserveTestVersion(): void {
       tagTarget,
     });
     if (decision.action === "create" && decision.existingTag) {
+      let createdReleaseForExistingTag: GitHubReleaseRecord | undefined;
       try {
-        createTestDraftRelease(
+        createdReleaseForExistingTag = createTestDraftRelease(
           repository,
           technicalTag,
           sourceSha,
@@ -921,7 +940,10 @@ function reserveTestVersion(): void {
         releases = listGitHubReleases(repository);
         if (!findUniqueRelease(releases, technicalTag)) throw error;
       }
-      releases = listGitHubReleases(repository);
+      const refreshedReleases = listGitHubReleases(repository);
+      releases = createdReleaseForExistingTag
+        ? mergeCreatedRelease(refreshedReleases, createdReleaseForExistingTag)
+        : refreshedReleases;
       tagTarget = resolveRemoteTagTarget(technicalTag, token);
       decision = decideTestReservation({
         releases,
@@ -975,8 +997,8 @@ function createTestDraftRelease(
   technicalTag: string,
   sourceSha: string,
   reservation: TestReservation,
-): void {
-  gh([
+): GitHubReleaseRecord {
+  const response = gh([
     "api",
     "--method",
     "POST",
@@ -993,7 +1015,10 @@ function createTestDraftRelease(
     "draft=true",
     "-F",
     "prerelease=true",
+    "--jq",
+    "{id, tag_name, name, body, draft, prerelease, target_commitish, upload_url, html_url}",
   ]);
+  return parseGitHubReleaseResponse(response, "create Release response");
 }
 
 function resolveRemoteTagTarget(
