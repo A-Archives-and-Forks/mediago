@@ -288,7 +288,7 @@ jobs:
       - name: Create private staging archive
         id: stage
         env:
-          RUNNER_NAME: ${{ matrix.runner }}
+          DESKTOP_RUNNER: ${{ matrix.runner }}
         run: task ci:desktop:create-test-stage
 
       - name: Upload stage directly to private draft

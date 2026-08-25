@@ -167,7 +167,7 @@ const desktopRunAllowlist = {
     {
       name: "Create private staging archive",
       id: "stage",
-      env: { RUNNER_NAME: "${{ matrix.runner }}" },
+      env: { DESKTOP_RUNNER: "${{ matrix.runner }}" },
       run: "task ci:desktop:create-test-stage",
     },
     {

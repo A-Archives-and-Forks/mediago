@@ -512,7 +512,7 @@ function runCommand(command: string | undefined): void {
   if (command === "create-test-stage") {
     const archive = createTestStageArchive({
       runId: requiredEnvironment("GITHUB_RUN_ID"),
-      runner: requiredEnvironment("RUNNER_NAME"),
+      runner: requiredEnvironment("DESKTOP_RUNNER"),
     });
     appendGithubOutput(
       "archive",
