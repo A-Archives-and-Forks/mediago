@@ -416,6 +416,20 @@ export function formatTestReservationMarker(
   return `<!-- mediago-test-reservation:${JSON.stringify(reservation)} -->`;
 }
 
+export function testDraftReleaseIdentityArguments(
+  reservation: TestReservation,
+): string[] {
+  validateTestReservation(reservation);
+  return [
+    "-f",
+    `tag_name=test-run-${reservation.runId}`,
+    "-f",
+    `target_commitish=${reservation.sourceSha}`,
+    "-f",
+    `name=${reservation.version}`,
+  ];
+}
+
 export function parseTestReservation(
   release: GitHubReleaseRecord,
 ): TestReservation | undefined {
@@ -890,12 +904,7 @@ function reserveTestVersion(): void {
   if (decision.action === "create") {
     let createdRelease: GitHubReleaseRecord | undefined;
     try {
-      createdRelease = createTestDraftRelease(
-        repository,
-        technicalTag,
-        sourceSha,
-        decision.reservation,
-      );
+      createdRelease = createTestDraftRelease(repository, decision.reservation);
     } catch (error) {
       process.stderr.write(
         `[release-workflow] Create Release returned an ambiguous failure; reconciling ${technicalTag}\n`,
@@ -932,8 +941,6 @@ function reserveTestVersion(): void {
       try {
         createdReleaseForExistingTag = createTestDraftRelease(
           repository,
-          technicalTag,
-          sourceSha,
           decision.reservation,
         );
       } catch (error) {
@@ -994,8 +1001,6 @@ function reserveTestVersion(): void {
 
 function createTestDraftRelease(
   repository: string,
-  technicalTag: string,
-  sourceSha: string,
   reservation: TestReservation,
 ): GitHubReleaseRecord {
   const response = gh([
@@ -1003,12 +1008,7 @@ function createTestDraftRelease(
     "--method",
     "POST",
     `repos/${repository}/releases`,
-    "-f",
-    `tag_name=${technicalTag}`,
-    "-f",
-    `target_commitish=${sourceSha}`,
-    "-f",
-    `name=${reservation.version}`,
+    ...testDraftReleaseIdentityArguments(reservation),
     "-f",
     `body=${formatTestReservationMarker(reservation)}`,
     "-F",
@@ -1807,6 +1807,7 @@ function recordTestDocker(): void {
     "--method",
     "PATCH",
     `repos/${repository}/releases/${releaseId}`,
+    ...testDraftReleaseIdentityArguments(reservation),
     "-f",
     `body=${body}`,
     "-F",

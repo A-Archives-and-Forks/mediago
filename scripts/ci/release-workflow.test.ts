@@ -11,6 +11,7 @@ import {
   parseTestReservation,
   resolveBuildTargets,
   selectOwnedRerunCommit,
+  testDraftReleaseIdentityArguments,
   type GitHubReleaseRecord,
 } from "./release-workflow.ts";
 
@@ -122,6 +123,25 @@ test("uses the create response while the Release listing is temporarily stale", 
       buildTarget: reservation.buildTarget,
     }),
   ).toMatchObject({ action: "reuse", release: created, reservation });
+});
+
+test("preserves test Release identity whenever a draft is updated", () => {
+  const reservation = {
+    schema: 1,
+    runId: "103",
+    sourceSha: "a".repeat(40),
+    buildTarget: "all",
+    version: "3.5.1-test.0",
+  } as const;
+
+  expect(testDraftReleaseIdentityArguments(reservation)).toStrictEqual([
+    "-f",
+    "tag_name=test-run-103",
+    "-f",
+    `target_commitish=${reservation.sourceSha}`,
+    "-f",
+    "name=3.5.1-test.0",
+  ]);
 });
 
 test("reuses reservations and rejects changed rerun identity", () => {
