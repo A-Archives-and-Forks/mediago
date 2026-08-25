@@ -24,7 +24,7 @@ function isJavaScriptEntrypoint(
   filename: string,
   pathApi: PlatformPath,
 ): boolean {
-  return pathApi.isAbsolute(filename) && /\.(?:c)?js$/i.test(filename);
+  return pathApi.isAbsolute(filename) && /\.(?:[cm]?js)$/i.test(filename);
 }
 
 async function resolveJavaScriptEntrypoint(
@@ -62,6 +62,7 @@ async function resolveJavaScriptEntrypoint(
   ];
   const adjacentCandidates = directories.flatMap((directory) => [
     pathApi.join(directory, "node_modules", "pnpm", "bin", "pnpm.cjs"),
+    pathApi.join(directory, "node_modules", "pnpm", "bin", "pnpm.mjs"),
     pathApi.join(directory, "node_modules", "corepack", "dist", "pnpm.js"),
     pathApi.join(
       directory,
@@ -71,6 +72,15 @@ async function resolveJavaScriptEntrypoint(
       "pnpm",
       "bin",
       "pnpm.cjs",
+    ),
+    pathApi.join(
+      directory,
+      "..",
+      "lib",
+      "node_modules",
+      "pnpm",
+      "bin",
+      "pnpm.mjs",
     ),
   ]);
   for (const adjacentCandidate of new Set(adjacentCandidates)) {
@@ -112,12 +122,20 @@ function isPnpmSelfUpdateEntrypoint(
     /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(
       version ?? "",
     ) &&
-    ["node_modules/pnpm/bin/pnpm.cjs", "bin/pnpm.cjs"].includes(suffix);
+    [
+      "node_modules/pnpm/bin/pnpm.cjs",
+      "node_modules/pnpm/bin/pnpm.mjs",
+      "bin/pnpm.cjs",
+      "bin/pnpm.mjs",
+    ].includes(suffix);
   const isolatedGlobalEntrypoint =
     names[0] === "global" &&
     names[1] === "v11" &&
     /^[0-9A-Za-z][0-9A-Za-z._-]{0,127}$/.test(segments[2] ?? "") &&
-    suffix === "node_modules/pnpm/bin/pnpm.cjs";
+    [
+      "node_modules/pnpm/bin/pnpm.cjs",
+      "node_modules/pnpm/bin/pnpm.mjs",
+    ].includes(suffix);
   const isolatedStoreEntrypoint =
     names[0] === "store" &&
     names[1] === "v11" &&
@@ -128,7 +146,10 @@ function isPnpmSelfUpdateEntrypoint(
       segments[5] ?? "",
     ) &&
     /^[0-9a-f]{64}$/i.test(segments[6] ?? "") &&
-    names.slice(7).join("/") === "node_modules/pnpm/bin/pnpm.cjs";
+    [
+      "node_modules/pnpm/bin/pnpm.cjs",
+      "node_modules/pnpm/bin/pnpm.mjs",
+    ].includes(names.slice(7).join("/"));
   return toolsEntrypoint || isolatedGlobalEntrypoint || isolatedStoreEntrypoint;
 }
 
@@ -150,7 +171,7 @@ export async function resolvePnpmEntrypoint(options: {
     );
     if (!entrypoint) {
       throw new Error(
-        `npm_execpath must resolve to a regular .js or .cjs pnpm entrypoint: ${npmExecPath}`,
+        `npm_execpath must resolve to a regular .js, .cjs, or .mjs pnpm entrypoint: ${npmExecPath}`,
       );
     }
     return entrypoint;
@@ -178,7 +199,7 @@ export async function resolvePnpmEntrypoint(options: {
   }
 
   throw new Error(
-    "Unable to resolve a regular pnpm .js/.cjs entrypoint from npm_execpath, PATH, or PNPM_HOME",
+    "Unable to resolve a regular pnpm .js/.cjs/.mjs entrypoint from npm_execpath, PATH, or PNPM_HOME",
   );
 }
 
@@ -196,7 +217,7 @@ export function createPnpmLauncher(options: {
   }
   if (!isJavaScriptEntrypoint(options.entrypoint, pathApi)) {
     throw new Error(
-      `pnpm entrypoint must be an absolute .js or .cjs file: ${options.entrypoint}`,
+      `pnpm entrypoint must be an absolute .js, .cjs, or .mjs file: ${options.entrypoint}`,
     );
   }
   return {
@@ -215,7 +236,7 @@ export async function probePnpmPath(
     return {
       isFile,
       realPath,
-      ...(isFile && !/\.(?:c)?js$/i.test(realPath)
+      ...(isFile && !/\.(?:[cm]?js)$/i.test(realPath)
         ? { shimTarget: await readPnpmShimTarget(realPath) }
         : {}),
     };

@@ -183,7 +183,7 @@ describe("bundle environment pnpm runtime", () => {
     expect(candidates).toContain(declaredEntrypoint);
   });
 
-  it("resolves the pnpm/action-setup v6 isolated global shim target", async () => {
+  it("resolves the pnpm/action-setup v6 pnpm 11 MJS shim target", async () => {
     const root = await fs.mkdtemp(
       path.join(os.tmpdir(), "mediago-action-setup-global-pnpm-"),
     );
@@ -197,7 +197,7 @@ describe("bundle environment pnpm runtime", () => {
       "node_modules",
       "pnpm",
       "bin",
-      "pnpm.cjs",
+      "pnpm.mjs",
     );
     const storeEntrypoint = path.join(
       pnpmHome,
@@ -206,12 +206,12 @@ describe("bundle environment pnpm runtime", () => {
       "links",
       "@",
       "pnpm",
-      "10.15.0",
+      "11.23.0",
       "359dc289e609e4780d0691c6504a31a5071af210f72dae21e58856578c7ee4bf",
       "node_modules",
       "pnpm",
       "bin",
-      "pnpm.cjs",
+      "pnpm.mjs",
     );
     const shim = path.join(shimDirectory, "pnpm");
     try {
