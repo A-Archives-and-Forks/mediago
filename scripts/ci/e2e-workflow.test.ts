@@ -85,8 +85,13 @@ function assertE2EWorkflowContract(workflowContents: string) {
   expect(e2eJob).toContain("name: Test three-surface Playwright");
   expect(e2eJob).toContain("timeout-minutes: 8");
   expect(e2eJob).toContain("uses: actions/checkout@v7");
-  expect(e2eJob).toContain("uses: pnpm/action-setup@v6");
-  expect(e2eJob).toContain('version: "10.15.0"');
+  expect(e2eJob).toContain(
+    [
+      "      - uses: pnpm/action-setup@v6",
+      "        with:",
+      "          run_install: false",
+    ].join("\n"),
+  );
   expect(e2eJob).toContain("uses: actions/setup-node@v7");
   expect(e2eJob).toContain('node-version: "24.14.0"');
   expect(e2eJob).toContain("uses: actions/setup-go@v7");
