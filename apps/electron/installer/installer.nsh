@@ -17,11 +17,11 @@
 ; produces a `warning 9100: without standard key FileVersion` which IS
 ; gated by -WX and still fails the build.
 ;
-; The installer's FileDescription is rewritten post-build via `app-builder
-; rcedit` in `afterAllArtifactBuild` (see apps/electron/scripts/build.ts).
-; That sidesteps the NSIS constraint and lets the installer and app
-; binary carry distinct descriptions (like VS Code / Chrome's Inno Setup
-; default of "{AppName} Setup").
+; Do not rewrite the completed installer with a generic PE resource editor.
+; NSIS stores its compressed installation data in a PE overlay, and resource
+; editors may discard that overlay while rewriting the executable. Keep
+; electron-builder's default FileDescription so the installer payload remains
+; intact.
 ;
 ; Wired up through `nsis.include` in apps/electron/scripts/build.ts.
 ; ============================================================================

@@ -12,6 +12,8 @@ type ManifestEntry = {
   blockMapSize?: number;
 };
 
+const TEST_NSIS_PAYLOAD_SIZE = 1024 * 1024;
+
 test("collects and validates a complete cross-platform release", async () => {
   const root = await mkdtemp(
     path.join(tmpdir(), "mediago-electron-artifacts-"),
@@ -266,6 +268,33 @@ test("rejects incorrect declared asset sizes", async () => {
   ).rejects.toThrow(/contains the wrong size/);
 });
 
+test("rejects a Windows installer whose appended NSIS payload is missing", async () => {
+  const root = await mkdtemp(
+    path.join(tmpdir(), "mediago-electron-nsis-payload-"),
+  );
+  onTestFinished(() => rm(root, { recursive: true, force: true }));
+
+  const input = path.join(root, "input");
+  const release = await createCompleteRelease(input, "3.6.0", "latest");
+  const brokenEntry = await writeReleaseAsset(
+    release.windows,
+    release.windowsInstaller,
+    true,
+    createWindowsInstallerFixture(0),
+  );
+  await writeFile(
+    path.join(release.windows, "latest.yml"),
+    manifest([brokenEntry], "3.6.0"),
+  );
+
+  await expect(
+    collectElectronArtifacts(input, path.join(root, "output"), {
+      version: "3.6.0",
+      channel: "latest",
+    }),
+  ).rejects.toThrow(/only 0 bytes of appended NSIS payload/);
+});
+
 async function createCompleteRelease(
   input: string,
   version: string,
@@ -290,7 +319,12 @@ async function createCompleteRelease(
   const macIntelZip = `${prefix}-setup-darwin-x64-${version}.zip`;
   const linuxDeb = `${prefix}-setup-linux-amd64-${version}.deb`;
 
-  const windowsEntry = await writeReleaseAsset(windows, windowsInstaller, true);
+  const windowsEntry = await writeReleaseAsset(
+    windows,
+    windowsInstaller,
+    true,
+    createWindowsInstallerFixture(),
+  );
   await writeReleaseAsset(windows, windowsPortable, false);
   const armEntries = await Promise.all([
     writeReleaseAsset(arm, macArmZip, true),
@@ -326,6 +360,7 @@ async function createCompleteRelease(
     arm,
     intel,
     linux,
+    windowsInstaller,
     macIntelZip,
     windowsEntry,
     armEntries,
@@ -338,8 +373,9 @@ async function writeReleaseAsset(
   directory: string,
   name: string,
   withBlockmap: boolean,
+  suppliedContent?: Buffer,
 ): Promise<ManifestEntry> {
-  const content = Buffer.from(`release asset: ${name}`);
+  const content = suppliedContent ?? Buffer.from(`release asset: ${name}`);
   await writeFile(path.join(directory, name), content);
   const entry: ManifestEntry = {
     url: name,
@@ -352,6 +388,31 @@ async function writeReleaseAsset(
     entry.blockMapSize = blockmap.byteLength;
   }
   return entry;
+}
+
+function createWindowsInstallerFixture(
+  payloadSize = TEST_NSIS_PAYLOAD_SIZE,
+): Buffer {
+  const peOffset = 0x80;
+  const optionalHeaderSize = 0xe0;
+  const sectionTableOffset = peOffset + 24 + optionalHeaderSize;
+  const sectionDataOffset = 0x200;
+  const sectionDataSize = 0x200;
+  const imageEnd = sectionDataOffset + sectionDataSize;
+  const installer = Buffer.alloc(imageEnd + payloadSize, 0xa5);
+
+  installer.fill(0, 0, imageEnd);
+  installer.write("MZ", 0, "ascii");
+  installer.writeUInt32LE(peOffset, 0x3c);
+  installer.write("PE\0\0", peOffset, "binary");
+  installer.writeUInt16LE(0x14c, peOffset + 4);
+  installer.writeUInt16LE(1, peOffset + 6);
+  installer.writeUInt16LE(optionalHeaderSize, peOffset + 20);
+  installer.writeUInt16LE(0x10b, peOffset + 24);
+  installer.write(".text", sectionTableOffset, "ascii");
+  installer.writeUInt32LE(sectionDataSize, sectionTableOffset + 16);
+  installer.writeUInt32LE(sectionDataOffset, sectionTableOffset + 20);
+  return installer;
 }
 
 function manifest(entries: readonly ManifestEntry[], version: string): string {

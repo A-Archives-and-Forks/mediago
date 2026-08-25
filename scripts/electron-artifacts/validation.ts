@@ -1,4 +1,4 @@
-import { readFile, stat } from "node:fs/promises";
+import { open, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import {
   isElectronUpdateChannel,
@@ -12,6 +12,12 @@ import {
   releaseAssetName,
   type UpdaterManifestEntry,
 } from "./manifest.ts";
+
+const DOS_HEADER_SIZE = 64;
+const PE_HEADER_SIZE = 24;
+const PE_SECTION_HEADER_SIZE = 40;
+const MAX_PE_SECTIONS = 96;
+const MIN_NSIS_PAYLOAD_SIZE = 1024 * 1024;
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^$(){}|[\]\\]/g, "\\$&");
@@ -30,6 +36,95 @@ function requireSingleAsset(
     );
   }
   return matches[0];
+}
+
+async function validateWindowsInstaller(
+  installerPath: string,
+  installerName: string,
+): Promise<void> {
+  const handle = await open(installerPath, "r");
+  try {
+    const fileSize = (await handle.stat()).size;
+    const readAt = async (
+      length: number,
+      position: number,
+    ): Promise<Buffer> => {
+      if (
+        !Number.isSafeInteger(position) ||
+        position < 0 ||
+        position + length > fileSize
+      ) {
+        throw new Error(
+          `Windows installer ${installerName} contains an invalid PE header`,
+        );
+      }
+      const buffer = Buffer.alloc(length);
+      const { bytesRead } = await handle.read(buffer, 0, length, position);
+      if (bytesRead !== length) {
+        throw new Error(
+          `Windows installer ${installerName} contains a truncated PE header`,
+        );
+      }
+      return buffer;
+    };
+
+    const dosHeader = await readAt(DOS_HEADER_SIZE, 0);
+    if (dosHeader.toString("ascii", 0, 2) !== "MZ") {
+      throw new Error(
+        `Windows installer ${installerName} is not a PE executable`,
+      );
+    }
+
+    const peOffset = dosHeader.readUInt32LE(0x3c);
+    const peHeader = await readAt(PE_HEADER_SIZE, peOffset);
+    if (peHeader.toString("binary", 0, 4) !== "PE\0\0") {
+      throw new Error(
+        `Windows installer ${installerName} contains an invalid PE signature`,
+      );
+    }
+
+    const sectionCount = peHeader.readUInt16LE(6);
+    if (sectionCount === 0 || sectionCount > MAX_PE_SECTIONS) {
+      throw new Error(
+        `Windows installer ${installerName} contains an invalid PE section count: ${sectionCount}`,
+      );
+    }
+    const optionalHeaderSize = peHeader.readUInt16LE(20);
+    const sectionTableOffset = peOffset + PE_HEADER_SIZE + optionalHeaderSize;
+    const sectionTable = await readAt(
+      sectionCount * PE_SECTION_HEADER_SIZE,
+      sectionTableOffset,
+    );
+
+    let imageEnd = 0;
+    for (let index = 0; index < sectionCount; index += 1) {
+      const sectionOffset = index * PE_SECTION_HEADER_SIZE;
+      const rawSize = sectionTable.readUInt32LE(sectionOffset + 16);
+      const rawPointer = sectionTable.readUInt32LE(sectionOffset + 20);
+      if (rawSize === 0) continue;
+      const sectionEnd = rawPointer + rawSize;
+      if (sectionEnd > fileSize) {
+        throw new Error(
+          `Windows installer ${installerName} contains a truncated PE section`,
+        );
+      }
+      imageEnd = Math.max(imageEnd, sectionEnd);
+    }
+    if (imageEnd === 0) {
+      throw new Error(
+        `Windows installer ${installerName} does not contain a PE image`,
+      );
+    }
+
+    const payloadSize = fileSize - imageEnd;
+    if (payloadSize < MIN_NSIS_PAYLOAD_SIZE) {
+      throw new Error(
+        `Windows installer ${installerName} contains only ${payloadSize} bytes of appended NSIS payload; expected at least ${MIN_NSIS_PAYLOAD_SIZE}`,
+      );
+    }
+  } finally {
+    await handle.close();
+  }
 }
 
 function parseOptionalSize(
@@ -186,6 +281,11 @@ export async function validateCompleteRelease(
   const macIntelZip = asset("macOS x64 ZIP", `setup-darwin-x64-${version}.zip`);
   // electron-builder maps Electron's x64 architecture to Debian's amd64 name.
   const linuxDeb = asset("Linux amd64 DEB", `setup-linux-amd64-${version}.deb`);
+
+  await validateWindowsInstaller(
+    fileByName.get(windowsInstaller) as string,
+    windowsInstaller,
+  );
 
   const manifestAssets = new Map<string, string[]>([
     [`${validation.channel}.yml`, [windowsInstaller]],

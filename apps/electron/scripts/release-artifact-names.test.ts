@@ -23,3 +23,8 @@ test("decouples public artifact names from the installed product name", () => {
     '"${productName}-portable-${platform}-${arch}-${buildVersion}.${ext}"',
   );
 });
+
+test("does not post-process completed NSIS installers", () => {
+  expect(buildSource).not.toContain("artifactBuildCompleted");
+  expect(buildSource).not.toContain("rcedit");
+});
