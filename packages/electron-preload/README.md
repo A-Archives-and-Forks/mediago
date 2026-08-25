@@ -11,7 +11,7 @@ This package contains the preload script that bridges the communication between 
 - Safe IPC communication between main and renderer processes
 - Type-safe API definitions
 - Centralized preload logic for better maintainability
-- Optimized build with esbuild
+- Optimized build with tsdown and Rolldown
 
 ## Usage
 
