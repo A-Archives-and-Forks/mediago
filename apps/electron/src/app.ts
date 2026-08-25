@@ -11,8 +11,11 @@ import {
   Tray,
 } from "electron";
 import { inject, injectable } from "inversify";
-import TrayIcon from "../assets/icon.ico";
+import TrayIcon from "../assets/tray.ico";
+import TrayIconPng from "../assets/tray.png";
+import TrayIconPng2x from "../assets/tray@2x.png";
 import TrayTemplate from "../assets/trayTemplate.png";
+import TrayTemplate2x from "../assets/trayTemplate@2x.png";
 import ProtocolService from "./core/protocol";
 import ElectronRouter from "./core/router";
 import { db, isMac, logDir } from "./constants";
@@ -206,23 +209,27 @@ export default class ElectronApp {
   }
 
   initTray() {
-    let trayIcon = nativeImage.createFromPath(resolve(__dirname, TrayIcon));
-    if (isMac) {
-      const templateSource = nativeImage.createFromPath(
-        resolve(__dirname, TrayTemplate),
-      );
+    let trayIcon;
+    if (process.platform === "win32") {
+      trayIcon = nativeImage.createFromPath(resolve(__dirname, TrayIcon));
+    } else {
+      const oneX = isMac ? TrayTemplate : TrayIconPng;
+      const twoX = isMac ? TrayTemplate2x : TrayIconPng2x;
       trayIcon = nativeImage.createEmpty();
-
-      for (const scaleFactor of [1, 2]) {
-        const size = 16 * scaleFactor;
-        trayIcon.addRepresentation({
-          scaleFactor,
-          dataURL: templateSource
-            .resize({ width: size, height: size })
-            .toDataURL(),
-        });
-      }
-
+      trayIcon.addRepresentation({
+        scaleFactor: 1,
+        dataURL: nativeImage
+          .createFromPath(resolve(__dirname, oneX))
+          .toDataURL(),
+      });
+      trayIcon.addRepresentation({
+        scaleFactor: 2,
+        dataURL: nativeImage
+          .createFromPath(resolve(__dirname, twoX))
+          .toDataURL(),
+      });
+    }
+    if (isMac) {
       trayIcon.setTemplateImage(true);
     }
 

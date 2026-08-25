@@ -36,8 +36,11 @@ vi.mock("@mediago/shared-common", () => ({
   resolveAppLanguage: vi.fn((language: string) => language),
 }));
 
-vi.mock("../assets/icon.ico", () => ({ default: "icon.ico" }));
+vi.mock("../assets/tray.ico", () => ({ default: "tray.ico" }));
+vi.mock("../assets/tray.png", () => ({ default: "tray.png" }));
+vi.mock("../assets/tray@2x.png", () => ({ default: "tray@2x.png" }));
 vi.mock("../assets/trayTemplate.png", () => ({ default: "tray.png" }));
+vi.mock("../assets/trayTemplate@2x.png", () => ({ default: "tray@2x.png" }));
 vi.mock("./controller", () => ({}));
 vi.mock("./core/application-menu", () => ({
   installApplicationMenu: applicationMenuMocks.installApplicationMenu,

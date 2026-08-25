@@ -203,7 +203,7 @@ function getReleaseConfig(): Configuration {
     },
     linux: {
       category: "Utility",
-      icon: "../assets/icon.icns",
+      icon: "../assets/icons/linux",
       maintainer: "caorushizi <84996057@qq.com>",
       target: {
         target: "deb",

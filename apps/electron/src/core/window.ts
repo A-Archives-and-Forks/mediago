@@ -1,5 +1,6 @@
 import { BrowserWindow, type BrowserWindowConstructorOptions } from "electron";
 import isDev from "electron-is-dev";
+import { resolveWindowIcon } from "./desktop-icons";
 
 export default class Window {
   window: BrowserWindow | null = null;
@@ -7,7 +8,9 @@ export default class Window {
   url: string;
 
   constructor(options: BrowserWindowConstructorOptions) {
-    this.options = options;
+    const icon = resolveWindowIcon(__dirname);
+    this.options =
+      icon && options.icon === undefined ? { ...options, icon } : options;
   }
 
   create() {
