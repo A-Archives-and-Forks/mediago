@@ -151,6 +151,7 @@ export function createTestStageArchive(options: {
   const result = spawnSync("tar", ["-czf", archive, "--", ...files], {
     cwd: releaseDirectory,
     encoding: "utf8",
+    env: { ...process.env, COPYFILE_DISABLE: "1" },
     stdio: ["ignore", "pipe", "pipe"],
   });
   if (result.error) throw result.error;

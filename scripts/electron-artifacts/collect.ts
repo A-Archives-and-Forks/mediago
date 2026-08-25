@@ -72,7 +72,11 @@ export async function collectElectronArtifacts(
 
   const candidates = (await listFiles(input)).filter((file) => {
     const name = path.basename(file);
-    return RELEASE_FILE_PATTERN.test(name) && !/^builder-/i.test(name);
+    return (
+      RELEASE_FILE_PATTERN.test(name) &&
+      !/^builder-/i.test(name) &&
+      !name.startsWith("._")
+    );
   });
   if (candidates.length === 0) {
     throw new Error(`No Electron release files found below ${input}`);

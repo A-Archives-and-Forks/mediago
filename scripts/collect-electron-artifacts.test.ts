@@ -29,6 +29,10 @@ test("collects and validates a complete cross-platform release", async () => {
     path.join(release.windows, "builder-effective-config.yaml"),
     "ignored",
   );
+  await writeFile(
+    path.join(release.arm, "._mediago-setup-darwin-arm64-3.6.0.dmg"),
+    "ignored AppleDouble metadata",
+  );
 
   const files = await collectElectronArtifacts(input, output, {
     version: "3.6.0",
@@ -44,6 +48,7 @@ test("collects and validates a complete cross-platform release", async () => {
     names.some((name) => name.startsWith("mediago-community-")),
   ).toBeFalsy();
   expect(!names.some((name) => name.startsWith("builder-"))).toBeTruthy();
+  expect(!names.some((name) => name.startsWith("._"))).toBeTruthy();
   await expect(readFile(path.join(output, "stale.txt"))).rejects.toMatchObject({
     code: "ENOENT",
   });
