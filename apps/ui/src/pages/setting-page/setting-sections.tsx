@@ -1,10 +1,10 @@
 import {
-  Chrome,
+  CodeXml,
   Copy,
   Download,
   Eraser,
   FolderOpen,
-  Github,
+  Puzzle,
   RefreshCw,
   Server,
   Star,
@@ -680,7 +680,7 @@ export const BrowserExtensionCard = memo(function BrowserExtensionCard() {
           className="w-full"
           onClick={() => shell.open(EXTENSION_GUIDE_URL)}
         >
-          <Chrome className="size-4" />
+          <Puzzle className="size-4" />
           {t("extensionGuide")}
         </Button>
       </div>
@@ -697,7 +697,7 @@ export const OpenSourceCard = memo(function OpenSourceCard() {
       <div className="flex flex-col gap-4 py-5">
         <div className="flex items-start gap-3">
           <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-secondary text-foreground">
-            <Github className="size-5" />
+            <CodeXml className="size-5" />
           </div>
           <div className="min-w-0 space-y-1">
             <p className="truncate text-sm font-medium">

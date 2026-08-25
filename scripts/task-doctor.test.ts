@@ -104,19 +104,17 @@ test("aggregates every diagnostic and never reflects unrelated environment", asy
 });
 
 test("returns success only when every exact tool and runtime check is ready", async () => {
-  const readiness = RUNTIME_TOOLS.map(
-    (toolName): DependencyReadiness => ({
-      executablePath: dependencyExecutablePath(
-        "/validated/deps",
-        "linux-x64",
-        toolName,
-      ),
-      platformKey: "linux-x64",
-      status: "ready",
+  const readiness = RUNTIME_TOOLS.map((toolName): DependencyReadiness => ({
+    executablePath: dependencyExecutablePath(
+      "/validated/deps",
+      "linux-x64",
       toolName,
-      version: "v1.0.0",
-    }),
-  );
+    ),
+    platformKey: "linux-x64",
+    status: "ready",
+    toolName,
+    version: "v1.0.0",
+  }));
   const result = await collectDoctorDiagnostics({
     architecture: "x64",
     commandProbe: availableSystemProbe,
@@ -278,17 +276,15 @@ test("reports an unsupported runtime platform once without repair noise", async 
 });
 
 function readyReadiness(platformKey: "linux-x64"): DependencyReadiness[] {
-  return RUNTIME_TOOLS.map(
-    (toolName): DependencyReadiness => ({
-      executablePath: dependencyExecutablePath(
-        "/validated/deps",
-        platformKey,
-        toolName,
-      ),
+  return RUNTIME_TOOLS.map((toolName): DependencyReadiness => ({
+    executablePath: dependencyExecutablePath(
+      "/validated/deps",
       platformKey,
-      status: "ready",
       toolName,
-      version: "v1.0.0",
-    }),
-  );
+    ),
+    platformKey,
+    status: "ready",
+    toolName,
+    version: "v1.0.0",
+  }));
 }

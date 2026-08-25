@@ -714,7 +714,7 @@ function bareBootstrapImports(entrypoint: string): string[] {
 
 describe("root Taskfile public API", () => {
   it("pins the parser and Task schema versions", () => {
-    expect(packageJson.devDependencies.yaml).toBe("2.8.3");
+    expect(packageJson.devDependencies.yaml).toBe("2.9.0");
     expect(taskfile.version).toBe("3");
     expect(asRecord(taskfile.vars, "Taskfile vars")).toMatchObject({
       MEDIAGO_DEPS_ROOT:

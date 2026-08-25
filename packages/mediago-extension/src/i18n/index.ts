@@ -1,7 +1,7 @@
 import i18next, { type i18n } from "i18next";
 import { initReactI18next } from "react-i18next";
 
-import { resolveLanguage, type SupportedLanguage } from "./language";
+import { type SupportedLanguage } from "./language";
 import { resources } from "./resources";
 
 /**

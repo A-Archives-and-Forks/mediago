@@ -167,9 +167,7 @@ curl http://localhost:39719/api/downloads/123/logs
 ```json
 {
   "total": 42,
-  "list": [
-    /* DownloadTask[] */
-  ]
+  "list": [/* DownloadTask[] */]
 }
 ```
 
