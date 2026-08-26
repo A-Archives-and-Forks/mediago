@@ -2,6 +2,18 @@ package db
 
 import "time"
 
+// FavoriteIconStatus describes whether a favorite icon can be displayed or
+// should be resolved again. The value is persisted so every Core client sees
+// the same result.
+type FavoriteIconStatus string
+
+const (
+	FavoriteIconStatusUnresolved FavoriteIconStatus = "unresolved"
+	FavoriteIconStatusReady      FavoriteIconStatus = "ready"
+	FavoriteIconStatusMissing    FavoriteIconStatus = "missing"
+	FavoriteIconStatusRetryable  FavoriteIconStatus = "retryable"
+)
+
 // Video maps to the "video" table (legacy naming; actually represents download tasks).
 // Column names must exactly match the table schema created by TypeORM (camelCase).
 type Video struct {
@@ -21,12 +33,13 @@ func (Video) TableName() string { return "video" }
 
 // Favorite maps to the "favorite" table.
 type Favorite struct {
-	ID          int64     `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
-	Title       string    `gorm:"column:title;type:text;not null" json:"title"`
-	URL         string    `gorm:"column:url;type:text;not null" json:"url"`
-	Icon        *string   `gorm:"column:icon;type:text" json:"icon"`
-	CreatedDate time.Time `gorm:"column:createdDate;autoCreateTime" json:"createdDate"`
-	UpdatedDate time.Time `gorm:"column:updatedDate;autoUpdateTime" json:"updatedDate"`
+	ID          int64              `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	Title       string             `gorm:"column:title;type:text;not null" json:"title"`
+	URL         string             `gorm:"column:url;type:text;not null" json:"url"`
+	Icon        *string            `gorm:"column:icon;type:text" json:"icon"`
+	IconStatus  FavoriteIconStatus `gorm:"column:iconStatus;type:text;not null;default:'unresolved'" json:"iconStatus"`
+	CreatedDate time.Time          `gorm:"column:createdDate;autoCreateTime" json:"createdDate"`
+	UpdatedDate time.Time          `gorm:"column:updatedDate;autoUpdateTime" json:"updatedDate"`
 }
 
 func (Favorite) TableName() string { return "favorite" }

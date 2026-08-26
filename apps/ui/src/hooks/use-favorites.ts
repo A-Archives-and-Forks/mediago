@@ -4,8 +4,10 @@ import {
   getFavorites,
   addFavorite as addFavApi,
   removeFavorite as removeFavApi,
+  resolveFavoriteIcon as resolveFavoriteIconApi,
 } from "@/api/favorite";
 import type { Favorite } from "@mediago/shared-common";
+import { useMemoizedFn } from "ahooks";
 
 export function useFavorites() {
   const { data, isLoading, error, mutate } = useSWR(
@@ -27,6 +29,20 @@ export function useFavorites() {
     mutate();
   };
 
+  const resolveFavoriteIcon = useMemoizedFn(async (id: number) => {
+    const resolved = await resolveFavoriteIconApi(id);
+    await mutate(
+      (current) =>
+        Array.isArray(current)
+          ? current.map((favorite) =>
+              favorite.id === resolved.id ? resolved : favorite,
+            )
+          : current,
+      { revalidate: false },
+    );
+    return resolved;
+  });
+
   return {
     data: Array.isArray(data) ? data : ([] as Favorite[]),
     isLoading,
@@ -34,5 +50,6 @@ export function useFavorites() {
     mutate,
     addFavorite,
     removeFavorite,
+    resolveFavoriteIcon,
   };
 }

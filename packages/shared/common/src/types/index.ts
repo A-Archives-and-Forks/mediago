@@ -423,8 +423,12 @@ export interface GoApi {
   getEnvPath(): Promise<EnvPath>;
   getFavorites(): Promise<Favorite[]>;
   addFavorite(
-    favorite: Omit<Favorite, "id" | "createdDate" | "updatedDate">,
+    favorite: Omit<
+      Favorite,
+      "id" | "iconStatus" | "createdDate" | "updatedDate"
+    >,
   ): Promise<Favorite>;
+  resolveFavoriteIcon(id: number): Promise<Favorite>;
   removeFavorite(id: number): Promise<void>;
   getAppStore(): Promise<AppStore>;
   setAppStore(

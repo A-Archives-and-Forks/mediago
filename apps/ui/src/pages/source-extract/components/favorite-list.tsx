@@ -18,12 +18,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { ADD_FAVORITE, OPEN_FAVORITE } from "@/const";
-import { getFavIcon, tdApp } from "@/utils";
+import { tdApp } from "@/utils";
 import { FavItem } from "./fav-item";
 import { useFavorites } from "@/hooks/use-favorites";
 import { usePlatform } from "@/hooks/use-platform";
 import { useBrowserActions } from "@/hooks/use-browser-actions";
 import { getPageTitle } from "@/api/util";
+import { useFavoriteIconResolution } from "./use-favorite-icon-resolution";
 
 export function FavoriteList() {
   const {
@@ -32,6 +33,7 @@ export function FavoriteList() {
     error,
     addFavorite,
     removeFavorite,
+    resolveFavoriteIcon,
     mutate,
   } = useFavorites();
   const { contextMenu } = usePlatform();
@@ -43,6 +45,7 @@ export function FavoriteList() {
   const [urlError, setUrlError] = useState<string | null>(null);
   const urlInputId = useId();
   const titleInputId = useId();
+  useFavoriteIconResolution(favoriteList, resolveFavoriteIcon);
 
   const onClickLoadItem = useMemoizedFn((item: Favorite) => {
     loadUrl(item.url);
@@ -72,11 +75,9 @@ export function FavoriteList() {
 
     setUrlError(null);
     try {
-      const icon = getFavIcon(url);
       await addFavorite({
         url,
         title,
-        icon,
       });
       setUrl("");
       setTitle("");
@@ -179,7 +180,7 @@ export function FavoriteList() {
               onContextMenu={() => handleContextMenu(item)}
               onClick={() => onClickLoadItem(item)}
               onClose={() => handleRemoveFavorite(item.id)}
-              src={item.icon}
+              src={item.icon ?? undefined}
               title={item.title}
             />
           ))}

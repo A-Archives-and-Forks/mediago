@@ -291,6 +291,13 @@ export class MediaGoClient {
   }
 
   /**
+   * Resolves a favorite icon from the favorite's stored original URL.
+   */
+  async resolveFavoriteIcon(id: number): Promise<ApiResponse<FavoriteItem>> {
+    return this.api.post(`/api/favorites/${id}/icon/resolve`);
+  }
+
+  /**
    * Exports favorites as JSON.
    */
   async exportFavorites(): Promise<ApiResponse<string>> {

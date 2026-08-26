@@ -64,6 +64,7 @@ var catalogs = map[string]map[string]string{
 
 		// Favorite
 		MsgURLAlreadyExists: "URL already exists",
+		MsgFavoriteNotFound: "favorite with id %d not found",
 
 		// Event
 		MsgEventStreamFailed: "Failed to create event stream",
@@ -126,6 +127,7 @@ var catalogs = map[string]map[string]string{
 
 		// Favorite
 		MsgURLAlreadyExists: "URL 已存在",
+		MsgFavoriteNotFound: "未找到 ID 为 %d 的收藏",
 
 		// Event
 		MsgEventStreamFailed: "创建事件流失败",
@@ -188,6 +190,7 @@ var catalogs = map[string]map[string]string{
 
 		// Favorite
 		MsgURLAlreadyExists: "L'URL esiste già",
+		MsgFavoriteNotFound: "Preferito con ID %d non trovato",
 
 		// Event
 		MsgEventStreamFailed: "Impossibile creare il flusso di eventi",

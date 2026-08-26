@@ -49,11 +49,34 @@ func (r *FavoriteRepository) FindByURL(url string) (*db.Favorite, error) {
 	return &fav, nil
 }
 
+// FindByID looks up a favorite by its database ID.
+func (r *FavoriteRepository) FindByID(id int64) (*db.Favorite, error) {
+	var fav db.Favorite
+	err := r.db.Where("id = ?", id).First(&fav).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &fav, nil
+}
+
 // FindAll retrieves all favorites.
 func (r *FavoriteRepository) FindAll(order string) ([]*db.Favorite, error) {
 	var favs []*db.Favorite
 	err := r.db.Order("createdDate " + order).Find(&favs).Error
 	return favs, err
+}
+
+// UpdateIcon persists the icon resolution result for a favorite.
+func (r *FavoriteRepository) UpdateIcon(id int64, icon *string, status db.FavoriteIconStatus) error {
+	return r.db.Model(&db.Favorite{}).
+		Where("id = ?", id).
+		Updates(map[string]any{
+			"icon":       icon,
+			"iconStatus": status,
+		}).Error
 }
 
 // Delete removes a favorite entry.

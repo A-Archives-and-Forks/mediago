@@ -2,7 +2,8 @@ declare interface Favorite {
   id: number;
   title: string;
   url: string;
-  icon?: string;
+  icon?: string | null;
+  iconStatus: "unresolved" | "ready" | "missing" | "retryable";
 }
 
 declare interface UrlDetail {

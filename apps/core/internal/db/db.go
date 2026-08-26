@@ -26,7 +26,27 @@ func New(dbPath string) (*Database, error) {
 	}
 
 	// Migrate legacy "watting" status to "pending"
-	db.Exec(`UPDATE video SET status = 'pending' WHERE status = 'watting'`)
+	if err := db.Exec(`UPDATE video SET status = 'pending' WHERE status = 'watting'`).Error; err != nil {
+		return nil, err
+	}
+
+	// Existing favorites predate iconStatus. Preserve valid stored icons and
+	// leave empty rows unresolved so Core can derive them from their original
+	// URL when a client asks for resolution.
+	if err := db.Exec(`
+		UPDATE favorite
+		SET iconStatus = CASE
+			WHEN icon IS NOT NULL AND TRIM(icon) <> '' THEN 'ready'
+			ELSE 'unresolved'
+		END
+		WHERE iconStatus IS NULL
+			OR iconStatus = ''
+			OR iconStatus NOT IN ('unresolved', 'ready', 'missing', 'retryable')
+			OR (iconStatus = 'unresolved' AND icon IS NOT NULL AND TRIM(icon) <> '')
+			OR (iconStatus = 'ready' AND (icon IS NULL OR TRIM(icon) = ''))
+	`).Error; err != nil {
+		return nil, err
+	}
 
 	return &Database{DB: db}, nil
 }

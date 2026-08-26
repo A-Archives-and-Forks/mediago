@@ -348,9 +348,16 @@ export interface FavoriteItem {
   title: string;
   url: string;
   icon?: string | null;
+  iconStatus: FavoriteIconStatus;
   createdDate: string;
   updatedDate: string;
 }
+
+export type FavoriteIconStatus =
+  | "unresolved"
+  | "ready"
+  | "missing"
+  | "retryable";
 
 /**
  * Parameters for adding a favorite.

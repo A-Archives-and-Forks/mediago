@@ -71,6 +71,27 @@ func (h *FavoriteHandler) Create(c *gin.Context) {
 	c.JSON(http.StatusOK, dto.SuccessResponse{Success: true, Code: http.StatusOK, Message: i18n.T(c, i18n.MsgOK), Data: fav})
 }
 
+// ResolveIcon resolves a favorite icon from the favorite's persisted URL.
+func (h *FavoriteHandler) ResolveIcon(c *gin.Context) {
+	id, ok := parsePositiveID(c)
+	if !ok {
+		return
+	}
+
+	favorite, err := h.svc.ResolveFavoriteIcon(c.Request.Context(), id)
+	if err != nil {
+		if errors.Is(err, service.ErrFavoriteNotFound) {
+			writeFavoriteNotFound(c, id)
+			return
+		}
+		logger.Error("Failed to resolve favorite icon", zap.Int64("id", id), zap.Error(err))
+		writeInternalError(c)
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.SuccessResponse{Success: true, Code: http.StatusOK, Message: i18n.T(c, i18n.MsgOK), Data: favorite})
+}
+
 // Delete removes a favorite.
 func (h *FavoriteHandler) Delete(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)

@@ -37,7 +37,7 @@ import {
   browserActionsSelector,
   useBrowserStore,
 } from "@/store/browser";
-import { cn, getFavIcon } from "@/utils";
+import { cn } from "@/utils";
 import { useBrowserActions } from "@/hooks/use-browser-actions";
 import { useFavorites } from "@/hooks/use-favorites";
 import { usePlatform } from "@/hooks/use-platform";
@@ -104,11 +104,9 @@ export function ToolBar({ page }: Props) {
     if (curIsFavorite) {
       await removeFavorite(curIsFavorite.id);
     } else {
-      const icon = getFavIcon(store.url);
       await addFavorite({
         url: store.url,
         title: store.title || store.url,
-        icon,
       });
     }
   });

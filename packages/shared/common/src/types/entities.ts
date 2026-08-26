@@ -18,10 +18,17 @@ export interface Favorite {
   id: number;
   title: string;
   url: string;
-  icon?: string;
+  icon?: string | null;
+  iconStatus: FavoriteIconStatus;
   createdDate: Date;
   updatedDate: Date;
 }
+
+export type FavoriteIconStatus =
+  | "unresolved"
+  | "ready"
+  | "missing"
+  | "retryable";
 
 export interface Video {
   id: number;

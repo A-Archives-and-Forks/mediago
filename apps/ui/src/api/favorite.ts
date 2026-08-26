@@ -14,6 +14,9 @@ export const addFavorite = (fav: {
 export const removeFavorite = (id: number): Promise<void> =>
   http.delete(`/api/favorites/${id}`);
 
+export const resolveFavoriteIcon = (id: number): Promise<Favorite> =>
+  http.post(`/api/favorites/${id}/icon/resolve`);
+
 export const exportFavorites = (): Promise<string> =>
   http.get("/api/favorites/export");
 

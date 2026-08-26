@@ -78,6 +78,7 @@ func (s *Server) registerRoutes() {
 		{
 			favorites.GET("", s.favoriteHandler.List)
 			favorites.POST("", s.favoriteHandler.Create)
+			favorites.POST("/:id/icon/resolve", s.favoriteHandler.ResolveIcon)
 			favorites.DELETE("/:id", s.favoriteHandler.Delete)
 			favorites.GET("/export", s.favoriteHandler.Export)
 			favorites.POST("/import", s.favoriteHandler.Import)

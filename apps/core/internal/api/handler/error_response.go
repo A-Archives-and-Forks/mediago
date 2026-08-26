@@ -15,11 +15,16 @@ const (
 	errorCodeInternalError       = "internal_error"
 	errorCodeDownloadNotFound    = "download_not_found"
 	errorCodeConversionNotFound  = "conversion_not_found"
+	errorCodeFavoriteNotFound    = "favorite_not_found"
 	errorCodeTaskNotFound        = "task_not_found"
 	errorCodeSourcesCountInvalid = "sources_count_invalid"
 )
 
 func parseDownloadID(c *gin.Context) (int64, bool) {
+	return parsePositiveID(c)
+}
+
+func parsePositiveID(c *gin.Context) (int64, bool) {
 	rawID := c.Param("id")
 	if rawID == "" {
 		writeInvalidID(c)
@@ -58,6 +63,10 @@ func writeDownloadNotFound(c *gin.Context, id int64) {
 
 func writeConversionNotFound(c *gin.Context, id int64) {
 	writeErrorResponse(c, http.StatusNotFound, errorCodeConversionNotFound, i18n.T(c, i18n.MsgConversionNotFound, id))
+}
+
+func writeFavoriteNotFound(c *gin.Context, id int64) {
+	writeErrorResponse(c, http.StatusNotFound, errorCodeFavoriteNotFound, i18n.T(c, i18n.MsgFavoriteNotFound, id))
 }
 
 func writeSourcesCountInvalid(c *gin.Context) {

@@ -52,6 +52,7 @@ const (
 
 	// Favorite
 	MsgURLAlreadyExists = "favorite.url_already_exists"
+	MsgFavoriteNotFound = "favorite.not_found" // fmt arg: %d
 
 	// Event
 	MsgEventStreamFailed = "event.stream_failed"

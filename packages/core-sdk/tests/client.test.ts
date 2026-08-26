@@ -187,3 +187,27 @@ describe("MediaGoClient discovery methods", () => {
     );
   });
 });
+
+describe("MediaGoClient favorite icon resolution", () => {
+  it("resolves an icon by favorite ID without accepting a client icon URL", async () => {
+    const client = new MediaGoClient({ baseURL: "http://example.com" });
+    const post = vi.spyOn(client.api, "post").mockResolvedValue({
+      success: true,
+      code: 200,
+      message: "OK",
+      data: {
+        id: 42,
+        title: "Example",
+        url: "https://example.com/original",
+        icon: "https://example.com/favicon.ico",
+        iconStatus: "ready",
+        createdDate: "2026-08-27T00:00:00Z",
+        updatedDate: "2026-08-27T00:00:00Z",
+      },
+    });
+
+    await client.resolveFavoriteIcon(42);
+
+    expect(post).toHaveBeenCalledWith("/api/favorites/42/icon/resolve");
+  });
+});
