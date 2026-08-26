@@ -27,9 +27,11 @@ describe("documentation home content", () => {
       'import HomeTopics from "./.vitepress/theme/components/HomeTopics.vue"',
     );
     expect(home).toContain("<HomeTopics />");
-    expect(topics).toContain('href="/blog/video-downloader-recommendation/"');
-    expect(topics).toContain('href="/blog/video-download/"');
-    expect(topics).toContain('href="/blog/m3u8-hls-download/"');
+    expect(topics).toContain(
+      ":href=\"withBase('/blog/video-downloader-recommendation/')\"",
+    );
+    expect(topics).toContain(":href=\"withBase('/blog/video-download/')\"");
+    expect(topics).toContain(":href=\"withBase('/blog/m3u8-hls-download/')\"");
   });
 
   it("uses an asymmetric desktop layout and a single mobile column", () => {

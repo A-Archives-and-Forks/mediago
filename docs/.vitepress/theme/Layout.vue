@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import DefaultTheme from "vitepress/theme";
-import { useData, inBrowser, useRoute } from "vitepress";
+import { useData, inBrowser, useRoute, withBase } from "vitepress";
 import { computed, watchEffect } from "vue";
 import Comments from "./components/Comments.vue";
 import Footer from "./components/Footer.vue";
@@ -67,7 +67,9 @@ const { Layout } = DefaultTheme;
         aria-label="Article language switch"
       >
         <span>{{ blogTranslationLink.note }}</span>
-        <a :href="blogTranslationLink.href">{{ blogTranslationLink.label }}</a>
+        <a :href="withBase(blogTranslationLink.href)">
+          {{ blogTranslationLink.label }}
+        </a>
       </div>
     </template>
     <template #doc-after>

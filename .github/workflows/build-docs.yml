@@ -4,23 +4,26 @@ on:
   push:
     paths:
       - "docs/**"
-      - ".github/actions/setup-ossutil/**"
       - ".github/workflows/build-docs.yml"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "Taskfile.yml"
     branches: ["master"]
 
   workflow_dispatch:
 
 permissions:
   contents: read
+  pages: write
+  id-token: write
 
 concurrency:
   group: "pages"
   cancel-in-progress: false
 
 env:
-  OSS_BUCKET: downloader-docs
-  OSS_ENDPOINT: oss-cn-beijing.aliyuncs.com
-  OSS_REGION: cn-beijing
+  DOCS_BASE: /mediago/
 
 jobs:
   build:
@@ -29,6 +32,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - uses: go-task/setup-task@v1
         with:
@@ -45,16 +50,25 @@ jobs:
           node-version: "24.14.0"
           cache: "pnpm"
 
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
       - name: Build with Vitepress
         run: task ci:docs:build
 
-      - name: Setup Alibaba Cloud ossutil
-        uses: ./.github/actions/setup-ossutil
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v4
         with:
-          version: "2.3.0"
+          path: docs/.vitepress/dist
 
-      - name: Upload documentation to Alibaba Cloud OSS
-        env:
-          OSS_ACCESS_KEY_ID: ${{ secrets.ACCESS_KEY_ID }}
-          OSS_ACCESS_KEY_SECRET: ${{ secrets.ACCESS_KEY_SECRET }}
-        run: ossutil cp docs/.vitepress/dist "oss://${OSS_BUCKET}" -r -f
+  deploy:
+    name: Deploy Docs
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

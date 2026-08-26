@@ -1,14 +1,18 @@
+<script setup lang="ts">
+import { withBase } from "vitepress";
+</script>
+
 <template>
   <section class="home-topics" aria-labelledby="home-topics-title">
     <header class="home-topics__header">
       <h2 id="home-topics-title">专题阅读</h2>
-      <a class="home-topics__all" href="/blog/">查看全部文章</a>
+      <a class="home-topics__all" :href="withBase('/blog/')">查看全部文章</a>
     </header>
 
     <div class="home-topics__grid">
       <a
         class="home-topics__item home-topics__item--primary"
-        href="/blog/video-downloader-recommendation/"
+        :href="withBase('/blog/video-downloader-recommendation/')"
       >
         <strong>视频下载器推荐</strong>
         <p>
@@ -18,7 +22,7 @@
 
       <a
         class="home-topics__item home-topics__item--secondary"
-        href="/blog/video-download/"
+        :href="withBase('/blog/video-download/')"
       >
         <strong>网页视频下载指南</strong>
         <p>
@@ -29,7 +33,7 @@
 
       <a
         class="home-topics__item home-topics__item--secondary"
-        href="/blog/m3u8-hls-download/"
+        :href="withBase('/blog/m3u8-hls-download/')"
       >
         <strong>M3U8 / HLS 专题</strong>
         <p>

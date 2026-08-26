@@ -52,17 +52,7 @@ const ciRunAllowlist = {
   ],
 } as const;
 const docsRunAllowlist = {
-  build: [
-    { name: "Build with Vitepress", run: "task ci:docs:build" },
-    {
-      name: "Upload documentation to Alibaba Cloud OSS",
-      env: {
-        OSS_ACCESS_KEY_ID: "${{ secrets.ACCESS_KEY_ID }}",
-        OSS_ACCESS_KEY_SECRET: "${{ secrets.ACCESS_KEY_SECRET }}",
-      },
-      run: 'ossutil cp docs/.vitepress/dist "oss://${OSS_BUCKET}" -r -f',
-    },
-  ],
+  build: [{ name: "Build with Vitepress", run: "task ci:docs:build" }],
 } as const;
 const desktopRunAllowlist = {
   prepare: [
@@ -503,27 +493,46 @@ describe("build-docs.yml Task workflow contract", () => {
     expectTaskEntries(workflow, { build: "task ci:docs:build" });
   });
 
-  it("allows only the docs Task and exact OSS platform run steps", () => {
+  it("allows only the docs Task run step", () => {
     expectRunStepAllowlist(workflow, docsRunAllowlist);
   });
 
-  it("installs verified ossutil through the repository action", () => {
+  it("publishes the VitePress artifact through GitHub Pages", () => {
     const build = asRecord(workflow.jobs.build, "docs build job");
+    const deploy = asRecord(workflow.jobs.deploy, "docs deploy job");
+
     expect(build.steps).toContainEqual({
-      name: "Setup Alibaba Cloud ossutil",
-      uses: "./.github/actions/setup-ossutil",
-      with: { version: "2.3.0" },
+      name: "Configure GitHub Pages",
+      uses: "actions/configure-pages@v5",
+    });
+    expect(build.steps).toContainEqual({
+      name: "Upload GitHub Pages artifact",
+      uses: "actions/upload-pages-artifact@v4",
+      with: { path: "docs/.vitepress/dist" },
+    });
+    expect(deploy.steps).toContainEqual({
+      name: "Deploy to GitHub Pages",
+      id: "deployment",
+      uses: "actions/deploy-pages@v4",
+    });
+    expect(deploy.needs).toBe("build");
+    expect(deploy.environment).toEqual({
+      name: "github-pages",
+      url: "${{ steps.deployment.outputs.page_url }}",
     });
 
     const permissions = asRecord(
       workflow.definition.permissions,
       "docs workflow permissions",
     );
-    expect(permissions).toEqual({ contents: "read" });
-    expect(JSON.stringify(workflow.definition)).not.toContain(
-      "LTAI5tDrRjFUAvufpCJioz3b",
-    );
-    expect(JSON.stringify(workflow.definition)).not.toContain(".ossutilconfig");
+    expect(permissions).toEqual({
+      contents: "read",
+      pages: "write",
+      "id-token": "write",
+    });
+    expect(workflow.definition.env).toEqual({ DOCS_BASE: "/mediago/" });
+    expect(JSON.stringify(workflow.definition)).not.toContain("ossutil");
+    expect(JSON.stringify(workflow.definition)).not.toContain("ACCESS_KEY");
   });
 
   it("rejects wrapped repository commands beside the docs Task entry", () => {

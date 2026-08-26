@@ -3,10 +3,11 @@ import { defineConfig, type HeadConfig } from "vitepress";
 import { baiduAnalytics, googleAnalytics } from "./plugins.ts";
 
 const isDev = process.env.NODE_ENV === "development";
+const base = process.env.DOCS_BASE || "/";
 const siteUrl = "https://downloader.caorushizi.cn";
 
 const head: HeadConfig[] = [
-  ["link", { rel: "shortcut icon", href: "/favicon.ico" }],
+  ["link", { rel: "shortcut icon", href: `${base}favicon.ico` }],
 ];
 if (!isDev) {
   head.push(...baiduAnalytics(), ...googleAnalytics());
@@ -117,6 +118,7 @@ function getBreadcrumbItems(
 
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
+  base,
   title: "MediaGo",
   description: "简单易用，快速下载",
   lastUpdated: true,

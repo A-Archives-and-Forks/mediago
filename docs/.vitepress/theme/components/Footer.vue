@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { useData } from "vitepress";
+import { useData, withBase } from "vitepress";
 import { useLayout } from "vitepress/theme";
 
 const messages = {
@@ -58,11 +58,11 @@ const localizedMessages = computed(() => messages[locale.value]);
 const localePrefix = computed(() =>
   locale.value === "zh" ? "" : `/${locale.value}`,
 );
-const homeLink = computed(() => `${localePrefix.value}/`);
-const guideLink = computed(() => `${localePrefix.value}/guides`);
-const privacyLink = computed(() => `${localePrefix.value}/privacy`);
+const homeLink = computed(() => withBase(`${localePrefix.value}/`));
+const guideLink = computed(() => withBase(`${localePrefix.value}/guides`));
+const privacyLink = computed(() => withBase(`${localePrefix.value}/privacy`));
 const blogLink = computed(() =>
-  locale.value === "en" ? "/en/blog/" : "/blog/",
+  withBase(locale.value === "en" ? "/en/blog/" : "/blog/"),
 );
 
 function t(key: MessageKey) {
@@ -82,7 +82,7 @@ function t(key: MessageKey) {
     <div v-if="isHome" class="docs-footer__home">
       <div class="docs-footer__primary">
         <a class="docs-footer__brand" :href="homeLink">
-          <img src="/favicon.ico" alt="" width="28" height="28" />
+          <img :src="withBase('/favicon.ico')" alt="" width="28" height="28" />
           <span>
             <strong>MediaGo</strong>
             <small>{{ t("slogan") }}</small>
