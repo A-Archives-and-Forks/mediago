@@ -165,6 +165,7 @@ const profileImplementations = {
   "internal:deps:media-integration": "test",
   "internal:deps:e2e": "test",
   "internal:dev:all": "development",
+  "internal:electron:prepare-development-runtime": "development",
   "internal:dev:web": "development",
   "internal:dev:electron": "development",
   "internal:dev:extension": "development",
@@ -223,8 +224,15 @@ const implementationGraph = {
       "internal:deps:node",
       "internal:deps:runtime",
       "internal:core:build",
+      "internal:electron:prepare-development-runtime",
     ],
     leaves: ["pnpm dev:all:raw"],
+  },
+  "internal:electron:prepare-development-runtime": {
+    deps: ["internal:deps:node"],
+    leaves: [
+      "pnpm exec tsx packages/tooling/src/electron/prepare-development-runtime.ts",
+    ],
   },
   "internal:dev:web": {
     deps: [
@@ -239,6 +247,7 @@ const implementationGraph = {
       "internal:deps:node",
       "internal:deps:runtime",
       "internal:core:build",
+      "internal:electron:prepare-development-runtime",
     ],
     leaves: ["pnpm start:electron"],
   },

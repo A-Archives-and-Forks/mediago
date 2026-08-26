@@ -10,7 +10,7 @@ import {
 } from "@mediago/shared-common";
 import { i18n } from "../core/i18n";
 import { DownloaderServer } from "../services/downloader.server";
-import { app, nativeTheme, Notification } from "electron";
+import { app, nativeTheme } from "electron";
 import isDev from "electron-is-dev";
 import { inject, injectable } from "inversify";
 import _ from "lodash";
@@ -20,6 +20,8 @@ import { defaultScheme } from "../constants";
 import GoConfigCache from "../services/go-config-cache";
 import ElectronLogger from "../vendor/ElectronLogger";
 import ElectronStore from "../vendor/ElectronStore";
+import { showNativeNotification } from "../utils/native-notification";
+import { resolveDownloadNotificationName } from "../utils/download-notification-name";
 
 @injectable()
 @provide()
@@ -103,37 +105,45 @@ export default class MainWindow extends Window {
   onDownloadSuccess = async (id: number) => {
     this.logger.info(`taskId: ${id} success`);
 
-    const promptTone = this.configCache.get("promptTone");
-    if (promptTone) {
-      new Notification({
-        title: i18n.t("downloadSuccess"),
-        body: i18n.t("videoDownloadSuccess", { name: String(id) }),
-      }).show();
-    }
-
     const data: DownloadSuccessEvent = {
       type: "success",
       data: { id } as unknown as DownloadTask,
     };
     this.send(DOWNLOAD_EVENT_NAME, data);
+
+    const promptTone = this.configCache.get("promptTone");
+    if (promptTone) {
+      const name = await this.getDownloadNotificationName(id);
+      showNativeNotification(
+        {
+          title: i18n.t("downloadSuccess"),
+          body: i18n.t("videoDownloadSuccess", { name }),
+        },
+        this.logger,
+      );
+    }
   };
 
   onDownloadFailed = async (id: number, err: unknown) => {
     this.logger.info(`taskId: ${id} failed`, err);
-
-    const promptTone = this.configCache.get("promptTone");
-    if (promptTone) {
-      new Notification({
-        title: i18n.t("downloadFailed"),
-        body: i18n.t("videoDownloadFailed", { name: String(id) }),
-      }).show();
-    }
 
     const data: DownloadFailedEvent = {
       type: "failed",
       data: { id, error: String(err) },
     };
     this.send(DOWNLOAD_EVENT_NAME, data);
+
+    const promptTone = this.configCache.get("promptTone");
+    if (promptTone) {
+      const name = await this.getDownloadNotificationName(id);
+      showNativeNotification(
+        {
+          title: i18n.t("downloadFailed"),
+          body: i18n.t("videoDownloadFailed", { name }),
+        },
+        this.logger,
+      );
+    }
   };
 
   onDownloadStart = async (id: number) => {
@@ -153,6 +163,14 @@ export default class MainWindow extends Window {
   showWindow() {
     if (!this.window) this.init();
     this.focusWindow();
+  }
+
+  private getDownloadNotificationName(id: number): Promise<string> {
+    return resolveDownloadNotificationName(
+      id,
+      (taskId) => this.downloaderServer.getClient().getDownloadTask(taskId),
+      this.logger,
+    );
   }
 
   private focusWindow() {

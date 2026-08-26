@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./electron/macos-development-runtime": "./src/electron/macos-development-runtime.ts",
     "./electron-artifacts": "./src/electron-artifacts/index.ts",
     "./env": "./src/env/index.ts",
     "./process": "./src/process/index.ts",
@@ -16,6 +17,7 @@
     "test": "pnpm --dir ../.. exec vitest run packages/tooling"
   },
   "dependencies": {
+    "@electron/osx-sign": "2.7.0",
     "dotenv-flow": "4.1.0"
   },
   "devDependencies": {

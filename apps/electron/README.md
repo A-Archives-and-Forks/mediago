@@ -34,6 +34,13 @@ Run repository workflows from the repository root with Task v3.51.1 or newer
 within the v3 release line. See [CONTRIBUTING.md](../../CONTRIBUTING.md) for
 installation and confirm it with `task --version` before starting.
 
+Electron 42 and newer use Apple's `UNNotification` API, which rejects unsigned
+development runtimes on macOS. The development task copies the pinned Electron
+runtime into `.task/electron-dev`, rebrands it as `MediaGo Dev`, applies a complete
+ad-hoc signature to the app bundle and its nested helpers, verifies the result,
+and then launches the normal development server. No local certificate, Keychain
+identity, or distribution signing credential is required.
+
 ```bash
 # Install the Node workspace and pinned runtime tools
 task setup

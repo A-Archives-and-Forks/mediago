@@ -4,6 +4,15 @@
 
 MediaGo is a pnpm/turborepo monorepo. Feature apps live in `apps/` (`frontend-main`, `frontend-mobile`, `backend-web`, `backend-electron`) for the user surfaces and API. Reusable logic stays in `packages/` (`shared` for cross-runtime helpers, `backend` for orchestration, `main` for Electron packaging). Long-form docs and assets sit in `docs/`, `images/`, and `docker/`. End-to-end checks live in `tests/`.
 
+## Tooling and Script Placement
+
+Repository automation is centralized in `packages/tooling`.
+
+- Do not create app-local or package-local `scripts/` directories.
+- Put build, development, release, migration, code-generation, and verification entrypoints under `packages/tooling/src/<domain>/` and invoke them from `Taskfile.yml` or package scripts.
+- Before adding a new tooling entrypoint, search `packages/tooling` and extend an existing domain module when practical.
+- Keep product runtime code in its owning app or package; this rule applies to repository automation and one-off executable tooling, not application features.
+
 ## Documentation Site Safety
 
 `docs/` is the production VitePress source directory. Its contents are packaged and deployed to the public documentation site.

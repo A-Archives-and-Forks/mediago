@@ -501,9 +501,22 @@ tasks:
       - task: internal:deps:node
       - task: internal:deps:runtime
       - task: internal:core:build
+      - task: internal:electron:prepare-development-runtime
     cmds:
       - 'node -e "console.log(''MEDIAGO_DEV_PROCESSES_STARTING'')"'
       - pnpm dev:all:raw
+
+  internal:electron:prepare-development-runtime:
+    internal: true
+    run: once
+    vars: *development-profile-vars
+    env: *profile-env
+    dotenv: *profile-dotenv
+    requires: *profile-requires
+    deps:
+      - task: internal:deps:node
+    cmds:
+      - pnpm exec tsx packages/tooling/src/electron/prepare-development-runtime.ts
 
   internal:dev:web:
     internal: true
@@ -528,6 +541,7 @@ tasks:
       - task: internal:deps:node
       - task: internal:deps:runtime
       - task: internal:core:build
+      - task: internal:electron:prepare-development-runtime
     cmds:
       - pnpm start:electron
 
