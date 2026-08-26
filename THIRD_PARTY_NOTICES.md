@@ -20,16 +20,16 @@ The downloaded executable keeps its upstream contents and is renamed to
 `aria2c` or `aria2c.exe` only so existing MediaGo process resolution remains
 compatible.
 
-## yt-dlp 2026.07.04
+## yt-dlp 2026.08.19
 
 - Project and corresponding source:
-  <https://github.com/yt-dlp/yt-dlp/tree/2026.07.04>
-- Release: <https://github.com/yt-dlp/yt-dlp/releases/tag/2026.07.04>
+  <https://github.com/yt-dlp/yt-dlp/tree/2026.08.19>
+- Release: <https://github.com/yt-dlp/yt-dlp/releases/tag/2026.08.19>
 - License: the yt-dlp source is dedicated to the public domain under the
   Unlicense; official standalone executables also contain third-party
   components under their respective licenses.
 - Standalone executable notices and license texts:
-  <https://github.com/yt-dlp/yt-dlp/blob/2026.07.04/THIRD_PARTY_LICENSES.txt>
+  <https://github.com/yt-dlp/yt-dlp/blob/2026.08.19/THIRD_PARTY_LICENSES.txt>
 
 ## Deno 2.9.5
 

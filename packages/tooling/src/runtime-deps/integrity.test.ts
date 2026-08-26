@@ -39,6 +39,20 @@ const depsVersions = JSON.parse(
 >;
 const OFFICIAL_ARIA2_LINUX_X64_SHA256 =
   "b6f2cdadcd34ba16dd7fcb29de4b84c36f893f9b223a9a05157d1892687a45a0";
+const YT_DLP_2026_08_19_SHA256 = {
+  "darwin-x64":
+    "0f192b7ec147ab6288885d6351d9ab67367640029b4377576ef46dd79cf7b202",
+  "darwin-arm64":
+    "0f192b7ec147ab6288885d6351d9ab67367640029b4377576ef46dd79cf7b202",
+  "linux-x64":
+    "58162f9bfdc27458ea47bfcb311cf47028f17d8154a8bf7d689861d46399230a",
+  "linux-arm64":
+    "b16e4dab368a816cd05d477d698a605a6ae87ccee1c8ffd38fa21d7254141fcc",
+  "win32-x64":
+    "66674953fe251b89f4d08c5f0e35e0728679bd67ab3d7d05c0562af101dd3e7a",
+  "win32-arm64":
+    "05b438997bafc3affdfda9d041353c9d73e04dc842207254b655b0887c4445b0",
+} as const;
 const unixTest = process.platform === "win32" ? test.skip : test;
 
 test("pins exactly one lowercase SHA-256 for every release asset", () => {
@@ -66,6 +80,14 @@ test("pins the official linux-x64 aria2 binary SHA-256", () => {
     sha256: {
       "linux-x64": OFFICIAL_ARIA2_LINUX_X64_SHA256,
     },
+  });
+});
+
+test("pins the yt-dlp release that removed android_vr from default YouTube clients", () => {
+  expect(depsVersions["yt-dlp"]).toMatchObject({
+    repo: "yt-dlp/yt-dlp",
+    version: "2026.08.19",
+    sha256: YT_DLP_2026_08_19_SHA256,
   });
 });
 

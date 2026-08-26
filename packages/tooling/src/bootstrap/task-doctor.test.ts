@@ -96,7 +96,7 @@ test("aggregates every diagnostic and never reflects unrelated environment", asy
   expect(result.lines.join("\n")).toMatch(/Docker 29\.4\.0.*ready/i);
   for (const [index, toolName] of RUNTIME_TOOLS.entries()) {
     expect(result.lines.join("\n")).toContain(toolName);
-    expect(result.lines.join("\n")).toContain(statuses[index]);
+    expect(result.lines.join("\n")).toContain(statuses[index] ?? "corrupt");
   }
   expect(result.lines.join("\n")).not.toContain("DOCTOR_SECRET_SENTINEL");
   expect(result.lines.join("\n")).not.toContain("GO_SECRET_SENTINEL");
