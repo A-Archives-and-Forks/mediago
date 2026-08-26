@@ -91,7 +91,8 @@ export const it = {
   clipboardCopyFailed: "Impossibile copiare negli appunti",
   settingsSaveFailed: "Impossibile salvare l'impostazione",
   settingsPromotion: "Promozione",
-  dismissPromotion: "Nascondi questa promozione",
+  movePromotionToSettings: "Sposta nelle impostazioni",
+  movePromotionToSidebar: "Sposta nella barra laterale",
   moreSettings: "Avanzate",
   openSourceProject: "Open source",
   openSourceDescription:

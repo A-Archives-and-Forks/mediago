@@ -90,7 +90,8 @@ export const en = {
   clipboardCopyFailed: "Could not copy to the clipboard",
   settingsSaveFailed: "Could not save the setting",
   settingsPromotion: "Promotion",
-  dismissPromotion: "Hide this promotion",
+  movePromotionToSettings: "Move to settings",
+  movePromotionToSidebar: "Move to sidebar",
   moreSettings: "Advanced",
   openSourceProject: "Open source",
   openSourceDescription:

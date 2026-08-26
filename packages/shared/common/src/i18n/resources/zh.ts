@@ -85,7 +85,8 @@ export const zh = {
   clipboardCopyFailed: "无法复制到剪贴板",
   settingsSaveFailed: "无法保存设置",
   settingsPromotion: "推广",
-  dismissPromotion: "隐藏此推广内容",
+  movePromotionToSettings: "移到设置页",
+  movePromotionToSidebar: "移到侧边栏",
   moreSettings: "更多设置",
   openSourceProject: "开源项目",
   openSourceDescription:

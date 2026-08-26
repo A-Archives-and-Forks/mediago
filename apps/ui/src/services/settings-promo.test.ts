@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, test, vi } from "vitest";
 import {
   isSettingsPromoEligible,
@@ -9,38 +10,78 @@ import {
 const sourceUrl =
   "https://raw.githubusercontent.com/mediago-dev/mediago/master/remote-config/settings-promo.json";
 const validManifest = {
-  schemaVersion: 1,
+  schemaVersion: 5,
   enabled: true,
   campaignId: "extension-promo",
   cacheSeconds: 900,
-  dismissible: true,
   actionUrl: "https://downloader.caorushizi.cn/extension.html",
-  imageUrl:
-    "https://raw.githubusercontent.com/mediago-dev/mediago/master/remote-config/promo.webp",
   platforms: ["electron", "web"],
   content: {
     en: {
-      badge: "Recommended",
-      title: "Install the extension",
-      description: "Capture media from your browser.",
-      button: "Learn more",
+      imageUrl:
+        "https://raw.githubusercontent.com/mediago-dev/mediago/master/images/browser_en.png",
+      sidebarImageUrl:
+        "https://raw.githubusercontent.com/mediago-dev/mediago/master/images/browser_sidebar_en.png",
+      title: "Send browser media to MediaGo in one click",
+      buttonText: "Try it now",
     },
     zh: {
-      badge: "推荐",
-      title: "安装浏览器扩展",
-      description: "从浏览器捕获媒体资源。",
-      button: "了解详情",
+      imageUrl:
+        "https://raw.githubusercontent.com/mediago-dev/mediago/master/images/browser.png",
+      sidebarImageUrl:
+        "https://raw.githubusercontent.com/mediago-dev/mediago/master/images/browser_sidebar.png",
+      title: "一键将浏览器资源发送到 MediaGo",
+      buttonText: "立即体验",
     },
   },
 } as const;
 
 describe("settings promotion manifest", () => {
-  test("accepts structured HTTPS content and normalizes defaults", () => {
+  test("accepts the checked-in remote configuration", () => {
+    const checkedInManifest = JSON.parse(
+      readFileSync(
+        new URL(
+          "../../../../remote-config/settings-promo.json",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+    ) as unknown;
+
+    expect(
+      parseSettingsPromoManifest(checkedInManifest, sourceUrl),
+    ).not.toBeNull();
+  });
+
+  test("accepts localized HTTPS images and normalizes defaults", () => {
     const manifest = parseSettingsPromoManifest(validManifest, sourceUrl);
 
     expect(manifest).not.toBeNull();
     expect(manifest?.campaignId).toBe("extension-promo");
-    expect(manifest?.content.zh?.title).toBe("安装浏览器扩展");
+    expect(manifest?.content.zh?.title).toBe("一键将浏览器资源发送到 MediaGo");
+    expect(manifest?.content.zh?.sidebarImageUrl).toContain(
+      "browser_sidebar.png",
+    );
+  });
+
+  test("falls back to the wide image for legacy configurations", () => {
+    const manifest = parseSettingsPromoManifest(
+      {
+        ...validManifest,
+        content: {
+          en: {
+            imageUrl: validManifest.content.en.imageUrl,
+            title: validManifest.content.en.title,
+            buttonText: validManifest.content.en.buttonText,
+          },
+        },
+      },
+      sourceUrl,
+    );
+
+    expect(manifest?.content.en?.sidebarImageUrl).toBe(
+      manifest?.content.en?.imageUrl,
+    );
   });
 
   test("rejects insecure actions and cross-origin tracking images", () => {
@@ -52,7 +93,32 @@ describe("settings promotion manifest", () => {
     ).toBeNull();
     expect(
       parseSettingsPromoManifest(
-        { ...validManifest, imageUrl: "https://tracker.example/pixel.gif" },
+        {
+          ...validManifest,
+          content: {
+            ...validManifest.content,
+            en: {
+              ...validManifest.content.en,
+              sidebarImageUrl: "https://tracker.example/sidebar.png",
+            },
+          },
+        },
+        sourceUrl,
+      ),
+    ).toBeNull();
+    expect(
+      parseSettingsPromoManifest(
+        {
+          ...validManifest,
+          content: {
+            ...validManifest.content,
+            en: {
+              imageUrl: "https://tracker.example/pixel.gif",
+              title: "Tracked promotion",
+              buttonText: "Open",
+            },
+          },
+        },
         sourceUrl,
       ),
     ).toBeNull();
@@ -100,10 +166,10 @@ describe("settings promotion manifest", () => {
     if (!manifest) throw new Error("Expected a valid fixture");
 
     expect(selectSettingsPromoContent(manifest, "zh-CN")?.title).toBe(
-      "安装浏览器扩展",
+      "一键将浏览器资源发送到 MediaGo",
     );
     expect(selectSettingsPromoContent(manifest, "fr-FR")?.title).toBe(
-      "Install the extension",
+      "Send browser media to MediaGo in one click",
     );
   });
 

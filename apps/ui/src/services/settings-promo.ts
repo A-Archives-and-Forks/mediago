@@ -1,9 +1,12 @@
+import settingsPromoPreviewImageUrl from "../../../../remote-config/assets/settings-promo-drama.webp?url";
+import settingsPromoSidebarPreviewImageUrl from "../../../../remote-config/assets/settings-promo-drama-sidebar.webp?url";
+
 export const SETTINGS_PROMO_URL =
   import.meta.env.APP_SETTINGS_PROMO_URL ||
   "https://raw.githubusercontent.com/mediago-dev/mediago/master/remote-config/settings-promo.json";
 
-const CACHE_KEY = "mediago.settings-promo.cache.v1";
-const CACHE_SCHEMA_VERSION = 1;
+const CACHE_KEY = "mediago.settings-promo.cache.v5";
+const CACHE_SCHEMA_VERSION = 5;
 const DEFAULT_CACHE_SECONDS = 30 * 60;
 const MIN_CACHE_SECONDS = 60;
 const MAX_CACHE_SECONDS = 24 * 60 * 60;
@@ -15,21 +18,18 @@ export type SettingsPromoLocale = (typeof SUPPORTED_LOCALES)[number];
 export type SettingsPromoPlatform = (typeof SUPPORTED_PLATFORMS)[number];
 
 export interface SettingsPromoContent {
-  badge?: string;
+  imageUrl: string;
+  sidebarImageUrl: string;
   title: string;
-  description: string;
-  button: string;
-  imageAlt?: string;
+  buttonText: string;
 }
 
 export interface SettingsPromoManifest {
-  schemaVersion: 1;
+  schemaVersion: 5;
   enabled: boolean;
   campaignId: string;
   cacheSeconds: number;
-  dismissible: boolean;
   actionUrl: string;
-  imageUrl?: string;
   startsAt?: string;
   endsAt?: string;
   minVersion?: string;
@@ -39,7 +39,7 @@ export interface SettingsPromoManifest {
 }
 
 interface CachedSettingsPromo {
-  schemaVersion: 1;
+  schemaVersion: 5;
   sourceUrl: string;
   fetchedAt: number;
   manifest: SettingsPromoManifest;
@@ -62,14 +62,6 @@ function isBoundedText(value: unknown, maximumLength: number): value is string {
     value.trim().length > 0 &&
     value.length <= maximumLength
   );
-}
-
-function optionalBoundedText(
-  value: unknown,
-  maximumLength: number,
-): string | undefined | null {
-  if (value === undefined) return undefined;
-  return isBoundedText(value, maximumLength) ? value : null;
 }
 
 function parseHttpsUrl(value: unknown): URL | null {
@@ -100,7 +92,10 @@ function parseVersion(value: unknown): string | undefined | null {
   return value;
 }
 
-function parseContent(value: unknown): SettingsPromoManifest["content"] | null {
+function parseContent(
+  value: unknown,
+  source: URL,
+): SettingsPromoManifest["content"] | null {
   if (!isRecord(value)) return null;
 
   const content: SettingsPromoManifest["content"] = {};
@@ -109,24 +104,27 @@ function parseContent(value: unknown): SettingsPromoManifest["content"] | null {
     if (candidate === undefined) continue;
     if (!isRecord(candidate)) return null;
 
-    const badge = optionalBoundedText(candidate.badge, 40);
-    const imageAlt = optionalBoundedText(candidate.imageAlt, 120);
+    const imageUrl = parseHttpsUrl(candidate.imageUrl);
+    const sidebarImageUrl =
+      candidate.sidebarImageUrl === undefined
+        ? imageUrl
+        : parseHttpsUrl(candidate.sidebarImageUrl);
     if (
-      badge === null ||
-      imageAlt === null ||
-      !isBoundedText(candidate.title, 100) ||
-      !isBoundedText(candidate.description, 280) ||
-      !isBoundedText(candidate.button, 60)
+      !imageUrl ||
+      imageUrl.origin !== source.origin ||
+      !sidebarImageUrl ||
+      sidebarImageUrl.origin !== source.origin
     ) {
       return null;
     }
+    if (!isBoundedText(candidate.title, 100)) return null;
+    if (!isBoundedText(candidate.buttonText, 40)) return null;
 
     content[locale] = {
+      imageUrl: imageUrl.href,
+      sidebarImageUrl: sidebarImageUrl.href,
       title: candidate.title,
-      description: candidate.description,
-      button: candidate.button,
-      ...(badge ? { badge } : {}),
-      ...(imageAlt ? { imageAlt } : {}),
+      buttonText: candidate.buttonText,
     };
   }
 
@@ -151,15 +149,13 @@ export function parseSettingsPromoManifest(
   value: unknown,
   sourceUrl = SETTINGS_PROMO_URL,
 ): SettingsPromoManifest | null {
-  if (!isRecord(value) || value.schemaVersion !== 1) return null;
+  if (!isRecord(value) || value.schemaVersion !== 5) return null;
   if (typeof value.enabled !== "boolean") return null;
   if (!isBoundedText(value.campaignId, 80)) return null;
 
   const source = parseHttpsUrl(sourceUrl);
   const actionUrl = parseHttpsUrl(value.actionUrl);
-  const imageUrl =
-    value.imageUrl === undefined ? undefined : parseHttpsUrl(value.imageUrl);
-  const content = parseContent(value.content);
+  const content = source ? parseContent(value.content, source) : null;
   const startsAt = parseDate(value.startsAt);
   const endsAt = parseDate(value.endsAt);
   const minVersion = parseVersion(value.minVersion);
@@ -168,7 +164,6 @@ export function parseSettingsPromoManifest(
   if (
     !source ||
     !actionUrl ||
-    imageUrl === null ||
     !content ||
     startsAt === null ||
     endsAt === null ||
@@ -178,8 +173,6 @@ export function parseSettingsPromoManifest(
   ) {
     return null;
   }
-
-  if (imageUrl && imageUrl.origin !== source.origin) return null;
 
   const cacheSeconds =
     value.cacheSeconds === undefined
@@ -194,22 +187,13 @@ export function parseSettingsPromoManifest(
     return null;
   }
 
-  if (
-    value.dismissible !== undefined &&
-    typeof value.dismissible !== "boolean"
-  ) {
-    return null;
-  }
-
   return {
-    schemaVersion: 1,
+    schemaVersion: 5,
     enabled: value.enabled,
     campaignId: value.campaignId,
     cacheSeconds,
-    dismissible: value.dismissible ?? true,
     actionUrl: actionUrl.href,
     content,
-    ...(imageUrl ? { imageUrl: imageUrl.href } : {}),
     ...(startsAt ? { startsAt } : {}),
     ...(endsAt ? { endsAt } : {}),
     ...(minVersion ? { minVersion } : {}),
@@ -309,7 +293,7 @@ function readCache(
     const manifest = parseSettingsPromoManifest(value.manifest, sourceUrl);
     if (!manifest) return null;
     return {
-      schemaVersion: 1,
+      schemaVersion: 5,
       sourceUrl,
       fetchedAt: value.fetchedAt,
       manifest,
@@ -335,6 +319,43 @@ export async function loadSettingsPromoManifest(
   sourceUrl = SETTINGS_PROMO_URL,
   options: LoadSettingsPromoOptions = {},
 ): Promise<SettingsPromoManifest | null> {
+  // Temporary local preview. Remove after the promotion artwork is approved.
+  if (
+    import.meta.env.DEV &&
+    sourceUrl === SETTINGS_PROMO_URL &&
+    options.fetcher === undefined
+  ) {
+    return {
+      schemaVersion: 5,
+      enabled: true,
+      campaignId: "local-drama-preview-v1",
+      cacheSeconds: 900,
+      actionUrl:
+        "https://mediago.torchstellar.com/?utm_source=mediago&utm_medium=in_app_promo&utm_campaign=drama_launch_2026_08",
+      platforms: ["electron", "web"],
+      content: {
+        zh: {
+          imageUrl: settingsPromoPreviewImageUrl,
+          sidebarImageUrl: settingsPromoSidebarPreviewImageUrl,
+          title: "一站式 AI 漫剧创作工作台",
+          buttonText: "立即体验",
+        },
+        en: {
+          imageUrl: settingsPromoPreviewImageUrl,
+          sidebarImageUrl: settingsPromoSidebarPreviewImageUrl,
+          title: "All-in-one AI comic-drama workspace",
+          buttonText: "Try Drama",
+        },
+        it: {
+          imageUrl: settingsPromoPreviewImageUrl,
+          sidebarImageUrl: settingsPromoSidebarPreviewImageUrl,
+          title: "Workspace AI per comic drama",
+          buttonText: "Prova Drama",
+        },
+      },
+    };
+  }
+
   const now = options.now ?? Date.now;
   const storage =
     options.storage === undefined ? browserStorage() : options.storage;
@@ -366,7 +387,7 @@ export async function loadSettingsPromoManifest(
     );
     if (!manifest) return cached?.manifest ?? null;
     writeCache(storage, {
-      schemaVersion: 1,
+      schemaVersion: 5,
       sourceUrl,
       fetchedAt: now(),
       manifest,

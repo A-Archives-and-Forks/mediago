@@ -19,13 +19,7 @@ import {
 } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Field,
   FieldContent,
@@ -287,13 +281,14 @@ export const SettingCard = memo(function SettingCard({
         className,
       )}
     >
-      <CardHeader className="h-14 border-b px-5 py-0 [.border-b]:pb-0">
-        <CardTitle id={titleId} className="self-center text-sm font-semibold">
+      <CardHeader className="flex h-14 flex-row items-center gap-3 border-b px-5 py-0 [.border-b]:pb-0">
+        <CardTitle
+          id={titleId}
+          className="min-w-0 flex-1 text-sm font-semibold"
+        >
           {title}
         </CardTitle>
-        {headerAction ? (
-          <CardAction className="self-center">{headerAction}</CardAction>
-        ) : null}
+        {headerAction ? <div className="shrink-0">{headerAction}</div> : null}
       </CardHeader>
       <CardContent className="@container/settings flex flex-col px-5 py-0">
         {children}
@@ -347,7 +342,7 @@ export function SettingRow({
       orientation="horizontal"
       data-invalid={Boolean(error)}
       className={cn(
-        "grid min-h-14 grid-cols-1 items-start gap-2 py-4 @sm/settings:grid-cols-[minmax(140px,0.85fr)_minmax(180px,1.15fr)] @sm/settings:items-center @sm/settings:gap-6",
+        "grid min-h-14 grid-cols-1 items-start gap-2 py-4 @min-[15rem]/settings:grid-cols-[minmax(112px,0.85fr)_minmax(0,1.15fr)] @min-[15rem]/settings:items-center @min-[15rem]/settings:gap-3 @sm/settings:grid-cols-[minmax(140px,0.85fr)_minmax(180px,1.15fr)] @sm/settings:gap-6",
         className,
       )}
     >
@@ -365,7 +360,7 @@ export function SettingRow({
       </div>
       <FieldContent
         className={cn(
-          "min-w-0 w-full @sm/settings:items-end",
+          "min-w-0 w-full @min-[15rem]/settings:items-end",
           contentClassName,
         )}
       >

@@ -78,7 +78,6 @@ const SettingsCards = memo(function SettingsCards({
         {!isWeb && allSettingsVisible ? <StableOpenSourceCard /> : null}
       </div>
       <div className="flex min-w-0 flex-col gap-4">
-        <StableSettingsPromoCard />
         {!isWeb ? <StableDockerSettingsCard /> : <StableSkillsSettingsCard />}
         {!isWeb && visibleStep >= 2 ? <StableSkillsSettingsCard /> : null}
         {!isWeb && visibleStep >= 3 ? <StableCLISettingsCard /> : null}
@@ -88,6 +87,7 @@ const SettingsCards = memo(function SettingsCards({
           <>
             <StableMoreSettingsCard onCheckUpdate={onCheckUpdate} />
             {isWeb ? <StableOpenSourceCard /> : null}
+            <StableSettingsPromoCard placement="settings" />
           </>
         ) : null}
       </div>

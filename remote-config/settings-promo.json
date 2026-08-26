@@ -1,29 +1,28 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 5,
   "enabled": true,
-  "campaignId": "browser-extension-2026-08",
+  "campaignId": "drama-2026-08",
   "cacheSeconds": 900,
-  "dismissible": true,
   "platforms": ["electron", "web"],
-  "actionUrl": "https://downloader.caorushizi.cn/extension.html",
+  "actionUrl": "https://mediago.torchstellar.com/?utm_source=mediago&utm_medium=in_app_promo&utm_campaign=drama_launch_2026_08",
   "content": {
     "zh": {
-      "badge": "推荐",
-      "title": "安装 MediaGo 浏览器扩展",
-      "description": "在浏览器中发现视频资源，并快速发送到 MediaGo。",
-      "button": "查看扩展指南"
+      "title": "一站式 AI 漫剧创作工作台",
+      "buttonText": "立即体验",
+      "imageUrl": "https://raw.githubusercontent.com/mediago-dev/mediago/master/remote-config/assets/settings-promo-drama.webp",
+      "sidebarImageUrl": "https://raw.githubusercontent.com/mediago-dev/mediago/master/remote-config/assets/settings-promo-drama-sidebar.webp"
     },
     "en": {
-      "badge": "Recommended",
-      "title": "Install the MediaGo browser extension",
-      "description": "Discover video resources in your browser and send them to MediaGo.",
-      "button": "View extension guide"
+      "title": "All-in-one AI comic-drama workspace",
+      "buttonText": "Try Drama",
+      "imageUrl": "https://raw.githubusercontent.com/mediago-dev/mediago/master/remote-config/assets/settings-promo-drama.webp",
+      "sidebarImageUrl": "https://raw.githubusercontent.com/mediago-dev/mediago/master/remote-config/assets/settings-promo-drama-sidebar.webp"
     },
     "it": {
-      "badge": "Consigliato",
-      "title": "Installa l'estensione MediaGo",
-      "description": "Trova risorse video nel browser e inviale rapidamente a MediaGo.",
-      "button": "Guida all'estensione"
+      "title": "Workspace AI per comic drama",
+      "buttonText": "Prova Drama",
+      "imageUrl": "https://raw.githubusercontent.com/mediago-dev/mediago/master/remote-config/assets/settings-promo-drama.webp",
+      "sidebarImageUrl": "https://raw.githubusercontent.com/mediago-dev/mediago/master/remote-config/assets/settings-promo-drama-sidebar.webp"
     }
   }
 }

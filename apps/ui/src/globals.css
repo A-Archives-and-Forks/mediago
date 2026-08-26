@@ -224,3 +224,60 @@ body,
     @apply bg-background text-foreground;
   }
 }
+
+@keyframes promo-cta-shimmer {
+  0%,
+  22% {
+    opacity: 0;
+    transform: translateX(-120%) skewX(-18deg);
+  }
+
+  32% {
+    opacity: 1;
+  }
+
+  62% {
+    opacity: 0;
+    transform: translateX(420%) skewX(-18deg);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateX(420%) skewX(-18deg);
+  }
+}
+
+@keyframes promo-card-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes promo-card-fade-out {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+.promo-card-fade-in {
+  animation: promo-card-fade-in 220ms ease-out both;
+}
+
+.promo-card-fade-out {
+  animation: promo-card-fade-out 180ms ease-in both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .promo-card-fade-in,
+  .promo-card-fade-out {
+    animation: none;
+  }
+}

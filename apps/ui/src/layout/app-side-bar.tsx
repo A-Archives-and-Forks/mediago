@@ -12,6 +12,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { HelpButton } from "@/components/help-button";
 import { Button } from "@/components/ui/button";
 import { usePlatform } from "@/hooks/use-platform";
+import { SettingsPromoCard } from "@/pages/setting-page/settings-promo-card";
 import { useAppStore } from "@/store/app";
 import { useDownloadStore } from "@/store/download";
 import { useSessionStore } from "@/store/session";
@@ -356,6 +357,12 @@ export function AppSideBar({ className }: Props) {
           ))}
         </div>
       </nav>
+      {!compact ? (
+        <SettingsPromoCard
+          placement="sidebar"
+          className="max-[1079px]:hidden"
+        />
+      ) : null}
       <div
         className={cn(
           "flex shrink-0 items-center gap-1 border-t p-3 max-[1079px]:flex-col max-[1079px]:px-2",

@@ -78,6 +78,9 @@ test("keeps regenerate and copy actions on the same full-width row", () => {
   expect(actions).toContain("w-full");
   expect(actions).toContain("flex-nowrap");
   expect(rowOpeningTag).toContain(
+    "@min-[15rem]/settings:grid-cols-[minmax(112px,0.85fr)_minmax(0,1.15fr)]",
+  );
+  expect(rowOpeningTag).toContain(
     "@sm/settings:grid-cols-[minmax(140px,0.85fr)_minmax(180px,1.15fr)]",
   );
   expect(rowOpeningTag).not.toContain("@sm/settings:grid-cols-1");
