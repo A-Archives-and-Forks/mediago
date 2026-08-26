@@ -270,14 +270,14 @@ npx @mediago/core
 
 用户无需配置任何环境变量即可运行！
 
-可选的环境变量：
+服务端支持以下运行时环境变量：
 
-- `MEDIAGO_M3U8_BIN` - M3U8 下载器路径
-- `MEDIAGO_BILIBILI_BIN` - Bilibili 下载器路径
-- `MEDIAGO_DIRECT_BIN` - 直接下载器路径
-- `MEDIAGO_LOG_LEVEL` - 日志级别 (debug/info/warn/error)
-- `MEDIAGO_LOG_DIR` - 日志目录路径
-- `MEDIAGO_SERVER_ADDR` - 服务器监听地址 (默认 :8080)
+- `GIN_MODE` - Gin 运行模式
+- `HOST` - 服务监听地址
+- `PORT` - 服务监听端口
+- `DB_PATH` - SQLite 数据库文件路径
+
+日志级别和日志目录分别通过 `--log-level`、`--log-dir` 命令行参数配置。
 
 ---
 

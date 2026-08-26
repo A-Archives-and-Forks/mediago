@@ -189,7 +189,7 @@ const dockerRunAllowlist = {
       name: "Verify preview package is private",
       if: "inputs.run_mode == 'test'",
       env: {
-        GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}",
+        GH_TOKEN: "${{ github.token }}",
         OWNER: "${{ github.repository_owner }}",
         GITHUB_API_URL: "${{ github.api_url }}",
       },

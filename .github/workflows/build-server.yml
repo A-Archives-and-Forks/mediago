@@ -104,7 +104,7 @@ jobs:
       - name: Verify preview package is private
         if: inputs.run_mode == 'test'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
           OWNER: ${{ github.repository_owner }}
           GITHUB_API_URL: ${{ github.api_url }}
         run: task ci:docker:verify-preview-private
@@ -120,7 +120,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ github.token }}
 
       - name: Detect Docker Hub credentials for release
         id: dockerhub
