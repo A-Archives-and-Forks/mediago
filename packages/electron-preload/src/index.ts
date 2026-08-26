@@ -4,6 +4,9 @@ import {
   type EnvPath,
   type DownloadTask,
   type BrowserStore,
+  type BrowserTabSnapshot,
+  type BrowserTabsSnapshot,
+  type CreateBrowserTabInput,
   type DialogOpenOptions,
   type DialogSaveOptions,
   type ContextMenuItem,
@@ -22,38 +25,79 @@ const apiKey = "electron";
  */
 const electronApi: PlatformApi = {
   browser: {
-    loadURL(url: string): Promise<void> {
-      return ipcRenderer.invoke(IPC.browser.loadURL, url);
+    createTab(options?: CreateBrowserTabInput): Promise<BrowserTabSnapshot> {
+      return ipcRenderer.invoke(IPC.browser.createTab, options);
     },
-    back(): Promise<boolean> {
-      return ipcRenderer.invoke(IPC.browser.back);
+    activateTab(tabId: string): Promise<BrowserTabsSnapshot> {
+      return ipcRenderer.invoke(IPC.browser.activateTab, tabId);
     },
-    reload(): Promise<void> {
-      return ipcRenderer.invoke(IPC.browser.reload);
+    closeTab(tabId: string): Promise<BrowserTabsSnapshot> {
+      return ipcRenderer.invoke(IPC.browser.closeTab, tabId);
     },
-    show(): Promise<void> {
-      return ipcRenderer.invoke(IPC.browser.show);
+    getTabs(): Promise<BrowserTabsSnapshot> {
+      return ipcRenderer.invoke(IPC.browser.getTabs);
     },
-    hide(): Promise<void> {
-      return ipcRenderer.invoke(IPC.browser.hide);
+    loadURL(tabIdOrUrl: string, url?: string): Promise<void> {
+      return ipcRenderer.invoke(
+        IPC.browser.loadURL,
+        url === undefined
+          ? { tabId: "", url: tabIdOrUrl }
+          : { tabId: tabIdOrUrl, url },
+      );
     },
-    home(): Promise<void> {
-      return ipcRenderer.invoke(IPC.browser.home);
+    back(tabId?: string): Promise<boolean> {
+      return ipcRenderer.invoke(IPC.browser.back, tabId);
     },
-    setBounds(rect: Electron.Rectangle): Promise<void> {
-      return ipcRenderer.invoke(IPC.browser.setBounds, rect);
+    reload(tabId?: string): Promise<void> {
+      return ipcRenderer.invoke(IPC.browser.reload, tabId);
     },
-    setUserAgent(isMobile: boolean): Promise<void> {
-      return ipcRenderer.invoke(IPC.browser.setUserAgent, isMobile);
+    show(tabId?: string): Promise<void> {
+      return ipcRenderer.invoke(IPC.browser.show, tabId);
+    },
+    hide(tabId?: string): Promise<void> {
+      return ipcRenderer.invoke(IPC.browser.hide, tabId);
+    },
+    home(tabId?: string): Promise<void> {
+      return ipcRenderer.invoke(IPC.browser.home, tabId);
+    },
+    setBounds(
+      tabIdOrRect: string | Electron.Rectangle,
+      rect?: Electron.Rectangle,
+    ): Promise<void> {
+      return ipcRenderer.invoke(
+        IPC.browser.setBounds,
+        typeof tabIdOrRect === "string"
+          ? { tabId: tabIdOrRect, bounds: rect }
+          : { tabId: "", bounds: tabIdOrRect },
+      );
+    },
+    setUserAgent(
+      tabIdOrIsMobile: string | boolean,
+      isMobile?: boolean,
+    ): Promise<void> {
+      return ipcRenderer.invoke(
+        IPC.browser.setUserAgent,
+        typeof tabIdOrIsMobile === "string"
+          ? { tabId: tabIdOrIsMobile, isMobile: isMobile === true }
+          : { tabId: "", isMobile: tabIdOrIsMobile },
+      );
     },
     clearCache(): Promise<void> {
       return ipcRenderer.invoke(IPC.browser.clearCache);
     },
-    pluginReady(): Promise<void> {
-      return ipcRenderer.invoke(IPC.browser.pluginReady);
+    pluginReady(tabId?: string): Promise<void> {
+      return ipcRenderer.invoke(IPC.browser.pluginReady, tabId);
     },
-    showDownloadDialog(data: Omit<DownloadTask, "id">[]): Promise<void> {
-      return ipcRenderer.invoke(IPC.browser.showDownloadDialog, data);
+    showDownloadDialog(
+      tabIdOrData: string | Omit<DownloadTask, "id">[],
+      data?: Omit<DownloadTask, "id">[],
+    ): Promise<void> {
+      return ipcRenderer.invoke(
+        IPC.browser.showDownloadDialog,
+        typeof tabIdOrData === "string"
+          ? { tabId: tabIdOrData, data: data ?? [] }
+          : { tabId: "", data: tabIdOrData },
+      );
     },
     dismissOverlayDialog(): Promise<void> {
       return ipcRenderer.invoke(IPC.browser.dismissOverlayDialog);
@@ -72,7 +116,7 @@ const electronApi: PlatformApi = {
     getPreferredSystemLanguage(): Promise<string> {
       return ipcRenderer.invoke(IPC.app.getPreferredSystemLanguage);
     },
-    getSharedState(): Promise<unknown> {
+    getSharedState(): Promise<BrowserTabsSnapshot> {
       return ipcRenderer.invoke(IPC.app.getSharedState);
     },
     setSharedState(state: unknown): Promise<void> {
@@ -81,7 +125,9 @@ const electronApi: PlatformApi = {
     showBrowserWindow(): Promise<void> {
       return ipcRenderer.invoke(IPC.app.showBrowserWindow);
     },
-    combineToHomePage(store: BrowserStore): Promise<void> {
+    combineToHomePage(
+      store?: BrowserTabsSnapshot | BrowserStore,
+    ): Promise<void> {
       return ipcRenderer.invoke(IPC.app.combineToHomePage, store);
     },
     drainShareIntents() {

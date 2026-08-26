@@ -9,6 +9,18 @@ const noop = async (..._args: unknown[]): Promise<any> => {};
  */
 export const webPlatformStubs: PlatformApi = {
   browser: {
+    createTab: async () => ({
+      id: "web-tab",
+      kind: "user",
+      mode: "home",
+      status: "default",
+      url: "",
+      title: "",
+      sources: [],
+    }),
+    activateTab: async (tabId) => emptyTabsSnapshot(tabId),
+    closeTab: async () => emptyTabsSnapshot(),
+    getTabs: async () => emptyTabsSnapshot(),
     loadURL: noop,
     back: async () => false,
     reload: noop,
@@ -43,7 +55,7 @@ export const webPlatformStubs: PlatformApi = {
       if (typeof navigator === "undefined") return "";
       return navigator.languages?.[0] ?? navigator.language;
     },
-    getSharedState: async () => ({}),
+    getSharedState: async () => emptyTabsSnapshot(),
     setSharedState: noop,
     showBrowserWindow: noop,
     combineToHomePage: noop,
@@ -119,3 +131,7 @@ export const webPlatformStubs: PlatformApi = {
   on: () => {},
   off: () => {},
 };
+
+function emptyTabsSnapshot(activeTabId = "") {
+  return { tabs: [], activeTabId, sourcePanelCollapsed: false };
+}

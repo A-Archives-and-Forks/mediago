@@ -65,6 +65,7 @@ docker-compose up -d
 - ✅ **Swagger 文档**（完整的 API 文档）
 - ✅ **类型化构建流程**（Task + packages/tooling）
 - ✅ **Docker 支持**（一键部署）
+- ✅ **Agent 媒体发现**（HTTP、MCP、CLI；Electron 隐藏浏览器执行器）
 
 ---
 
@@ -95,7 +96,22 @@ swag init -g cmd/server/main.go -o docs --parseDependency --parseInternal
 - `POST /api/tasks/:id/stop` - 停止任务
 - `POST /api/config` - 更新配置
 - `GET /api/events` - SSE 事件流
+- `POST /api/discoveries` - 创建媒体发现任务
+- `GET /api/discoveries/:id` - 查询脱敏后的发现结果
+- `POST /api/discoveries/:id/cancel` - 取消发现任务
+- `POST /api/discoveries/:id/downloads` - 从 source ID 创建下载
+- `GET /api/discovery-executor/status` - 查询浏览器执行器状态
 - `GET /swagger/*any` - Swagger UI
+
+浏览器发现要求桌面端 Electron 与 Core 保持连接；独立 Docker/Core 目前仅支持直接 M3U8 的 `inspect` 模式。`useSessionCookies` 默认为关闭，公开 HTTP/MCP/CLI 结果永远不包含 Cookie 或 Authorization。内置 MCP 工具为 `discover_media`、`get_media_discovery`、`cancel_media_discovery`、`download_discovered_media`。
+
+```bash
+# CLI：等待并打印脱敏后的发现结果
+mediago discover "https://example.com/watch/1" --mode browser --json
+
+# 从结果中的 source ID 创建下载
+mediago discover download <discovery-id> --source source-1
+```
 
 ---
 

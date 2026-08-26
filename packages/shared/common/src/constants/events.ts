@@ -4,6 +4,10 @@
 
 export const IPC = {
   browser: {
+    createTab: "browser.createTab",
+    activateTab: "browser.activateTab",
+    closeTab: "browser.closeTab",
+    getTabs: "browser.getTabs",
     loadURL: "browser.loadURL",
     back: "browser.back",
     reload: "browser.reload",
@@ -60,9 +64,11 @@ export const IpcEvent = {
     shareIntentAvailable: "app:shareIntentAvailable",
   },
   browser: {
+    tabsChanged: "browser:tabsChanged",
     domReady: "browser:domReady",
     didNavigate: "browser:didNavigate",
     didNavigateInPage: "browser:didNavigateInPage",
+    didFailLoad: "browser:didFailLoad",
     sourceDetected: "browser:sourceDetected",
     showOverlayDialog: "browser:showOverlayDialog",
     privacyChanged: "browser:privacyChanged",

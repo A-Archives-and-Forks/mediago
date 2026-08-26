@@ -7,7 +7,7 @@ import {
   Search,
   Trash2,
 } from "lucide-react";
-import { memo, useDeferredValue, useMemo, useState } from "react";
+import { memo, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { useShallow } from "zustand/react/shallow";
@@ -16,9 +16,9 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { appStoreSelector, useAppStore } from "@/store/app";
 import {
+  browserActionsSelector,
   browserSourcesSelector,
   type SourceData,
-  setBrowserSelector,
   useBrowserStore,
 } from "@/store/browser";
 import { usePlatform } from "@/hooks/use-platform";
@@ -133,11 +133,12 @@ const SourceItem = memo(function SourceItem({
 });
 
 export function BrowserViewPanel() {
-  const { sources } = useBrowserStore(useShallow(browserSourcesSelector));
-  const { enableDocker } = useAppStore(useShallow(appStoreSelector));
-  const { setBrowserStore, deleteSource, clearSources } = useBrowserStore(
-    useShallow(setBrowserSelector),
+  const { tabId, sources } = useBrowserStore(
+    useShallow(browserSourcesSelector),
   );
+  const { enableDocker } = useAppStore(useShallow(appStoreSelector));
+  const { clearSources, deleteSource, setSourcePanelCollapsed } =
+    useBrowserStore(useShallow(browserActionsSelector));
   const { t } = useTranslation();
   const { browser } = usePlatform();
   const [filterQuery, setFilterQuery] = useState("");
@@ -147,16 +148,20 @@ export function BrowserViewPanel() {
     [deferredFilterQuery, sources],
   );
 
+  useEffect(() => {
+    setFilterQuery("");
+  }, [tabId]);
+
   const handleClear = useMemoizedFn(() => {
-    clearSources();
+    clearSources(tabId);
   });
 
   const handleCollapse = useMemoizedFn(() => {
-    setBrowserStore({ sourcePanelCollapsed: true });
+    setSourcePanelCollapsed(true);
   });
 
   const handleEdit = useMemoizedFn((items: SourceData[]) => {
-    browser.showDownloadDialog(items);
+    browser.showDownloadDialog(tabId, items);
   });
 
   const handleDownloadNow = useMemoizedFn(async (item: SourceData) => {
@@ -220,7 +225,7 @@ export function BrowserViewPanel() {
               key={item.id}
               item={item}
               enableDocker={enableDocker}
-              onDelete={deleteSource}
+              onDelete={(url) => deleteSource(tabId, url)}
               onEdit={handleEdit}
               onDownload={handleDownloadNow}
             />

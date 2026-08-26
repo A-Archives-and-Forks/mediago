@@ -24,6 +24,17 @@ var catalogs = map[string]map[string]string{
 		MsgInternalError:       "An internal error occurred",
 		MsgSourcesCountInvalid: "sources must contain between 1 and 20 items",
 
+		MsgDiscoveryNotFound:             "discovery not found",
+		MsgDiscoveryInvalidURL:           "discovery URL must use HTTP or HTTPS",
+		MsgDiscoveryInvalidMode:          "invalid discovery mode",
+		MsgDiscoveryInvalidInspectURL:    "inspect mode requires a direct M3U8 URL",
+		MsgDiscoveryExecutorUnavailable:  "browser discovery executor unavailable",
+		MsgDiscoveryInspectorUnavailable: "HLS inspector unavailable",
+		MsgDiscoveryQueueFull:            "discovery queue is full",
+		MsgDiscoveryInvalidState:         "invalid discovery state",
+		MsgDiscoverySourceNotFound:       "discovery source not found",
+		MsgDiscoveryDownloadUnavailable:  "download persistence is unavailable",
+
 		// Auth
 		MsgUnauthorized:     "unauthorized",
 		MsgAPIKeyRequired:   "apiKey is required",
@@ -75,6 +86,17 @@ var catalogs = map[string]map[string]string{
 		MsgInternalError:       "发生内部错误",
 		MsgSourcesCountInvalid: "来源数量必须在 1 到 20 个之间",
 
+		MsgDiscoveryNotFound:             "未找到素材发现任务",
+		MsgDiscoveryInvalidURL:           "素材发现 URL 必须使用 HTTP 或 HTTPS",
+		MsgDiscoveryInvalidMode:          "无效的素材发现模式",
+		MsgDiscoveryInvalidInspectURL:    "检查模式需要直接的 M3U8 URL",
+		MsgDiscoveryExecutorUnavailable:  "浏览器素材发现执行器不可用",
+		MsgDiscoveryInspectorUnavailable: "HLS 检查器不可用",
+		MsgDiscoveryQueueFull:            "素材发现队列已满",
+		MsgDiscoveryInvalidState:         "素材发现任务状态无效",
+		MsgDiscoverySourceNotFound:       "未找到素材来源",
+		MsgDiscoveryDownloadUnavailable:  "下载持久化服务不可用",
+
 		// Auth
 		MsgUnauthorized:     "未授权",
 		MsgAPIKeyRequired:   "请提供 apiKey",
@@ -125,6 +147,17 @@ var catalogs = map[string]map[string]string{
 		MsgInvalidRequest:      "Richiesta non valida",
 		MsgInternalError:       "Si è verificato un errore interno",
 		MsgSourcesCountInvalid: "Le sorgenti devono essere da 1 a 20",
+
+		MsgDiscoveryNotFound:             "Rilevamento multimediale non trovato",
+		MsgDiscoveryInvalidURL:           "L'URL deve usare HTTP o HTTPS",
+		MsgDiscoveryInvalidMode:          "Modalità di rilevamento non valida",
+		MsgDiscoveryInvalidInspectURL:    "La modalità inspect richiede un URL M3U8 diretto",
+		MsgDiscoveryExecutorUnavailable:  "Esecutore browser non disponibile",
+		MsgDiscoveryInspectorUnavailable: "Inspector HLS non disponibile",
+		MsgDiscoveryQueueFull:            "Coda di rilevamento piena",
+		MsgDiscoveryInvalidState:         "Stato del rilevamento non valido",
+		MsgDiscoverySourceNotFound:       "Sorgente multimediale non trovata",
+		MsgDiscoveryDownloadUnavailable:  "Persistenza download non disponibile",
 
 		// Auth
 		MsgUnauthorized:     "Non autorizzato",

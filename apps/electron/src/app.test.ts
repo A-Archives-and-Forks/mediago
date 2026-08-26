@@ -68,8 +68,8 @@ vi.mock("./services/overlay-dialog.service", () => ({
 vi.mock("./services/share-intent.service", () => ({
   default: class ShareIntentService {},
 }));
-vi.mock("./services/webview.service", () => ({
-  default: class WebviewService {},
+vi.mock("./services/browser-tab-manager.service", () => ({
+  default: class BrowserTabManagerService {},
 }));
 vi.mock("./vendor/ElectronDevtools", () => ({
   default: class ElectronDevtools {},
@@ -189,6 +189,18 @@ test("continues startup when the system tray is unavailable", async () => {
   expect(mainWindow.init).toHaveBeenCalledOnce();
 });
 
+test("destroys browser executors before stopping Core", async () => {
+  const { app, downloaderServer, webviewService } = createApp({});
+
+  await app.shutdown();
+
+  expect(webviewService.destroy).toHaveBeenCalledOnce();
+  expect(downloaderServer.stop).toHaveBeenCalledOnce();
+  expect(webviewService.destroy.mock.invocationCallOrder[0]).toBeLessThan(
+    downloaderServer.stop.mock.invocationCallOrder[0],
+  );
+});
+
 function createApp(config: Record<string, unknown>) {
   const mainWindow = {
     init: vi.fn(),
@@ -212,6 +224,8 @@ function createApp(config: Record<string, unknown>) {
     stop: vi.fn(async () => undefined),
   };
   const webviewService = {
+    destroy: vi.fn(),
+    reparentActiveView: vi.fn(),
     setAudioMuted: vi.fn(),
     setBlocking: vi.fn(),
     setDefaultSession: vi.fn(),
@@ -250,6 +264,7 @@ function createApp(config: Record<string, unknown>) {
   return {
     app,
     configCache,
+    downloaderServer,
     logger,
     mainWindow,
     shareIntentService,

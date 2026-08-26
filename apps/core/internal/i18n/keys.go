@@ -11,6 +11,18 @@ const (
 	MsgInternalError       = "common.internal_error"
 	MsgSourcesCountInvalid = "common.sources_count_invalid"
 
+	// Discovery
+	MsgDiscoveryNotFound             = "discovery.not_found"
+	MsgDiscoveryInvalidURL           = "discovery.invalid_url"
+	MsgDiscoveryInvalidMode          = "discovery.invalid_mode"
+	MsgDiscoveryInvalidInspectURL    = "discovery.invalid_inspect_url"
+	MsgDiscoveryExecutorUnavailable  = "discovery.executor_unavailable"
+	MsgDiscoveryInspectorUnavailable = "discovery.inspector_unavailable"
+	MsgDiscoveryQueueFull            = "discovery.queue_full"
+	MsgDiscoveryInvalidState         = "discovery.invalid_state"
+	MsgDiscoverySourceNotFound       = "discovery.source_not_found"
+	MsgDiscoveryDownloadUnavailable  = "discovery.download_unavailable"
+
 	// Auth
 	MsgUnauthorized     = "auth.unauthorized"
 	MsgAPIKeyRequired   = "auth.api_key_required"

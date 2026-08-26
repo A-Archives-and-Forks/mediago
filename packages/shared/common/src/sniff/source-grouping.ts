@@ -3,6 +3,8 @@ import type { HLSMediaInfo } from "../types";
 export interface GroupableSniffedSource {
   url: string;
   mediaInfo?: HLSMediaInfo;
+  /** Optional isolation key, normally a browser tab ID. */
+  sourceScope?: string;
 }
 
 function isMaster(source: GroupableSniffedSource): boolean {
@@ -11,12 +13,24 @@ function isMaster(source: GroupableSniffedSource): boolean {
 
 function masterContains(
   master: GroupableSniffedSource,
-  sourceUrl: string,
+  source: GroupableSniffedSource,
 ): boolean {
   return (
     isMaster(master) &&
-    master.mediaInfo?.variants.some((variant) => variant.url === sourceUrl) ===
+    sameScope(master, source) &&
+    master.mediaInfo?.variants.some((variant) => variant.url === source.url) ===
       true
+  );
+}
+
+function sameScope(
+  first: GroupableSniffedSource,
+  second: GroupableSniffedSource,
+): boolean {
+  return (
+    first.sourceScope === undefined ||
+    second.sourceScope === undefined ||
+    first.sourceScope === second.sourceScope
   );
 }
 
@@ -29,11 +43,13 @@ export function mergeSniffedSource<T extends GroupableSniffedSource>(
   current: T[],
   incoming: T,
 ): T[] {
-  const withoutSameUrl = current.filter((item) => item.url !== incoming.url);
+  const withoutSameUrl = current.filter(
+    (item) => item.url !== incoming.url || !sameScope(item, incoming),
+  );
 
   if (
     !isMaster(incoming) &&
-    withoutSameUrl.some((item) => masterContains(item, incoming.url))
+    withoutSameUrl.some((item) => masterContains(item, incoming))
   ) {
     return withoutSameUrl;
   }
@@ -46,7 +62,9 @@ export function mergeSniffedSource<T extends GroupableSniffedSource>(
     incoming.mediaInfo?.variants.map((variant) => variant.url) ?? [],
   );
   return [
-    ...withoutSameUrl.filter((item) => !relatedUrls.has(item.url)),
+    ...withoutSameUrl.filter(
+      (item) => !sameScope(item, incoming) || !relatedUrls.has(item.url),
+    ),
     incoming,
   ];
 }

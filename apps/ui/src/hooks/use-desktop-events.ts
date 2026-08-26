@@ -1,17 +1,20 @@
 import type { UpdateState } from "@mediago/shared-common";
 import { useEffect } from "react";
-import { PageMode, useBrowserStore } from "../store/browser";
+import { useBrowserStore } from "../store/browser";
 import { useSessionStore } from "../store/session";
 import { usePlatform } from "./use-platform";
 
 export function useDesktopEvents() {
-  const { on, off, update } = usePlatform();
+  const { browser, on, off, update } = usePlatform();
   const setUpdateState = useSessionStore((state) => state.setUpdateState);
-  const setBrowserStore = useBrowserStore((state) => state.setBrowserStore);
+  const hydrateSnapshot = useBrowserStore((state) => state.hydrateSnapshot);
 
   useEffect(() => {
     const onPrivacyChanged = () => {
-      setBrowserStore({ url: "", title: "", mode: PageMode.Default });
+      void browser
+        .getTabs()
+        .then(hydrateSnapshot)
+        .catch(() => undefined);
     };
     const onUpdateStateChanged = (...args: unknown[]) => {
       const nextState = args[1] as UpdateState | undefined;
@@ -31,5 +34,5 @@ export function useDesktopEvents() {
       off("browser:privacyChanged", onPrivacyChanged);
       off("update:stateChanged", onUpdateStateChanged);
     };
-  }, [off, on, setBrowserStore, setUpdateState, update]);
+  }, [browser, hydrateSnapshot, off, on, setUpdateState, update]);
 }

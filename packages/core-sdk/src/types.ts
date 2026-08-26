@@ -114,6 +114,128 @@ export interface InspectSourcesResponse {
   sources: SourceInspection[];
 }
 
+// #region Media discovery
+
+export type DiscoveryMode = "auto" | "browser" | "inspect";
+
+export type DiscoveryStatus =
+  | "pending"
+  | "running"
+  | "completed"
+  | "failed"
+  | "cancelled";
+
+export interface CreateDiscoveryParams {
+  url: string;
+  mode?: DiscoveryMode;
+  timeoutMs?: number;
+  useSessionCookies?: boolean;
+}
+
+/** Alias retained for consumers that name API request bodies as inputs. */
+export type CreateDiscoveryInput = CreateDiscoveryParams;
+
+export type DiscoverySourceType =
+  | "m3u8"
+  | "bilibili"
+  | "direct"
+  | "mediago"
+  | "youtube";
+
+export interface DiscoverySource {
+  id: string;
+  url: string;
+  pageUrl: string;
+  title: string;
+  type: DiscoverySourceType;
+  playlistType?: "master" | "media" | "unknown";
+  maxQuality?: string;
+  variants?: HLSVariantInspection[];
+  detectedAt: string;
+}
+
+export interface DiscoveryJob {
+  id: string;
+  input: CreateDiscoveryParams;
+  status: DiscoveryStatus;
+  sources: DiscoverySource[];
+  partial: boolean;
+  errorCode?: string;
+  error?: string;
+  createdAt: string;
+  startedAt?: string;
+  completedAt?: string;
+  expiresAt: string;
+}
+
+export interface DiscoveryExecutorStatus {
+  available: boolean;
+  activeDiscoveryId?: string;
+  queued: number;
+}
+
+export interface DiscoveryRequestOptions {
+  signal?: AbortSignal;
+  /** Transport timeout. Clamped to 1–35 seconds. */
+  timeoutMs?: number;
+}
+
+export interface CreateDiscoveryDownloadsParams {
+  sourceIds: string[];
+  folder?: string;
+  startDownload?: boolean;
+}
+
+/** @internal Electron bridge contract. Never expose headers through public jobs. */
+export interface BridgeDiscoverySource extends DiscoverySource {
+  headers?: string[];
+}
+
+/** @internal Electron bridge command delivered over the dedicated event stream. */
+export interface BridgeDiscoveryRequest {
+  type: "discovery-requested";
+  discoveryId: string;
+  input: Required<
+    Pick<
+      CreateDiscoveryParams,
+      "url" | "mode" | "timeoutMs" | "useSessionCookies"
+    >
+  >;
+}
+
+/** @internal Electron bridge cancellation command. */
+export interface BridgeDiscoveryCancellation {
+  type?: "discovery-cancelled";
+  discoveryId: string;
+}
+
+/** @internal Electron bridge completion callback body. */
+export interface BridgeDiscoveryCompleteParams {
+  sources: BridgeDiscoverySource[];
+  partial: boolean;
+}
+
+/** @internal Electron bridge failure callback body. */
+export interface BridgeDiscoveryFailureParams {
+  errorCode: string;
+  error: string;
+  sources?: BridgeDiscoverySource[];
+  partial?: boolean;
+}
+
+/** @internal Typed events emitted by MediaGoBridgeClient. */
+export interface BridgeEventMap {
+  "discovery-requested": BridgeDiscoveryRequest;
+  "discovery-cancelled": BridgeDiscoveryCancellation;
+  open: Event;
+  error: Event;
+}
+
+/** @internal Electron bridge event stream. */
+export type BridgeEventEmitter = TypedEventEmitter<BridgeEventMap>;
+
+// #endregion
+
 /**
  * Parameters for updating the server configuration.
  * All fields are optional.

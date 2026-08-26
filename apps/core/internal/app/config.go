@@ -7,22 +7,23 @@ import (
 
 // AppConfig stores startup configuration options passed by flags or environment.
 type AppConfig struct {
-	GinMode        string `json:"gin_mode"`
-	Host           string `json:"host"`
-	Port           string `json:"port"`
-	LogLevel       string `json:"log_level"`
-	LogDir         string `json:"log_dir"`
-	SchemaPath     string `json:"schema_path"`
-	DepsDir        string `json:"deps_dir"`
-	MaxRunner      int    `json:"max_runner"`
-	LocalDir       string `json:"local_dir"`
-	DeleteSegments bool   `json:"delete_segments"`
-	Proxy          string `json:"proxy"`
-	UseProxy       bool   `json:"use_proxy"`
-	DBPath         string `json:"db_path"`
-	ConfigDir      string `json:"config_dir"`
-	EnableAuth     bool   `json:"enable_auth"`
-	StaticDir      string `json:"static_dir"`
+	GinMode             string `json:"gin_mode"`
+	Host                string `json:"host"`
+	Port                string `json:"port"`
+	LogLevel            string `json:"log_level"`
+	LogDir              string `json:"log_dir"`
+	SchemaPath          string `json:"schema_path"`
+	DepsDir             string `json:"deps_dir"`
+	MaxRunner           int    `json:"max_runner"`
+	LocalDir            string `json:"local_dir"`
+	DeleteSegments      bool   `json:"delete_segments"`
+	Proxy               string `json:"proxy"`
+	UseProxy            bool   `json:"use_proxy"`
+	DBPath              string `json:"db_path"`
+	ConfigDir           string `json:"config_dir"`
+	EnableAuth          bool   `json:"enable_auth"`
+	StaticDir           string `json:"static_dir"`
+	ElectronBridgeToken string `json:"-"`
 }
 
 func DefaultConfig() *AppConfig {
@@ -48,6 +49,7 @@ func (c *AppConfig) ApplyEnvAndDefaults() {
 	c.Host = getEnv("HOST", c.Host)
 	c.Port = getEnv("PORT", c.Port)
 	c.DBPath = getEnv("DB_PATH", c.DBPath)
+	c.ElectronBridgeToken = getEnv("MEDIAGO_ELECTRON_BRIDGE_TOKEN", c.ElectronBridgeToken)
 
 	if c.SchemaPath == "" {
 		c.SchemaPath = getDefaultSchemaPath()

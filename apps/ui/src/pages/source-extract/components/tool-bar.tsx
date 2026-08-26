@@ -34,7 +34,7 @@ import {
   browserNavSelector,
   browserSourcePanelSelector,
   PageMode,
-  setBrowserSelector,
+  browserActionsSelector,
   useBrowserStore,
 } from "@/store/browser";
 import { cn, getFavIcon } from "@/utils";
@@ -49,12 +49,14 @@ interface Props {
 export function ToolBar({ page }: Props) {
   const { data: favoriteList, addFavorite, removeFavorite } = useFavorites();
   const { browser, app, contextMenu } = usePlatform();
-  const { goto, goHome } = useBrowserActions();
+  const { goBack, goHome, goto, reload } = useBrowserActions();
   const store = useBrowserStore(useShallow(browserNavSelector));
   const { sourceCount, sourcePanelCollapsed } = useBrowserStore(
     useShallow(browserSourcePanelSelector),
   );
-  const { setBrowserStore } = useBrowserStore(useShallow(setBrowserSelector));
+  const { setSourcePanelCollapsed, updateTab } = useBrowserStore(
+    useShallow(browserActionsSelector),
+  );
   const appStore = useAppStore(useShallow(appStoreSelector));
   const { setAppStore } = useAppStore(useShallow(setAppStoreSelector));
   const { t } = useTranslation();
@@ -65,7 +67,7 @@ export function ToolBar({ page }: Props) {
   // Set default UA
   const onSetDefaultUA = useMemoizedFn(() => {
     const nextMode = !appStore.isMobile;
-    browser.setUserAgent(nextMode);
+    browser.setUserAgent(store.tabId, nextMode);
     setAppStore({
       isMobile: nextMode,
     });
@@ -83,10 +85,7 @@ export function ToolBar({ page }: Props) {
   );
 
   const onClickGoBack = useMemoizedFn(async () => {
-    const back = await browser.back();
-    if (!back) {
-      setBrowserStore({ url: "", title: "", mode: PageMode.Default });
-    }
+    await goBack(store.tabId);
   });
 
   const onInputContextMenu = useMemoizedFn(() => {
@@ -115,14 +114,11 @@ export function ToolBar({ page }: Props) {
   });
 
   const onCombineToHome = useMemoizedFn(() => {
-    app.combineToHomePage({
-      url: store.url,
-      sourceList: [],
-    });
+    app.combineToHomePage();
   });
 
   const onExpandSourcePanel = useMemoizedFn(() => {
-    setBrowserStore({ sourcePanelCollapsed: false });
+    setSourcePanelCollapsed(false);
   });
 
   const expandSourcePanelLabel = `${t("expand")} · ${t("sniffedResourceCount", {
@@ -130,7 +126,7 @@ export function ToolBar({ page }: Props) {
   })}`;
 
   return (
-    <div className="flex h-14 shrink-0 flex-row items-center gap-2 border-b bg-surface px-3">
+    <div className="flex h-11 shrink-0 flex-row items-center gap-2 border-b bg-surface px-3">
       <Button
         type="button"
         variant="ghost"
@@ -150,7 +146,7 @@ export function ToolBar({ page }: Props) {
         disabled={disabled}
         title={t("home")}
         aria-label={t("home")}
-        onClick={goHome}
+        onClick={() => goHome(store.tabId)}
       >
         <House />
       </Button>
@@ -175,7 +171,7 @@ export function ToolBar({ page }: Props) {
           className="text-muted-foreground hover:text-foreground"
           title={t("cancle")}
           aria-label={t("cancle")}
-          onClick={goHome}
+          onClick={() => goHome(store.tabId)}
         >
           <X />
         </Button>
@@ -188,7 +184,7 @@ export function ToolBar({ page }: Props) {
           disabled={disabled}
           title={t("refresh")}
           aria-label={t("refresh")}
-          onClick={() => goto(store.url)}
+          onClick={() => reload(store.tabId)}
         >
           <RefreshCw />
         </Button>
@@ -224,7 +220,7 @@ export function ToolBar({ page }: Props) {
           value={store.url}
           onChange={(e) => {
             const url = e.target.value;
-            setBrowserStore({ url });
+            updateTab(store.tabId, { url });
           }}
           onFocus={(e) => {
             e.currentTarget.select();

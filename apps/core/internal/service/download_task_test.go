@@ -1,16 +1,32 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
+	"time"
 
 	"caorushizi.cn/mediago/internal/core"
 	"caorushizi.cn/mediago/internal/db"
 	"caorushizi.cn/mediago/internal/db/repo"
+	"caorushizi.cn/mediago/internal/logger"
+	"go.uber.org/zap"
 )
+
+type headerCaptureDownloader struct {
+	params chan core.DownloadParams
+}
+
+func (d *headerCaptureDownloader) Download(_ context.Context, params core.DownloadParams, _ core.Callbacks) error {
+	d.params <- params
+	return nil
+}
+
+func (*headerCaptureDownloader) Config() interface{} { return nil }
 
 func TestAddDownloadTaskRejectsExistingURL(t *testing.T) {
 	service, videoRepo := newTestDownloadTaskService(t)
@@ -187,6 +203,78 @@ func TestDownloadParamsForVideoPreservesBilibiliFields(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("downloadParamsForVideo() = %#v, want %#v", got, want)
+	}
+}
+
+func TestStartDownloadWithRuntimeHeadersDoesNotPersistCredentials(t *testing.T) {
+	previousLogger, previousSugar := logger.Logger, logger.Sugar
+	logger.Logger = zap.NewNop()
+	logger.Sugar = logger.Logger.Sugar()
+	t.Cleanup(func() {
+		logger.Logger = previousLogger
+		logger.Sugar = previousSugar
+	})
+
+	database, err := db.New(filepath.Join(t.TempDir(), "mediago.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+	repository := repo.NewVideoRepository(database)
+	downloader := &headerCaptureDownloader{params: make(chan core.DownloadParams, 1)}
+	queue := core.NewTaskQueue(downloader, 1)
+	svc := NewDownloadTaskService(repository, queue, nil)
+
+	runtimeHeaders := []string{
+		"Cookie: sentinel-cookie",
+		"Authorization: Bearer sentinel-authorization",
+		"Proxy-Authorization: Basic sentinel-proxy",
+		"Referer: https://example.com/watch",
+		"User-Agent: MediaGo-Test",
+	}
+	persistedHeaders := PersistentDiscoveryHeaders(runtimeHeaders)
+	video, err := svc.AddDownloadTask(&AddDownloadTaskInput{
+		Name:    "runtime-credentials",
+		Type:    "m3u8",
+		URL:     "https://cdn.example.com/master.m3u8",
+		Headers: persistedHeaders,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stored, err := repository.FindByIDOrFail(video.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stored.Headers == nil || strings.Contains(*stored.Headers, "sentinel-") || !strings.Contains(*stored.Headers, "Referer") {
+		t.Fatalf("persisted headers = %v", stored.Headers)
+	}
+
+	if err := svc.StartDownloadWithRuntimeHeaders(video.ID, t.TempDir(), false, runtimeHeaders); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case params := <-downloader.params:
+		joined := strings.Join(params.Headers, "\n")
+		for _, expected := range []string{"sentinel-cookie", "sentinel-authorization", "sentinel-proxy", "Referer", "User-Agent"} {
+			if !strings.Contains(joined, expected) {
+				t.Fatalf("runtime params missing %q: %s", expected, joined)
+			}
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for download params")
+	}
+	waitForRuntimeHeaderQueue(t, queue)
+}
+
+func waitForRuntimeHeaderQueue(t *testing.T, queue *core.TaskQueue) {
+	t.Helper()
+	deadline := time.Now().Add(time.Second)
+	for queue.IsFull() {
+		if time.Now().After(deadline) {
+			t.Fatal("timed out waiting for download queue")
+		}
+		time.Sleep(time.Millisecond)
 	}
 }
 

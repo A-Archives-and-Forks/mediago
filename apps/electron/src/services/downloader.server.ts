@@ -1,9 +1,11 @@
 import { EventEmitter } from "node:events";
+import { randomBytes } from "node:crypto";
 import path from "node:path";
 import { provide } from "@inversifyjs/binding-decorators";
 import {
   type CreateTaskResponse,
   MediaGoClient,
+  MediaGoBridgeClient,
   type TaskEventEmitter,
   TaskStatus,
 } from "@mediago/core-sdk";
@@ -19,6 +21,7 @@ import {
   resolveDepsBinaries,
 } from "../utils/binaryResolver";
 import ElectronLogger from "../vendor/ElectronLogger";
+import { DiscoveryExecutorService } from "./discovery-executor.service";
 
 export interface DownloadTaskOptions {
   deleteSegments: boolean;
@@ -38,6 +41,7 @@ export interface DownloadServiceOptions {
 }
 
 interface DownloaderStartOperation {
+  bridgeToken: string;
   promise: Promise<void>;
   runner: ServiceRunner;
   started: boolean;
@@ -50,6 +54,7 @@ export class DownloaderServer extends EventEmitter {
   private client: MediaGoClient | null = null;
   private runner: ServiceRunner | null = null;
   private events: TaskEventEmitter | null = null;
+  private discoveryStarted = false;
   private startOperation: DownloaderStartOperation | null = null;
   private stopping: Promise<void> | null = null;
   private shutdownFailed = false;
@@ -58,6 +63,8 @@ export class DownloaderServer extends EventEmitter {
   constructor(
     @inject(ElectronLogger)
     private readonly logger: ElectronLogger,
+    @inject(DiscoveryExecutorService)
+    private readonly discoveryExecutor: DiscoveryExecutorService,
   ) {
     super();
   }
@@ -75,6 +82,7 @@ export class DownloaderServer extends EventEmitter {
     if (this.runner) return Promise.resolve();
 
     let runner: ServiceRunner;
+    const bridgeToken = randomBytes(32).toString("hex");
     try {
       const core = resolveCoreBinaries();
       const deps = resolveDepsBinaries();
@@ -83,6 +91,9 @@ export class DownloaderServer extends EventEmitter {
         executableDir: path.dirname(core.coreBin),
         preferredPort: 39719,
         internal: false,
+        extraEnv: {
+          MEDIAGO_ELECTRON_BRIDGE_TOKEN: bridgeToken,
+        },
         extraArgs: [
           `-log-level=info`,
           `-log-dir=${opts.logDir}`,
@@ -98,6 +109,7 @@ export class DownloaderServer extends EventEmitter {
 
     this.runner = runner;
     const operation = {
+      bridgeToken,
       runner,
       started: false,
     } as DownloaderStartOperation;
@@ -129,6 +141,13 @@ export class DownloaderServer extends EventEmitter {
     this.client = new MediaGoClient({
       baseURL: this.serverUrl,
     });
+    this.discoveryExecutor.start(
+      new MediaGoBridgeClient({
+        baseURL: this.serverUrl,
+        token: operation.bridgeToken,
+      }),
+    );
+    this.discoveryStarted = true;
     this.events = this.client.streamEvents();
     const events = this.events;
 
@@ -171,6 +190,10 @@ export class DownloaderServer extends EventEmitter {
     const runner = this.runner;
     this.runner = null;
     this.serverUrl = "";
+    const discoveryStop = this.discoveryStarted
+      ? this.discoveryExecutor.stop()
+      : Promise.resolve();
+    this.discoveryStarted = false;
 
     let closeFailed = false;
     let closeError: unknown;
@@ -182,11 +205,14 @@ export class DownloaderServer extends EventEmitter {
     }
 
     if (!runner) {
-      if (closeFailed) {
-        this.shutdownFailed = true;
-        return Promise.reject(closeError);
-      }
-      return Promise.resolve();
+      return discoveryStop
+        .then(() => {
+          if (closeFailed) throw closeError;
+        })
+        .catch((error) => {
+          this.shutdownFailed = true;
+          throw error;
+        });
     }
 
     const startOperation =
@@ -196,6 +222,7 @@ export class DownloaderServer extends EventEmitter {
       startOperation,
       closeFailed,
       closeError,
+      discoveryStop,
     );
     this.stopping = stopping;
     void stopping.then(
@@ -215,6 +242,7 @@ export class DownloaderServer extends EventEmitter {
     startOperation: DownloaderStartOperation | null,
     closeFailed: boolean,
     closeError: unknown,
+    discoveryStop: Promise<void>,
   ) {
     if (startOperation) {
       try {
@@ -235,7 +263,17 @@ export class DownloaderServer extends EventEmitter {
       }
     }
 
+    let discoveryStopFailed = false;
+    let discoveryStopError: unknown;
+    try {
+      await discoveryStop;
+    } catch (error) {
+      discoveryStopFailed = true;
+      discoveryStopError = error;
+    }
+
     if (runnerStopFailed) throw runnerStopError;
+    if (discoveryStopFailed) throw discoveryStopError;
     if (closeFailed) throw closeError;
   }
 

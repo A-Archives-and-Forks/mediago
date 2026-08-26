@@ -47,6 +47,60 @@ MediaGo 把下载核心暴露成一个 HTTP 服务。桌面端在 `39719` 端口
 - **桌面端**:默认**无需认证**,直接请求 `localhost:39719` 即可
 - **Docker 部署**:启用认证时,在 MediaGo **设置页面**中获取 API Key,之后的请求带 `Authorization: Bearer <key>` 头
 
+## 媒体发现（嗅探 / 解析）
+
+媒体发现是异步任务。`inspect` 直接解析 HLS，`browser` 让 Electron 主进程创建一个不可见的隔离浏览器视图并嗅探网络请求；它不会跳转或替换用户当前可见的素材提取标签。
+
+| 模式      | 行为                                                              |
+| --------- | ----------------------------------------------------------------- |
+| `auto`    | 直接 `.m3u8` URL 使用 `inspect`，其他 HTTP(S) 页面使用 `browser`  |
+| `inspect` | 仅接受直接 M3U8 URL，不需要 Electron 浏览器执行器                 |
+| `browser` | 打开页面并收集媒体请求，需要桌面端 Electron 正在运行并已连接 Core |
+
+独立 Docker/Core 当前没有远程浏览器执行器，因此只能使用 `inspect` 或让 `auto` 处理直接 M3U8；页面嗅探会返回 `discovery_executor_unavailable`。
+
+### 创建并查询发现任务
+
+```bash
+curl -X POST http://localhost:39719/api/discoveries \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://example.com/watch/1",
+    "mode": "browser",
+    "timeoutMs": 20000,
+    "useSessionCookies": false
+  }'
+
+curl http://localhost:39719/api/discoveries/<discovery-id>
+curl -X POST http://localhost:39719/api/discoveries/<discovery-id>/cancel
+curl http://localhost:39719/api/discovery-executor/status
+```
+
+`timeoutMs` 会限制在 3000–30000 ms。状态为 `pending`、`running`、`completed`、`failed` 或 `cancelled`；任务结果在内存中保留约 10 分钟。公开响应、CLI 输出和 MCP 结果都不会返回 `Cookie`、`Authorization` 等私密请求头。
+
+`useSessionCookies` 默认为 `false`，使用隔离会话。只有明确设为 `true` 才会复用桌面端已登录会话；这可能访问个性化内容，且凭据只保存在内存中、重启后失效。MediaGo 不绕过 DRM 或站点访问控制。
+
+### 从 source ID 创建下载
+
+```bash
+curl -X POST http://localhost:39719/api/discoveries/<discovery-id>/downloads \
+  -H "Content-Type: application/json" \
+  -d '{"sourceIds":["source-1"],"startDownload":true}'
+```
+
+一次最多选择 20 个 source ID。只有 Core 内部的下载交接能读取短期私密请求头；这些头不会进入发现响应，敏感部分也不会写入数据库。
+
+### CLI 与 MCP
+
+```bash
+mediago discover "https://example.com/watch/1" --mode browser --json
+mediago discover get <discovery-id> --json
+mediago discover cancel <discovery-id>
+mediago discover download <discovery-id> --source source-1
+```
+
+需要登录态时显式添加 `--session-cookies`。内置 MCP 的对应工具是 `discover_media`、`get_media_discovery`、`cancel_media_discovery` 和 `download_discovered_media`；MCP 使用 `/mcp`、Bearer token，并在设置中启用。
+
 ## 快速上手
 
 下面这三条命令串起"新建 → 开始下载 → 完成通知"的完整流程。

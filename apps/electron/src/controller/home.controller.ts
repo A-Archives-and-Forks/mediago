@@ -1,5 +1,11 @@
 import { provide } from "@inversifyjs/binding-decorators";
-import { type Controller, EnvPath, IPC } from "@mediago/shared-common";
+import {
+  type BrowserStore,
+  type BrowserTabsSnapshot,
+  type Controller,
+  EnvPath,
+  IPC,
+} from "@mediago/shared-common";
 import { handle } from "../core/decorators";
 import { DownloaderServer } from "../services/downloader.server";
 import { TYPES } from "../types/symbols";
@@ -12,12 +18,11 @@ import BrowserWindow from "../windows/browser.window";
 import MainWindow from "../windows/main.window";
 import ShareIntentService from "../services/share-intent.service";
 import { getPreferredSystemLanguage } from "../core/system-language";
+import BrowserTabManagerService from "../services/browser-tab-manager.service";
 
 @injectable()
 @provide(TYPES.Controller)
 export default class HomeController implements Controller {
-  private sharedState: Record<string, unknown> = {};
-
   constructor(
     @inject(MainWindow)
     private readonly mainWindow: MainWindow,
@@ -29,6 +34,8 @@ export default class HomeController implements Controller {
     private readonly downloaderServer: DownloaderServer,
     @inject(ShareIntentService)
     private readonly shareIntentService: ShareIntentService,
+    @inject(BrowserTabManagerService)
+    private readonly tabs: BrowserTabManagerService,
   ) {}
 
   @handle(IPC.app.getEnvPath)
@@ -72,23 +79,31 @@ export default class HomeController implements Controller {
     const client = this.downloaderServer.getClient();
     await client.setConfigKey("openInNewWindow", true);
     this.browserWindow.showWindow();
+    this.tabs.reparentActiveView();
   }
 
   @handle(IPC.app.combineToHomePage)
-  async combineToHomePage() {
+  async combineToHomePage(
+    _event: IpcMainEvent,
+    state?: BrowserTabsSnapshot | BrowserStore,
+  ) {
+    if (isTabsSnapshot(state)) this.tabs.restoreSnapshot(state);
     this.browserWindow.hideWindow();
     const client = this.downloaderServer.getClient();
     await client.setConfigKey("openInNewWindow", false);
+    this.tabs.reparentActiveView();
   }
 
   @handle(IPC.app.getSharedState)
-  async getSharedState() {
-    return this.sharedState;
+  getSharedState(): BrowserTabsSnapshot {
+    return this.tabs.getSnapshot();
   }
 
   @handle(IPC.app.setSharedState)
-  async setSharedState(event: IpcMainEvent, state: any) {
-    this.sharedState = state;
+  setSharedState(_event: IpcMainEvent, state: unknown): BrowserTabsSnapshot {
+    return isTabsSnapshot(state)
+      ? this.tabs.restoreSnapshot(state)
+      : this.tabs.getSnapshot();
   }
 
   @handle(IPC.app.drainShareIntents)
@@ -124,4 +139,13 @@ export default class HomeController implements Controller {
   getUpdateDiagnosticInfo() {
     return this.updater.getDiagnosticInfo();
   }
+}
+
+function isTabsSnapshot(state: unknown): state is BrowserTabsSnapshot {
+  return Boolean(
+    state &&
+    typeof state === "object" &&
+    "tabs" in state &&
+    Array.isArray(state.tabs),
+  );
 }

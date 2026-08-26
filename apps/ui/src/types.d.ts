@@ -10,17 +10,6 @@ declare interface UrlDetail {
   title: string;
 }
 
-declare interface BrowserStore {
-  mode: PageMode;
-  url: string;
-  title: string;
-  status: BrowserStatus;
-  errCode?: number;
-  errMsg?: string;
-  sources: SourceData[];
-  sourcePanelCollapsed: boolean;
-}
-
 interface ObjectConstructor {
   keys<T>(o: T): (keyof T)[];
 }

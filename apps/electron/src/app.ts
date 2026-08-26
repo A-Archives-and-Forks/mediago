@@ -23,7 +23,7 @@ import ElectronDevtools from "./vendor/ElectronDevtools";
 import ElectronUpdater from "./vendor/ElectronUpdater";
 import GoConfigCache from "./services/go-config-cache";
 import OverlayDialogService from "./services/overlay-dialog.service";
-import WebviewService from "./services/webview.service";
+import BrowserTabManagerService from "./services/browser-tab-manager.service";
 import BrowserWindowService from "./windows/browser.window";
 import MainWindow from "./windows/main.window";
 import "./controller";
@@ -52,8 +52,8 @@ export default class ElectronApp {
     private readonly devTools: ElectronDevtools,
     @inject(DownloaderServer)
     private readonly downloaderServer: DownloaderServer,
-    @inject(WebviewService)
-    private readonly webviewService: WebviewService,
+    @inject(BrowserTabManagerService)
+    private readonly browserTabs: BrowserTabManagerService,
     @inject(OverlayDialogService)
     private readonly overlayDialogService: OverlayDialogService,
     @inject(GoConfigCache)
@@ -69,6 +69,7 @@ export default class ElectronApp {
   private async serviceInit(): Promise<void> {
     this.mainWindow.init();
     this.overlayDialogService.init();
+    this.browserTabs.reparentActiveView();
   }
   handleExternalCommandLine(
     commandLine: readonly string[],
@@ -123,6 +124,7 @@ export default class ElectronApp {
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) {
         this.mainWindow.init();
+        this.browserTabs.reparentActiveView();
       }
     });
 
@@ -149,7 +151,7 @@ export default class ElectronApp {
       const { data: config } = await client.getConfig();
       this.configCache.seed(config as any);
       if (config.blockAds) {
-        this.webviewService.setBlocking(true);
+        this.browserTabs.setBlocking(true);
       }
       updaterConfig = {
         allowBeta: Boolean(config.allowBeta),
@@ -183,19 +185,19 @@ export default class ElectronApp {
             nativeTheme.themeSource = v;
           },
           useProxy: (v) => {
-            this.webviewService.setProxy(v, this.configCache.get("proxy"));
+            this.browserTabs.setProxy(v, this.configCache.get("proxy"));
           },
           proxy: (v) => {
-            this.webviewService.setProxy(this.configCache.get("useProxy"), v);
+            this.browserTabs.setProxy(this.configCache.get("useProxy"), v);
           },
           blockAds: (v) => {
-            this.webviewService.setBlocking(v);
+            this.browserTabs.setBlocking(v);
           },
           isMobile: (v) => {
-            this.webviewService.setUserAgent(v);
+            this.browserTabs.setUserAgent(v);
           },
           privacy: (v) => {
-            this.webviewService.setDefaultSession(v);
+            this.browserTabs.setDefaultSession(v);
           },
           language: (v) => {
             i18n.changeLanguage(
@@ -209,7 +211,7 @@ export default class ElectronApp {
             this.updater.changeAutoUpgrade(v);
           },
           audioMuted: (v) => {
-            this.webviewService.setAudioMuted(v);
+            this.browserTabs.setAudioMuted(v);
           },
         };
         handlers[key]?.(value);
@@ -221,6 +223,7 @@ export default class ElectronApp {
   }
 
   async shutdown(): Promise<void> {
+    this.browserTabs.destroy();
     await this.downloaderServer.stop();
   }
 

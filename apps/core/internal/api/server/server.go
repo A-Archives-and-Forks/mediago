@@ -1,8 +1,10 @@
 package server
 
 import (
+	"context"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"caorushizi.cn/mediago/assets"
 	"caorushizi.cn/mediago/internal/api/handler"
@@ -11,6 +13,7 @@ import (
 	"caorushizi.cn/mediago/internal/core"
 	"caorushizi.cn/mediago/internal/db"
 	"caorushizi.cn/mediago/internal/db/repo"
+	"caorushizi.cn/mediago/internal/discovery"
 	"caorushizi.cn/mediago/internal/i18n"
 	"caorushizi.cn/mediago/internal/service"
 	"caorushizi.cn/mediago/internal/tasklog"
@@ -26,13 +29,17 @@ type Server struct {
 	engine *gin.Engine
 	logs   *tasklog.Manager
 
-	taskHandler   *handler.TaskHandler
-	configHandler *handler.ConfigHandler
-	eventHandler  *handler.EventHandler
-	healthHandler *handler.HealthHandler
-	authHandler   *handler.AuthHandler
-	utilHandler   *handler.UtilHandler
-	sourceHandler *handler.SourceHandler
+	taskHandler            *handler.TaskHandler
+	configHandler          *handler.ConfigHandler
+	eventHandler           *handler.EventHandler
+	healthHandler          *handler.HealthHandler
+	authHandler            *handler.AuthHandler
+	utilHandler            *handler.UtilHandler
+	sourceHandler          *handler.SourceHandler
+	discoveryBridgeHandler *handler.DiscoveryBridgeHandler
+	discoveryHandler       *handler.DiscoveryHandler
+	discoveryService       *discovery.Service
+	discoveryBroker        *discovery.Broker
 
 	// Database persistence handlers (available when database is non-nil)
 	downloadHandler   *handler.DownloadHandler
@@ -48,11 +55,12 @@ type Server struct {
 
 // Options holds optional configuration for the server.
 type Options struct {
-	EnableAuth bool
-	StaticDir  string
-	FFmpegBin  string
-	VideoRoot  string
-	EnvPaths   handler.EnvPaths
+	EnableAuth          bool
+	StaticDir           string
+	FFmpegBin           string
+	VideoRoot           string
+	EnvPaths            handler.EnvPaths
+	ElectronBridgeToken string
 }
 
 // New creates an HTTP server instance.
@@ -64,13 +72,20 @@ func New(queue *core.TaskQueue, logs *tasklog.Manager, database *db.Database, co
 
 	engine := gin.New()
 	engine.Use(gin.Logger(), gin.Recovery())
-	engine.Use(cors.New(cors.Config{
+	corsMiddleware := cors.New(cors.Config{
 		AllowOrigins:     []string{"*"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-API-Key"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
-	}))
+	})
+	engine.Use(func(c *gin.Context) {
+		if strings.HasPrefix(c.Request.URL.Path, "/api/bridge/") {
+			c.Next()
+			return
+		}
+		corsMiddleware(c)
+	})
 
 	// i18n middleware — resolve language before auth so error messages are translated
 	engine.Use(i18n.Middleware(func() string {
@@ -85,19 +100,28 @@ func New(queue *core.TaskQueue, logs *tasklog.Manager, database *db.Database, co
 
 	hub := sse.New()
 	sourceInspector := service.NewM3U8Inspector(confStore)
+	discoveryBroker := discovery.NewBroker()
+	discoveryService := discovery.NewService(discovery.NewStore(discovery.StoreOptions{}), sourceInspector, discoveryBroker)
+	discoveryBroker.SetLifecycleHooks(
+		func() { _ = discoveryService.DispatchPending(context.Background()) },
+		func(id string) { discoveryService.HandleExecutorDisconnect(id) },
+	)
 
 	srv := &Server{
-		queue:         queue,
-		hub:           hub,
-		engine:        engine,
-		logs:          logs,
-		taskHandler:   handler.NewTaskHandler(queue, logs),
-		configHandler: handler.NewConfigHandler(confStore, hub),
-		eventHandler:  handler.NewEventHandler(hub),
-		healthHandler: handler.NewHealthHandler(),
-		authHandler:   handler.NewAuthHandler(confStore),
-		utilHandler:   handler.NewUtilHandler(opt.EnvPaths),
-		sourceHandler: handler.NewSourceHandler(sourceInspector),
+		queue:                  queue,
+		hub:                    hub,
+		engine:                 engine,
+		logs:                   logs,
+		taskHandler:            handler.NewTaskHandler(queue, logs),
+		configHandler:          handler.NewConfigHandler(confStore, hub),
+		eventHandler:           handler.NewEventHandler(hub),
+		healthHandler:          handler.NewHealthHandler(),
+		authHandler:            handler.NewAuthHandler(confStore),
+		utilHandler:            handler.NewUtilHandler(opt.EnvPaths),
+		sourceHandler:          handler.NewSourceHandler(sourceInspector),
+		discoveryBridgeHandler: handler.NewDiscoveryBridgeHandler(opt.ElectronBridgeToken, discoveryBroker, discoveryService),
+		discoveryService:       discoveryService,
+		discoveryBroker:        discoveryBroker,
 	}
 
 	// Initialize persistence-related components when a database is provided
@@ -122,6 +146,8 @@ func New(queue *core.TaskQueue, logs *tasklog.Manager, database *db.Database, co
 			srv.videoHandler = video.NewHandler(videoSvc)
 		}
 	}
+
+	srv.discoveryHandler = handler.NewDiscoveryHandler(discoveryService, srv.downloadService, confStore, hub)
 
 	srv.registerRoutes()
 	srv.setupQueueCallbacks()
@@ -198,4 +224,10 @@ func (s *Server) Run(addr string) error {
 // Engine returns the underlying Gin Engine (primarily used for testing).
 func (s *Server) Engine() *gin.Engine {
 	return s.engine
+}
+
+func (s *Server) Close() {
+	if s.discoveryService != nil {
+		s.discoveryService.Close()
+	}
 }

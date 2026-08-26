@@ -1,158 +1,344 @@
-import { create } from "zustand";
-import { immer } from "zustand/middleware/immer";
 import {
+  type BrowserTabSnapshot,
+  type BrowserTabSourceSnapshot,
+  type BrowserTabsSnapshot,
   DownloadType,
   type HLSMediaInfo,
   mergeSniffedSource,
 } from "@mediago/shared-common";
+import { create } from "zustand";
+import { immer } from "zustand/middleware/immer";
 import { subscribeWithSelector } from "zustand/middleware";
 
-export enum PageMode {
-  Default = "default",
-  Browser = "browser",
-}
+export const PageMode = {
+  Default: "home",
+  Browser: "browser",
+} as const;
 
-export enum BrowserStatus {
-  Default = "default",
-  Loaded = "loaded",
-  Loading = "loading",
-  Failed = "failed",
-}
+export const BrowserStatus = {
+  Default: "default",
+  Loaded: "loaded",
+  Loading: "loading",
+  Failed: "failed",
+} as const;
 
-export interface SourceData {
-  id: number;
-  url: string;
-  documentURL: string;
-  name: string;
+export interface SourceData extends BrowserTabSourceSnapshot {
   type: DownloadType;
   headers?: string;
   mediaInfo?: HLSMediaInfo;
 }
 
-const initialState: BrowserStore = {
-  mode: PageMode.Default,
-  url: "",
-  title: "",
-  status: BrowserStatus.Default,
-  errMsg: "",
-  errCode: 0,
-  sources: [],
-  sourcePanelCollapsed: false,
-};
+export interface BrowserTabState extends Omit<
+  BrowserTabSnapshot,
+  "kind" | "sources"
+> {
+  kind: "user";
+  sources: SourceData[];
+}
 
-type Actions = {
-  setBrowserStore: (values: Partial<BrowserStore>) => void;
-  startNavigation: (url: string) => void;
-  addSource: (source: SourceData) => void;
-  deleteSource: (url: string) => void;
-  setSources: (sources: SourceData[]) => void;
-  clearSources: () => void;
-};
+export interface BrowserState {
+  tabs: BrowserTabState[];
+  activeTabId: string;
+  sourcePanelCollapsed: boolean;
+}
 
-export const useBrowserStore = create<BrowserStore & Actions>()(
-  immer(
-    subscribeWithSelector((set) => ({
+type TabUpdate = Partial<Omit<BrowserTabState, "id" | "kind" | "sources">>;
+
+export interface BrowserActions {
+  addTab: (tab?: BrowserTabSnapshot) => BrowserTabState;
+  activateTab: (tabId: string) => void;
+  closeTab: (tabId: string) => void;
+  hydrateSnapshot: (snapshot: BrowserTabsSnapshot) => void;
+  updateTab: (tabId: string, values: TabUpdate) => void;
+  startNavigation: (tabId: string, url: string) => void;
+  addSource: (tabId: string, source: SourceData) => void;
+  deleteSource: (tabId: string, url: string) => void;
+  setSources: (tabId: string, sources: SourceData[]) => void;
+  clearSources: (tabId: string) => void;
+  setSourcePanelCollapsed: (collapsed: boolean) => void;
+  reset: () => void;
+}
+
+export type BrowserStore = BrowserState & BrowserActions;
+
+let localTabSequence = 0;
+
+function createHomeTab(id = nextLocalTabId()): BrowserTabState {
+  return {
+    id,
+    kind: "user",
+    mode: "home",
+    status: "default",
+    url: "",
+    title: "",
+    sources: [],
+  };
+}
+
+function createInitialState(): BrowserState {
+  const tab = createHomeTab();
+  return {
+    tabs: [tab],
+    activeTabId: tab.id,
+    sourcePanelCollapsed: false,
+  };
+}
+
+function nextLocalTabId(): string {
+  localTabSequence += 1;
+  return `local-tab-${localTabSequence}`;
+}
+
+function normalizeTab(
+  tab: BrowserTabSnapshot,
+  previous?: BrowserTabState,
+): BrowserTabState {
+  const previousSources = new Map(
+    previous?.sources.map((source) => [source.url, source]),
+  );
+  return {
+    id: tab.id,
+    kind: "user",
+    mode: tab.mode,
+    status: tab.status,
+    url: tab.url,
+    title: tab.title,
+    favicon: tab.favicon,
+    errorCode: tab.errorCode,
+    errorMessage: tab.errorMessage,
+    sources: tab.sources.map((source) => ({
+      id: source.id,
+      url: source.url,
+      documentURL: source.documentURL,
+      name: source.name,
+      type: source.type,
+      mediaInfo: source.mediaInfo,
+      headers: previousSources.get(source.url)?.headers,
+    })),
+  };
+}
+
+const initialState = createInitialState();
+
+export const useBrowserStore = create<BrowserStore>()(
+  subscribeWithSelector(
+    immer((set) => ({
       ...initialState,
-      setBrowserStore: (values) =>
+      addTab: (tab) => {
+        const normalized = tab ? normalizeTab(tab) : createHomeTab();
         set((state) => {
-          Object.keys(values).forEach((key) => {
-            if (values[key] != null) {
-              state[key] = values[key] as never;
-            }
+          const index = state.tabs.findIndex(
+            (candidate) => candidate.id === normalized.id,
+          );
+          if (index >= 0) state.tabs[index] = normalized;
+          else state.tabs.push(normalized);
+          state.activeTabId = normalized.id;
+        });
+        return normalized;
+      },
+      activateTab: (tabId) =>
+        set((state) => {
+          if (state.tabs.some((tab) => tab.id === tabId)) {
+            state.activeTabId = tabId;
+          }
+        }),
+      closeTab: (tabId) =>
+        set((state) => {
+          const index = state.tabs.findIndex((tab) => tab.id === tabId);
+          if (index < 0) return;
+          const wasActive = state.activeTabId === tabId;
+          state.tabs.splice(index, 1);
+          if (state.tabs.length === 0) {
+            const replacement = createHomeTab();
+            state.tabs.push(replacement);
+            state.activeTabId = replacement.id;
+          } else if (wasActive) {
+            state.activeTabId =
+              state.tabs[Math.min(index, state.tabs.length - 1)].id;
+          }
+        }),
+      hydrateSnapshot: (snapshot) =>
+        set((state) => {
+          if (!snapshot || !Array.isArray(snapshot.tabs)) return;
+          const previousTabs = new Map(
+            state.tabs.map((tab) => [tab.id, tab] as const),
+          );
+          const tabs = snapshot.tabs
+            .filter((tab) => tab.kind === "user")
+            .map((tab) => normalizeTab(tab, previousTabs.get(tab.id)));
+          if (tabs.length === 0) return;
+          state.tabs = tabs;
+          state.activeTabId = tabs.some(
+            (tab) => tab.id === snapshot.activeTabId,
+          )
+            ? snapshot.activeTabId
+            : tabs[0].id;
+          state.sourcePanelCollapsed = snapshot.sourcePanelCollapsed === true;
+        }),
+      updateTab: (tabId, values) =>
+        set((state) => {
+          const tab = state.tabs.find((candidate) => candidate.id === tabId);
+          if (!tab) return;
+          Object.assign(tab, values);
+        }),
+      startNavigation: (tabId, url) =>
+        set((state) => {
+          const tab = state.tabs.find((candidate) => candidate.id === tabId);
+          if (!tab) return;
+          Object.assign(tab, {
+            url,
+            mode: "browser" as const,
+            status: "loading" as const,
+            sources: [],
+            errorMessage: undefined,
+            errorCode: undefined,
           });
         }),
-      startNavigation: (url) =>
+      addSource: (tabId, source) =>
         set((state) => {
-          state.url = url;
-          state.mode = PageMode.Browser;
-          state.status = BrowserStatus.Loading;
-          state.sources = [];
-          state.errMsg = "";
-          state.errCode = 0;
-        }),
-      addSource: (source) =>
-        set((state) => {
-          const existing = state.sources.find(
-            (item: SourceData) => item.url === source.url,
-          );
+          const tab = state.tabs.find((candidate) => candidate.id === tabId);
+          if (!tab) return;
+          const existing = tab.sources.find((item) => item.url === source.url);
           let nextId = 1;
-          for (const item of state.sources) {
+          for (const item of tab.sources)
             nextId = Math.max(nextId, item.id + 1);
-          }
-          const normalized = {
+          tab.sources = mergeSniffedSource(tab.sources, {
             ...source,
             id: existing?.id ?? nextId,
-          };
-          state.sources = mergeSniffedSource(
-            state.sources as SourceData[],
-            normalized,
-          );
+          });
         }),
-      deleteSource: (url) =>
+      deleteSource: (tabId, url) =>
         set((state) => {
-          state.sources = state.sources.filter(
-            (item: SourceData) => item.url !== url,
-          );
+          const tab = state.tabs.find((candidate) => candidate.id === tabId);
+          if (!tab) return;
+          tab.sources = tab.sources.filter((item) => item.url !== url);
         }),
-      setSources: (sources) =>
+      setSources: (tabId, sources) =>
         set((state) => {
-          state.sources = sources;
+          const tab = state.tabs.find((candidate) => candidate.id === tabId);
+          if (tab) tab.sources = sources;
         }),
-      clearSources: () =>
+      clearSources: (tabId) =>
         set((state) => {
-          state.sources = [];
+          const tab = state.tabs.find((candidate) => candidate.id === tabId);
+          if (tab) tab.sources = [];
+        }),
+      setSourcePanelCollapsed: (collapsed) =>
+        set((state) => {
+          state.sourcePanelCollapsed = collapsed;
+        }),
+      reset: () =>
+        set((state) => {
+          const next = createInitialState();
+          state.tabs = next.tabs;
+          state.activeTabId = next.activeTabId;
+          state.sourcePanelCollapsed = next.sourcePanelCollapsed;
         }),
     })),
   ),
 );
 
-/** Full selector — use only when all fields are needed */
-export const browserStoreSelector = (state: BrowserStore & Actions) => {
+const EMPTY_TAB = createHomeTab("missing-tab");
+
+export const activeTabSelector = (state: BrowserStore): BrowserTabState =>
+  state.tabs.find((tab) => tab.id === state.activeTabId) ??
+  state.tabs[0] ??
+  EMPTY_TAB;
+
+export const browserTabsSelector = (state: BrowserStore) => ({
+  tabs: state.tabs,
+  activeTabId: state.activeTabId,
+});
+
+export const browserStoreSelector = (state: BrowserStore) => {
+  const tab = activeTabSelector(state);
   return {
-    mode: state.mode,
-    url: state.url,
-    title: state.title,
-    status: state.status,
-    errMsg: state.errMsg,
-    errCode: state.errCode,
-    sources: state.sources,
+    tabId: tab.id,
+    mode: tab.mode,
+    url: tab.url,
+    title: tab.title,
+    status: tab.status,
+    errMsg: tab.errorMessage,
+    errCode: tab.errorCode,
+    sources: tab.sources,
   };
 };
 
-/** Navigation-only selector — url/title/status/mode (no sources) */
-export const browserNavSelector = (state: BrowserStore & Actions) => ({
-  url: state.url,
-  title: state.title,
-  status: state.status,
-  mode: state.mode,
+export const browserNavSelector = (state: BrowserStore) => {
+  const tab = activeTabSelector(state);
+  return {
+    tabId: tab.id,
+    mode: tab.mode,
+    url: tab.url,
+    title: tab.title,
+    status: tab.status,
+  };
+};
+
+export const browserSourcesSelector = (state: BrowserStore) => {
+  const tab = activeTabSelector(state);
+  return { tabId: tab.id, sources: tab.sources };
+};
+
+export const browserSourcePanelSelector = (state: BrowserStore) => {
+  const tab = activeTabSelector(state);
+  return {
+    hasSources: tab.sources.length > 0,
+    sourceCount: tab.sources.length,
+    sourcePanelCollapsed: state.sourcePanelCollapsed,
+  };
+};
+
+export const browserErrorSelector = (state: BrowserStore) => {
+  const tab = activeTabSelector(state);
+  return {
+    tabId: tab.id,
+    status: tab.status,
+    errMsg: tab.errorMessage,
+    errCode: tab.errorCode,
+    url: tab.url,
+  };
+};
+
+export const browserActionsSelector = (state: BrowserStore) => ({
+  addTab: state.addTab,
+  activateTab: state.activateTab,
+  closeTab: state.closeTab,
+  hydrateSnapshot: state.hydrateSnapshot,
+  updateTab: state.updateTab,
+  startNavigation: state.startNavigation,
+  addSource: state.addSource,
+  deleteSource: state.deleteSource,
+  setSources: state.setSources,
+  clearSources: state.clearSources,
+  setSourcePanelCollapsed: state.setSourcePanelCollapsed,
+  reset: state.reset,
 });
 
-/** Sources-only selector */
-export const browserSourcesSelector = (state: BrowserStore & Actions) => ({
-  sources: state.sources,
-});
+export const setBrowserSelector = browserActionsSelector;
 
-/** Source-panel summary — avoids subscribing layout controls to source details. */
-export const browserSourcePanelSelector = (state: BrowserStore & Actions) => ({
-  hasSources: state.sources.length > 0,
-  sourceCount: state.sources.length,
+export const browserSnapshotSelector = (
+  state: BrowserStore,
+): BrowserTabsSnapshot => ({
+  tabs: state.tabs.map((tab) => ({
+    id: tab.id,
+    kind: "user",
+    mode: tab.mode,
+    status: tab.status,
+    url: tab.url,
+    title: tab.title,
+    favicon: tab.favicon,
+    errorCode: tab.errorCode,
+    errorMessage: tab.errorMessage,
+    sources: tab.sources.map((source) => ({
+      id: source.id,
+      url: source.url,
+      documentURL: source.documentURL,
+      name: source.name,
+      type: source.type,
+      mediaInfo: source.mediaInfo,
+    })),
+  })),
+  activeTabId: state.activeTabId,
   sourcePanelCollapsed: state.sourcePanelCollapsed,
 });
-
-/** Error-only selector */
-export const browserErrorSelector = (state: BrowserStore & Actions) => ({
-  status: state.status,
-  errMsg: state.errMsg,
-  errCode: state.errCode,
-});
-
-export const setBrowserSelector = (state: BrowserStore & Actions) => {
-  return {
-    setBrowserStore: state.setBrowserStore,
-    startNavigation: state.startNavigation,
-    addSource: state.addSource,
-    deleteSource: state.deleteSource,
-    setSources: state.setSources,
-    clearSources: state.clearSources,
-  };
-};

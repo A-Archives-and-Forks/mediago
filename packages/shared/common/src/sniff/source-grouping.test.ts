@@ -64,3 +64,31 @@ test("keeps unrelated playlists separate", () => {
 
   expect(mergeSniffedSource([first], second)).toStrictEqual([first, second]);
 });
+
+test("never groups or replaces sources across explicit tab scopes", () => {
+  const child: TestSource & { sourceScope: string } = {
+    id: "child",
+    sourceScope: "tab-b",
+    url: "https://media.example/720.m3u8",
+  };
+  const master: TestSource & { sourceScope: string } = {
+    id: "master",
+    sourceScope: "tab-a",
+    url: "https://media.example/master.m3u8",
+    mediaInfo: mediaInfo({
+      playlistType: "master",
+      variants: [{ url: child.url, quality: "720p" }],
+    }),
+  };
+  const sameURLInOtherTab: TestSource & { sourceScope: string } = {
+    id: "other-master",
+    sourceScope: "tab-b",
+    url: master.url,
+  };
+
+  expect(mergeSniffedSource([child], master)).toStrictEqual([child, master]);
+  expect(mergeSniffedSource([master], sameURLInOtherTab)).toStrictEqual([
+    master,
+    sameURLInOtherTab,
+  ]);
+});

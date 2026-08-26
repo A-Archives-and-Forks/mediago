@@ -20,11 +20,12 @@ const computeRect = (rect: DivRect) => {
 };
 
 interface WebViewProps {
+  tabId: string;
   className?: string;
   boundsInset?: Partial<Record<"top" | "right" | "bottom" | "left", number>>;
 }
 
-const WebView: FC<WebViewProps> = ({ className, boundsInset }) => {
+const WebView: FC<WebViewProps> = ({ tabId, className, boundsInset }) => {
   const webviewRef = useRef<HTMLDivElement>(null);
   const resizeObserver = useRef<ResizeObserver>(null);
   const rafId = useRef<number>(0);
@@ -51,19 +52,26 @@ const WebView: FC<WebViewProps> = ({ className, boundsInset }) => {
         viewRect.y += rect.y + top;
         viewRect.width = Math.max(0, viewRect.width - left - right);
         viewRect.height = Math.max(0, viewRect.height - top - bottom);
-        browser.setBounds(viewRect);
+        browser.setBounds(tabId, viewRect);
       });
     });
 
     resizeObserver.current.observe(webviewRef.current);
-    browser.show();
+    browser.show(tabId);
 
     return () => {
       if (rafId.current) cancelAnimationFrame(rafId.current);
       resizeObserver.current?.disconnect();
-      browser.hide();
+      browser.hide(tabId);
     };
-  }, []);
+  }, [
+    boundsInset?.bottom,
+    boundsInset?.left,
+    boundsInset?.right,
+    boundsInset?.top,
+    browser,
+    tabId,
+  ]);
 
   return <div ref={webviewRef} className={cn(className)} />;
 };

@@ -20,15 +20,25 @@ const doubles = vi.hoisted(() => {
   }
 
   return {
+    bridgeClients: [] as Array<{ options: Record<string, unknown> }>,
     clients: [] as Array<{
       streamEvents: ReturnType<typeof vi.fn>;
     }>,
     events: [] as FakeTaskEvents[],
+    discoveryExecutor: {
+      start: vi.fn(),
+      stop: vi.fn<() => Promise<void>>(),
+    },
     FakeTaskEvents,
     runners: [] as Array<{
       getURL: ReturnType<typeof vi.fn>;
       start: ReturnType<typeof vi.fn>;
       stop: ReturnType<typeof vi.fn>;
+    }>,
+    runnerOptions: [] as Array<{
+      extraArgs?: string[];
+      extraEnv?: Record<string, string>;
+      internal?: boolean;
     }>,
     runnerStart: vi.fn<() => Promise<void>>(),
     runnerStop: vi.fn<() => Promise<void>>(),
@@ -41,13 +51,19 @@ vi.mock("@mediago/service-runner", () => ({
     readonly start = vi.fn(() => doubles.runnerStart());
     readonly stop = vi.fn(() => doubles.runnerStop());
 
-    constructor() {
+    constructor(options: (typeof doubles.runnerOptions)[number]) {
       doubles.runners.push(this);
+      doubles.runnerOptions.push(options);
     }
   },
 }));
 
 vi.mock("@mediago/core-sdk", () => ({
+  MediaGoBridgeClient: class FakeMediaGoBridgeClient {
+    constructor(readonly options: Record<string, unknown>) {
+      doubles.bridgeClients.push(this);
+    }
+  },
   MediaGoClient: class FakeMediaGoClient {
     readonly streamEvents = vi.fn(() => {
       const events = new doubles.FakeTaskEvents();
@@ -91,15 +107,22 @@ function deferred() {
 }
 
 function createServer() {
-  return new DownloaderServer({ info: vi.fn() } as never);
+  return new DownloaderServer(
+    { info: vi.fn() } as never,
+    doubles.discoveryExecutor as never,
+  );
 }
 
 describe("DownloaderServer.stop", () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    doubles.bridgeClients.length = 0;
     doubles.clients.length = 0;
     doubles.events.length = 0;
     doubles.runners.length = 0;
+    doubles.runnerOptions.length = 0;
+    doubles.discoveryExecutor.start.mockReset();
+    doubles.discoveryExecutor.stop.mockReset().mockResolvedValue(undefined);
     doubles.runnerStart.mockReset().mockResolvedValue(undefined);
     doubles.runnerStop.mockReset().mockResolvedValue(undefined);
   });
@@ -124,6 +147,7 @@ describe("DownloaderServer.stop", () => {
     expect(concurrentStop).toBe(firstStop);
     expect(clearIntervalSpy).toHaveBeenCalledTimes(1);
     expect(doubles.events[0].close).toHaveBeenCalledTimes(1);
+    expect(doubles.discoveryExecutor.stop).toHaveBeenCalledTimes(1);
     expect(doubles.runners[0].stop).toHaveBeenCalledTimes(1);
     expect(() => server.getClient()).toThrowError(
       "DownloaderServer not started",
@@ -136,6 +160,7 @@ describe("DownloaderServer.stop", () => {
 
     expect(clearIntervalSpy).toHaveBeenCalledTimes(1);
     expect(doubles.events[0].close).toHaveBeenCalledTimes(1);
+    expect(doubles.discoveryExecutor.stop).toHaveBeenCalledTimes(1);
     expect(doubles.runners[0].stop).toHaveBeenCalledTimes(1);
   });
 
@@ -224,6 +249,45 @@ describe("DownloaderServer.stop", () => {
 
     await server.stop();
     expect(doubles.runnerStop).toHaveBeenCalledTimes(2);
+  });
+
+  it("creates a unique bridge token per Core start and keeps it out of arguments", async () => {
+    const server = createServer();
+
+    await server.start({ dbPath: "/fake/data/media.db", logDir: "/fake/logs" });
+    await server.stop();
+    await server.start({ dbPath: "/fake/data/media.db", logDir: "/fake/logs" });
+
+    expect(doubles.runnerOptions).toHaveLength(2);
+    const tokens = doubles.runnerOptions.map(
+      (options) => options.extraEnv?.MEDIAGO_ELECTRON_BRIDGE_TOKEN,
+    );
+    expect(tokens[0]).toMatch(/^[a-f0-9]{64}$/);
+    expect(tokens[1]).toMatch(/^[a-f0-9]{64}$/);
+    expect(tokens[0]).not.toBe(tokens[1]);
+    for (const [index, options] of doubles.runnerOptions.entries()) {
+      expect(options.internal).toBe(false);
+      expect(options.extraArgs?.join(" ")).not.toContain(tokens[index]);
+    }
+    expect(doubles.bridgeClients[0]?.options).toEqual({
+      baseURL: "http://127.0.0.1:39719",
+      token: tokens[0],
+    });
+    expect(doubles.discoveryExecutor.start).toHaveBeenCalledTimes(2);
+
+    await server.stop();
+  });
+
+  it("closes the discovery bridge before stopping the Core runner", async () => {
+    const server = createServer();
+    await server.start({ dbPath: "/fake/data/media.db", logDir: "/fake/logs" });
+
+    await server.stop();
+
+    expect(doubles.discoveryExecutor.stop).toHaveBeenCalledOnce();
+    expect(
+      doubles.discoveryExecutor.stop.mock.invocationCallOrder[0],
+    ).toBeLessThan(doubles.runners[0].stop.mock.invocationCallOrder[0]);
   });
 
   it("shares a runner stop rejection and remains stopped afterward", async () => {

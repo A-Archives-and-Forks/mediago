@@ -47,6 +47,38 @@ Gli esempi sotto mostrano solo il corpo `data`.
 - **Desktop**: nessuna autenticazione predefinita, usa `localhost:39719`
 - **Docker**: se l'autenticazione è abilitata, copia l'API key dalla pagina **Impostazioni** di MediaGo e includi `Authorization: Bearer <key>` in ogni richiesta
 
+## Scoperta media (sniffing e parsing)
+
+La scoperta è un'attività asincrona. `inspect` analizza direttamente un URL M3U8; `browser` chiede al processo principale Electron di creare una vista browser nascosta e isolata. La scheda visibile dell'utente non viene mai navigata o sostituita.
+
+- `auto`: usa `inspect` per URL `.m3u8` diretti e `browser` per le altre pagine HTTP(S).
+- `inspect`: accetta solo URL M3U8 diretti e non richiede Electron.
+- `browser`: richiede l'app desktop connessa a Core. Docker/Core autonomo restituisce `discovery_executor_unavailable` per lo sniffing delle pagine.
+
+```bash
+curl -X POST http://localhost:39719/api/discoveries \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://example.com/watch/1","mode":"browser","timeoutMs":20000,"useSessionCookies":false}'
+
+curl http://localhost:39719/api/discoveries/<discovery-id>
+curl -X POST http://localhost:39719/api/discoveries/<discovery-id>/cancel
+curl http://localhost:39719/api/discovery-executor/status
+curl -X POST http://localhost:39719/api/discoveries/<discovery-id>/downloads \
+  -H "Content-Type: application/json" \
+  -d '{"sourceIds":["source-1"],"startDownload":true}'
+```
+
+Il timeout è limitato a 3000–30000 ms e i risultati in memoria scadono dopo circa 10 minuti. `useSessionCookies` è disattivato per impostazione predefinita; abilitalo esplicitamente solo per riutilizzare la sessione desktop autenticata. Cookie, Authorization e altre credenziali non compaiono mai nelle risposte pubbliche, nella CLI o in MCP, non persistono dopo il riavvio e non vengono usati per aggirare DRM o controlli di accesso.
+
+```bash
+mediago discover "https://example.com/watch/1" --mode browser --json
+mediago discover get <discovery-id> --json
+mediago discover cancel <discovery-id>
+mediago discover download <discovery-id> --source source-1
+```
+
+Gli strumenti MCP equivalenti sono `discover_media`, `get_media_discovery`, `cancel_media_discovery` e `download_discovered_media`; l'endpoint `/mcp` richiede un Bearer token e deve essere abilitato nelle Impostazioni.
+
 ## Avvio rapido
 
 Tre comandi curl per il flusso "crea → scarica → ricevi notifica".

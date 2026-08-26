@@ -10,10 +10,15 @@ import type {
   AppStore,
   ConversionItem,
   ConversionPaginationParams,
+  CreateDiscoveryDownloadsParams,
+  CreateDiscoveryParams,
   CreateTaskParams,
   CreateTaskResponse,
   DownloadPaginationParams,
   DownloadTask,
+  DiscoveryExecutorStatus,
+  DiscoveryJob,
+  DiscoveryRequestOptions,
   EditDownloadTaskParams,
   EnvPaths,
   FavoriteItem,
@@ -407,6 +412,66 @@ export class MediaGoClient {
     return this.api.post("/api/sources/inspect", params);
   }
 
+  // #region Media discovery
+
+  async createDiscovery(
+    params: CreateDiscoveryParams,
+    options: DiscoveryRequestOptions = {},
+  ): Promise<ApiResponse<DiscoveryJob>> {
+    const transportTimeout = params.timeoutMs
+      ? params.timeoutMs + 5_000
+      : 25_000;
+    return this.api.post(
+      "/api/discoveries",
+      params,
+      discoveryRequestConfig(options, transportTimeout),
+    );
+  }
+
+  async getDiscovery(
+    id: string,
+    options: DiscoveryRequestOptions = {},
+  ): Promise<ApiResponse<DiscoveryJob>> {
+    return this.api.get(
+      `/api/discoveries/${encodeURIComponent(id)}`,
+      discoveryRequestConfig(options),
+    );
+  }
+
+  async cancelDiscovery(
+    id: string,
+    options: DiscoveryRequestOptions = {},
+  ): Promise<ApiResponse<DiscoveryJob>> {
+    return this.api.post(
+      `/api/discoveries/${encodeURIComponent(id)}/cancel`,
+      undefined,
+      discoveryRequestConfig(options),
+    );
+  }
+
+  async createDiscoveryDownloads(
+    id: string,
+    params: CreateDiscoveryDownloadsParams,
+    options: DiscoveryRequestOptions = {},
+  ): Promise<ApiResponse<DownloadTask[]>> {
+    return this.api.post(
+      `/api/discoveries/${encodeURIComponent(id)}/downloads`,
+      params,
+      discoveryRequestConfig(options),
+    );
+  }
+
+  async getDiscoveryExecutorStatus(
+    options: DiscoveryRequestOptions = {},
+  ): Promise<ApiResponse<DiscoveryExecutorStatus>> {
+    return this.api.get(
+      "/api/discovery-executor/status",
+      discoveryRequestConfig(options),
+    );
+  }
+
+  // #endregion
+
   // #endregion
 
   // #region Config
@@ -484,4 +549,22 @@ export class MediaGoClient {
     const source = new EventSource(eventsURL.toString());
     return new TaskStreamEventEmitter(source);
   }
+}
+
+const DEFAULT_DISCOVERY_REQUEST_TIMEOUT_MS = 10_000;
+const MIN_DISCOVERY_REQUEST_TIMEOUT_MS = 1_000;
+const MAX_DISCOVERY_REQUEST_TIMEOUT_MS = 35_000;
+
+function discoveryRequestConfig(
+  options: DiscoveryRequestOptions,
+  fallbackTimeout = DEFAULT_DISCOVERY_REQUEST_TIMEOUT_MS,
+) {
+  const requestedTimeout = options.timeoutMs ?? fallbackTimeout;
+  return {
+    signal: options.signal,
+    timeout: Math.min(
+      MAX_DISCOVERY_REQUEST_TIMEOUT_MS,
+      Math.max(MIN_DISCOVERY_REQUEST_TIMEOUT_MS, requestedTimeout),
+    ),
+  };
 }

@@ -4,6 +4,14 @@ func (s *Server) registerRoutes() {
 	s.engine.GET("/healthy", s.healthHandler.Check)
 	s.registerSwaggerRoute()
 
+	bridge := s.engine.Group("/api/bridge")
+	{
+		bridge.GET("/events", s.discoveryBridgeHandler.Events)
+		bridge.POST("/discoveries/:id/start", s.discoveryBridgeHandler.Start)
+		bridge.POST("/discoveries/:id/complete", s.discoveryBridgeHandler.Complete)
+		bridge.POST("/discoveries/:id/fail", s.discoveryBridgeHandler.Fail)
+	}
+
 	// Video player routes (when video-root is configured)
 	if s.videoHandler != nil {
 		v1 := s.engine.Group("/api/v1")
@@ -38,6 +46,11 @@ func (s *Server) registerRoutes() {
 		api.GET("/url/title", s.utilHandler.GetPageTitle)
 		api.GET("/env", s.utilHandler.GetEnvPaths)
 		api.POST("/sources/inspect", s.sourceHandler.Inspect)
+		api.POST("/discoveries", s.discoveryHandler.Create)
+		api.GET("/discoveries/:id", s.discoveryHandler.Get)
+		api.POST("/discoveries/:id/cancel", s.discoveryHandler.Cancel)
+		api.POST("/discoveries/:id/downloads", s.discoveryHandler.Downloads)
+		api.GET("/discovery-executor/status", s.discoveryHandler.ExecutorStatus)
 	}
 
 	// Database persistence routes (only registered when database is available)

@@ -1,5 +1,9 @@
 import EventEmitter from "node:events";
 import { provide } from "@inversifyjs/binding-decorators";
+import type {
+  BridgeDiscoveryCompleteParams,
+  BridgeDiscoverySource,
+} from "@mediago/core-sdk";
 import {
   DownloadType,
   type HLSMediaInfo,
@@ -8,16 +12,12 @@ import {
 } from "@mediago/shared-common";
 import { type OnSendHeadersListenerDetails, session } from "electron";
 import { inject, injectable } from "inversify";
-import {
-  formatHeaders,
-  PERSIST_WEBVIEW,
-  PRIVACY_WEBVIEW,
-  urlCache,
-} from "../utils";
+import { formatHeaders } from "../utils";
 import ElectronLogger from "../vendor/ElectronLogger";
 import {
   formattedHeadersToArray,
   inspectionToMediaInfo,
+  splitDiscoveryHeaders,
 } from "../utils/source-inspection";
 import { DownloaderServer } from "./downloader.server";
 
@@ -30,26 +30,89 @@ export interface SourceParams {
   mediaInfo?: HLSMediaInfo;
 }
 
-interface PageInfo {
+export interface PageInfo {
   title: string;
   url: string;
 }
 
+export interface SniffingSourceEvent {
+  tabId: string;
+  source: SourceParams;
+}
+
+export interface RegisterSniffingContext {
+  tabId: string;
+  webContentsId: number;
+  partition: string;
+  kind: "user" | "agent";
+  useSessionCookies?: boolean;
+  initialPageInfo?: PageInfo;
+}
+
+export interface AgentCollectionOptions {
+  signal?: AbortSignal;
+  timeoutMs: number;
+}
+
+interface PendingInspection {
+  generation: number;
+  id: string;
+  item: SourceParams;
+}
+
+interface AgentCollector {
+  cleanupAbort: () => void;
+  hardTimer: ReturnType<typeof setTimeout>;
+  quietTimer: ReturnType<typeof setTimeout> | null;
+  reject: (reason: unknown) => void;
+  resolve: (result: BridgeDiscoveryCompleteParams) => void;
+  settled: boolean;
+}
+
+interface SniffingContext {
+  agentSources: Map<string, BridgeDiscoverySource>;
+  checkTimer: ReturnType<typeof setTimeout> | null;
+  collector: AgentCollector | null;
+  dedup: Set<string>;
+  domReady: boolean;
+  generation: number;
+  inspectSequence: number;
+  inspectTimer: ReturnType<typeof setTimeout> | null;
+  kind: "user" | "agent";
+  pageHeaders: Map<DownloadType, string>;
+  pageInfo: PageInfo;
+  partition: string;
+  pendingInspections: Map<string, PendingInspection>;
+  sourceSequence: number;
+  tabId: string;
+  useSessionCookies: boolean;
+  webContentsId: number;
+}
+
+export class AgentCollectionError extends Error {
+  constructor(
+    readonly errorCode:
+      | "discovery_timeout"
+      | "discovery_cancelled"
+      | "discovery_navigation_failed",
+    message: string,
+  ) {
+    super(message);
+    this.name = "AgentCollectionError";
+  }
+}
+
+const PREPARE_DELAY_MS = 1_000;
+const INSPECT_DELAY_MS = 150;
+const NETWORK_QUIET_MS = 1_500;
+const MAX_AGENT_SOURCES = 200;
+
 @injectable()
 @provide()
 export class SniffingHelper extends EventEmitter {
-  private pageInfo: PageInfo = { title: "", url: "" };
-  private readonly prepareDelay = 1000;
-  private readonly inspectDelay = 150;
-  private checkTimer: ReturnType<typeof setTimeout> | null = null;
-  private inspectTimer: ReturnType<typeof setTimeout> | null = null;
-  private readonly pageHeaders = new Map<DownloadType, string>();
-  private readonly pendingInspections = new Map<
-    string,
-    { id: string; item: SourceParams }
-  >();
-  private inspectSequence = 0;
-  private navigationGeneration = 0;
+  private readonly contexts = new Map<string, SniffingContext>();
+  private readonly contextsByWebContents = new Map<number, SniffingContext>();
+  private readonly listenedPartitions = new Set<string>();
 
   constructor(
     @inject(ElectronLogger)
@@ -60,158 +123,247 @@ export class SniffingHelper extends EventEmitter {
     super();
   }
 
-  pluginReady() {
-    // empty
+  register(options: RegisterSniffingContext): void {
+    this.unregister(options.tabId);
+    const conflicting = this.contextsByWebContents.get(options.webContentsId);
+    if (conflicting) this.unregister(conflicting.tabId);
+    this.ensureSessionListener(options.partition);
+    const context: SniffingContext = {
+      agentSources: new Map(),
+      checkTimer: null,
+      collector: null,
+      dedup: new Set(),
+      domReady: false,
+      generation: 0,
+      inspectSequence: 0,
+      inspectTimer: null,
+      kind: options.kind,
+      pageHeaders: new Map(),
+      pageInfo: options.initialPageInfo ?? { title: "", url: "" },
+      partition: options.partition,
+      pendingInspections: new Map(),
+      sourceSequence: 0,
+      tabId: options.tabId,
+      useSessionCookies: options.useSessionCookies === true,
+      webContentsId: options.webContentsId,
+    };
+    this.contexts.set(options.tabId, context);
+    this.contextsByWebContents.set(options.webContentsId, context);
   }
 
-  getPageHeaders(type: DownloadType): string | undefined {
-    return this.pageHeaders.get(type);
-  }
-
-  update(pageInfo: PageInfo) {
-    const pageChanged = pageInfo.url !== this.pageInfo.url;
-    this.pageInfo = pageInfo;
-    // Cancel pending check from previous page
-    if (this.checkTimer) {
-      clearTimeout(this.checkTimer);
-      this.checkTimer = null;
-    }
-    if (pageChanged) {
-      this.navigationGeneration += 1;
-      this.pendingInspections.clear();
-      if (this.inspectTimer) {
-        clearTimeout(this.inspectTimer);
-        this.inspectTimer = null;
-      }
-      // Reset dedup cache when navigating to a new page.
-      urlCache.clear();
+  unregister(tabId: string): void {
+    const context = this.contexts.get(tabId);
+    if (!context) return;
+    this.clearContextTimers(context);
+    this.rejectCollector(
+      context,
+      new AgentCollectionError(
+        "discovery_cancelled",
+        "browser discovery cancelled",
+      ),
+    );
+    context.generation += 1;
+    context.domReady = false;
+    context.pendingInspections.clear();
+    context.agentSources.clear();
+    this.contexts.delete(tabId);
+    if (this.contextsByWebContents.get(context.webContentsId) === context) {
+      this.contextsByWebContents.delete(context.webContentsId);
     }
   }
 
-  checkPageInfo() {
-    // Cancel any pending check
-    if (this.checkTimer) {
-      clearTimeout(this.checkTimer);
-    }
+  close(): void {
+    for (const tabId of this.contexts.keys()) this.unregister(tabId);
+    this.removeAllListeners();
+  }
 
-    // Capture current page info to avoid race conditions
-    const pageInfo = { ...this.pageInfo };
+  pluginReady(_tabId?: string): void {
+    // Reserved for page-plugin coordination.
+  }
 
-    this.checkTimer = setTimeout(() => {
-      this.checkTimer = null;
+  getPageHeaders(tabId: string, type: DownloadType): string | undefined {
+    return this.contexts.get(tabId)?.pageHeaders.get(type);
+  }
+
+  update(tabId: string, pageInfo: PageInfo): void {
+    const context = this.contexts.get(tabId);
+    if (!context) return;
+    const pageChanged = pageInfo.url !== context.pageInfo.url;
+    context.pageInfo = pageInfo;
+    this.clearTimer(context, "checkTimer");
+    if (!pageChanged) return;
+
+    context.generation += 1;
+    context.pendingInspections.clear();
+    context.agentSources.clear();
+    context.pageHeaders.clear();
+    context.dedup.clear();
+    this.clearTimer(context, "inspectTimer");
+    this.clearQuietTimer(context);
+  }
+
+  markDomReady(tabId: string): void {
+    const context = this.contexts.get(tabId);
+    if (!context) return;
+    context.domReady = true;
+    this.scheduleQuietCompletion(context);
+  }
+
+  checkPageInfo(tabId: string): void {
+    const context = this.contexts.get(tabId);
+    if (!context) return;
+    this.clearTimer(context, "checkTimer");
+    const generation = context.generation;
+    const pageInfo = { ...context.pageInfo };
+    context.checkTimer = setTimeout(() => {
+      context.checkTimer = null;
+      if (!this.isCurrentContext(context, generation)) return;
       const filter = matchPageUrl(pageInfo.url);
-      if (filter) {
-        this.send({
-          url: pageInfo.url,
-          documentURL: pageInfo.url,
-          name: pageInfo.title,
-          type: filter.type,
-          headers: this.pageHeaders.get(filter.type),
-        });
-      }
-    }, this.prepareDelay);
+      if (!filter) return;
+      this.send(context.tabId, {
+        url: pageInfo.url,
+        documentURL: pageInfo.url,
+        name: pageInfo.title,
+        type: filter.type,
+        headers: context.pageHeaders.get(filter.type),
+      });
+    }, PREPARE_DELAY_MS);
   }
 
-  start(privacy: boolean = false) {
-    this.pageHeaders.clear();
-    const partition = privacy ? PRIVACY_WEBVIEW : PERSIST_WEBVIEW;
-    const viewSession = session.fromPartition(partition);
-    viewSession.webRequest.onSendHeaders(this.onSendHeaders);
-  }
-
-  send = (item: SourceParams) => {
-    const urlCacheKey = `${item.url}_${item.name}`;
-    const cacheUrl = urlCache.get(urlCacheKey);
-    if (cacheUrl) {
-      return;
-    }
-
-    urlCache.set(urlCacheKey, true);
+  send(tabId: string, item: SourceParams): void {
+    const context = this.contexts.get(tabId);
+    if (!context) return;
+    const cacheKey = `${item.type}:${item.url}`;
+    if (context.dedup.has(cacheKey)) return;
+    context.dedup.add(cacheKey);
 
     if (item.type !== DownloadType.m3u8) {
-      this.emitSource(item);
+      this.emitSource(context, item);
       return;
     }
 
-    const id = `hls-${Date.now()}-${++this.inspectSequence}`;
-    this.emitSource({
-      ...item,
-      mediaInfo: {
-        status: "inspecting",
-        playlistType: "unknown",
-        variants: [],
-      },
+    const id = `hls-${context.webContentsId}-${++context.inspectSequence}`;
+    if (context.kind === "user") {
+      this.emitSource(context, {
+        ...item,
+        mediaInfo: {
+          status: "inspecting",
+          playlistType: "unknown",
+          variants: [],
+        },
+      });
+    }
+    context.pendingInspections.set(item.url, {
+      generation: context.generation,
+      id,
+      item,
     });
-    this.pendingInspections.set(item.url, { id, item });
-    if (!this.inspectTimer) {
-      this.inspectTimer = setTimeout(() => {
-        this.inspectTimer = null;
-        void this.flushInspections();
-      }, this.inspectDelay);
+    this.clearQuietTimer(context);
+    if (!context.inspectTimer) {
+      context.inspectTimer = setTimeout(() => {
+        context.inspectTimer = null;
+        void this.flushInspections(context);
+      }, INSPECT_DELAY_MS);
     }
-  };
-
-  private emitSource(item: SourceParams): void {
-    this.logger.info(`[SniffingHelper] send: ${item.url}`);
-    this.emit("source", item);
   }
 
-  private async flushInspections(): Promise<void> {
-    const pending = [...this.pendingInspections.values()];
-    this.pendingInspections.clear();
-    if (pending.length === 0) return;
-
-    const generation = this.navigationGeneration;
-    try {
-      const client = this.downloaderServer.getClient();
-      const inputs = pending.map(({ id, item }) => ({
-        id,
-        url: item.url,
-        headers: formattedHeadersToArray(item.headers),
-      }));
-      const requests = [];
-      for (let index = 0; index < inputs.length; index += 20) {
-        requests.push(
-          client.inspectSources({ sources: inputs.slice(index, index + 20) }),
-        );
-      }
-      const responses = await Promise.all(requests);
-      const inspections = new Map(
-        responses.flatMap((response) =>
-          response.data.sources.map(
-            (inspection) => [inspection.id, inspection] as const,
-          ),
-        ),
+  collectAgent(
+    tabId: string,
+    options: AgentCollectionOptions,
+  ): Promise<BridgeDiscoveryCompleteParams> {
+    const context = this.contexts.get(tabId);
+    if (!context || context.kind !== "agent") {
+      return Promise.reject(
+        new Error(`Agent sniffing context ${tabId} is not registered`),
       );
-      if (generation !== this.navigationGeneration) return;
-      for (const { id, item } of pending) {
-        this.emitSource({
-          ...item,
-          mediaInfo: inspectionToMediaInfo(inspections.get(id)),
-        });
-      }
-    } catch (error) {
-      this.logger.warn("Failed to inspect sniffed HLS sources", error);
-      if (generation !== this.navigationGeneration) return;
-      for (const { item } of pending) {
-        this.emitSource({ ...item, mediaInfo: inspectionToMediaInfo() });
-      }
     }
+    if (context.collector) {
+      return Promise.reject(
+        new Error(`Agent sniffing context ${tabId} is already collecting`),
+      );
+    }
+
+    return new Promise((resolve, reject) => {
+      const hardTimer = setTimeout(
+        () => {
+          this.rejectCollector(
+            context,
+            new AgentCollectionError(
+              "discovery_timeout",
+              "browser discovery timed out",
+            ),
+          );
+        },
+        Math.max(1, options.timeoutMs),
+      );
+      const abort = () => {
+        this.rejectCollector(
+          context,
+          new AgentCollectionError(
+            "discovery_cancelled",
+            "browser discovery cancelled",
+          ),
+        );
+      };
+      context.collector = {
+        cleanupAbort: () => options.signal?.removeEventListener("abort", abort),
+        hardTimer,
+        quietTimer: null,
+        reject,
+        resolve,
+        settled: false,
+      };
+      options.signal?.addEventListener("abort", abort, { once: true });
+      if (options.signal?.aborted) abort();
+    });
   }
 
-  private onSendHeaders = (details: OnSendHeadersListenerDetails): void => {
+  cancelAgent(tabId: string): void {
+    const context = this.contexts.get(tabId);
+    if (!context) return;
+    this.rejectCollector(
+      context,
+      new AgentCollectionError(
+        "discovery_cancelled",
+        "browser discovery cancelled",
+      ),
+    );
+  }
+
+  failAgent(tabId: string, errorCode: "discovery_navigation_failed"): void {
+    const context = this.contexts.get(tabId);
+    if (!context) return;
+    this.rejectCollector(
+      context,
+      new AgentCollectionError(errorCode, "browser navigation failed"),
+    );
+  }
+
+  private ensureSessionListener(partition: string): void {
+    if (this.listenedPartitions.has(partition)) return;
+    const viewSession = session.fromPartition(partition);
+    viewSession.webRequest.onSendHeaders(this.onSendHeaders);
+    this.listenedPartitions.add(partition);
+  }
+
+  private readonly onSendHeaders = (
+    details: OnSendHeadersListenerDetails,
+  ): void => {
+    if (typeof details.webContentsId !== "number") return;
+    const context = this.contextsByWebContents.get(details.webContentsId);
+    if (!context) return;
     const { url, requestHeaders } = details;
-    const { title, url: documentURL } = this.pageInfo;
+    const { title, url: documentURL } = context.pageInfo;
     const headers = formatHeaders(requestHeaders);
 
     const cookieBackedType = getCookieBackedType(url);
     if (cookieBackedType && hasHeader(requestHeaders, "cookie")) {
-      this.pageHeaders.set(cookieBackedType, headers);
+      context.pageHeaders.set(cookieBackedType, headers);
     }
 
     const filter = matchRequestUrl(url);
     if (filter) {
-      this.send({
+      this.send(context.tabId, {
         url,
         documentURL,
         name: title,
@@ -220,6 +372,166 @@ export class SniffingHelper extends EventEmitter {
       });
     }
   };
+
+  private emitSource(context: SniffingContext, item: SourceParams): void {
+    this.logger.info(
+      `[SniffingHelper] source detected for ${context.tabId} (${item.type})`,
+    );
+    if (context.kind === "user") {
+      this.emit("source", { tabId: context.tabId, source: item });
+      return;
+    }
+    this.collectAgentSource(context, item);
+  }
+
+  private collectAgentSource(
+    context: SniffingContext,
+    item: SourceParams,
+  ): void {
+    if (context.agentSources.size >= MAX_AGENT_SOURCES) return;
+    const mediaInfo = item.mediaInfo;
+    const { publicHeaders, privateHeaders } = splitDiscoveryHeaders(
+      formattedHeadersToArray(item.headers),
+      context.useSessionCookies,
+    );
+    const existing = context.agentSources.get(item.url);
+    const source: BridgeDiscoverySource = {
+      id: existing?.id ?? `source-${++context.sourceSequence}`,
+      url: item.url,
+      pageUrl: item.documentURL || context.pageInfo.url || item.url,
+      title: item.name || context.pageInfo.title || item.url,
+      type: item.type,
+      playlistType: mediaInfo?.playlistType,
+      maxQuality: mediaInfo?.maxQuality,
+      variants: mediaInfo?.variants,
+      detectedAt: existing?.detectedAt ?? new Date().toISOString(),
+      headers: [...publicHeaders, ...privateHeaders],
+    };
+    context.agentSources.set(item.url, source);
+    this.scheduleQuietCompletion(context);
+  }
+
+  private async flushInspections(context: SniffingContext): Promise<void> {
+    const pending = [...context.pendingInspections.values()];
+    context.pendingInspections.clear();
+    if (pending.length === 0) return;
+
+    const generation = context.generation;
+    try {
+      const client = this.downloaderServer.getClient();
+      const inputs = pending.map(({ id, item }) => ({
+        id,
+        url: item.url,
+        headers: formattedHeadersToArray(item.headers),
+      }));
+      const responses = await Promise.all(
+        Array.from({ length: Math.ceil(inputs.length / 20) }, (_, index) =>
+          client.inspectSources({
+            sources: inputs.slice(index * 20, index * 20 + 20),
+          }),
+        ),
+      );
+      const inspections = new Map(
+        responses.flatMap((response) =>
+          response.data.sources.map(
+            (inspection) => [inspection.id, inspection] as const,
+          ),
+        ),
+      );
+      if (!this.isCurrentContext(context, generation)) return;
+      for (const pendingItem of pending) {
+        if (pendingItem.generation !== generation) continue;
+        this.emitSource(context, {
+          ...pendingItem.item,
+          mediaInfo: inspectionToMediaInfo(inspections.get(pendingItem.id)),
+        });
+      }
+    } catch {
+      this.logger.warn("Failed to inspect sniffed HLS sources");
+      if (!this.isCurrentContext(context, generation)) return;
+      for (const pendingItem of pending) {
+        if (pendingItem.generation !== generation) continue;
+        this.emitSource(context, {
+          ...pendingItem.item,
+          mediaInfo: inspectionToMediaInfo(),
+        });
+      }
+    } finally {
+      if (this.isCurrentContext(context, generation)) {
+        this.scheduleQuietCompletion(context);
+      }
+    }
+  }
+
+  private scheduleQuietCompletion(context: SniffingContext): void {
+    const collector = context.collector;
+    if (!collector || collector.settled) return;
+    if (!context.domReady) return;
+    if (context.pendingInspections.size > 0 || context.inspectTimer) return;
+    this.clearQuietTimer(context);
+    collector.quietTimer = setTimeout(() => {
+      collector.quietTimer = null;
+      if (context.collector !== collector || collector.settled) return;
+      this.resolveCollector(context);
+    }, NETWORK_QUIET_MS);
+  }
+
+  private resolveCollector(context: SniffingContext): void {
+    const collector = context.collector;
+    if (!collector || collector.settled) return;
+    collector.settled = true;
+    collector.cleanupAbort();
+    clearTimeout(collector.hardTimer);
+    if (collector.quietTimer) clearTimeout(collector.quietTimer);
+    context.collector = null;
+    collector.resolve({
+      sources: [...context.agentSources.values()],
+      partial: false,
+    });
+  }
+
+  private rejectCollector(context: SniffingContext, reason: unknown): void {
+    const collector = context.collector;
+    if (!collector || collector.settled) return;
+    collector.settled = true;
+    collector.cleanupAbort();
+    clearTimeout(collector.hardTimer);
+    if (collector.quietTimer) clearTimeout(collector.quietTimer);
+    context.collector = null;
+    collector.reject(reason);
+  }
+
+  private isCurrentContext(
+    context: SniffingContext,
+    generation: number,
+  ): boolean {
+    return (
+      this.contexts.get(context.tabId) === context &&
+      context.generation === generation
+    );
+  }
+
+  private clearContextTimers(context: SniffingContext): void {
+    this.clearTimer(context, "checkTimer");
+    this.clearTimer(context, "inspectTimer");
+    this.clearQuietTimer(context);
+  }
+
+  private clearQuietTimer(context: SniffingContext): void {
+    const collector = context.collector;
+    if (!collector?.quietTimer) return;
+    clearTimeout(collector.quietTimer);
+    collector.quietTimer = null;
+  }
+
+  private clearTimer(
+    context: SniffingContext,
+    key: "checkTimer" | "inspectTimer",
+  ): void {
+    const timer = context[key];
+    if (timer) clearTimeout(timer);
+    context[key] = null;
+  }
 }
 
 export function hasHeader(

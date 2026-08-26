@@ -28,7 +28,7 @@ export function useFavorites() {
   };
 
   return {
-    data: data ?? ([] as Favorite[]),
+    data: Array.isArray(data) ? data : ([] as Favorite[]),
     isLoading,
     error,
     mutate,

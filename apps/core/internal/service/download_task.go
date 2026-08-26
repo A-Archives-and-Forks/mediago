@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -220,6 +221,17 @@ func (s *DownloadTaskService) GetDownloadTask(id int64, localPath string) (*Down
 
 // StartDownload starts a download task.
 func (s *DownloadTaskService) StartDownload(taskID int64, localPath string, deleteSegments bool) error {
+	return s.startDownload(taskID, localPath, deleteSegments, nil)
+}
+
+// StartDownloadWithRuntimeHeaders starts a task with ephemeral request headers.
+// Runtime headers are passed to the queue only and are never written to the
+// persisted video record.
+func (s *DownloadTaskService) StartDownloadWithRuntimeHeaders(taskID int64, localPath string, deleteSegments bool, runtimeHeaders []string) error {
+	return s.startDownload(taskID, localPath, deleteSegments, runtimeHeaders)
+}
+
+func (s *DownloadTaskService) startDownload(taskID int64, localPath string, deleteSegments bool, runtimeHeaders []string) error {
 	video, err := s.repo.FindByIDOrFail(taskID)
 	if err != nil {
 		return err
@@ -231,6 +243,9 @@ func (s *DownloadTaskService) StartDownload(taskID int64, localPath string, dele
 	}
 
 	params := downloadParamsForVideo(video, taskID)
+	if runtimeHeaders != nil {
+		params.Headers = mergeDownloadHeaders(params.Headers, runtimeHeaders)
+	}
 
 	status := s.queue.Enqueue(params)
 
@@ -243,6 +258,28 @@ func (s *DownloadTaskService) StartDownload(taskID int64, localPath string, dele
 
 	// Enqueue failed
 	return s.repo.UpdateStatus([]int64{taskID}, "failed")
+}
+
+// PersistentDiscoveryHeaders serializes only headers that are safe to retain.
+// Session credentials stay exclusively in the in-memory discovery store.
+func PersistentDiscoveryHeaders(headers []string) *string {
+	safe := make([]string, 0, len(headers))
+	for _, header := range headers {
+		name, _, found := strings.Cut(header, ":")
+		if !found || sensitiveDiscoveryHeader(name) {
+			continue
+		}
+		safe = append(safe, header)
+	}
+	if len(safe) == 0 {
+		return nil
+	}
+	encoded, err := json.Marshal(safe)
+	if err != nil {
+		return nil
+	}
+	value := string(encoded)
+	return &value
 }
 
 // StopDownload stops a download task.
@@ -356,6 +393,39 @@ func downloadParamsForVideo(video *db.Video, downloadID int64) core.DownloadPara
 		Name:    video.Name,
 		Folder:  folder,
 		Headers: headers,
+	}
+}
+
+func mergeDownloadHeaders(stored, runtime []string) []string {
+	merged := slices.Clone(stored)
+	positions := make(map[string]int, len(merged))
+	for index, header := range merged {
+		if name, _, found := strings.Cut(header, ":"); found {
+			positions[strings.ToLower(strings.TrimSpace(name))] = index
+		}
+	}
+	for _, header := range runtime {
+		name, _, found := strings.Cut(header, ":")
+		if !found {
+			continue
+		}
+		key := strings.ToLower(strings.TrimSpace(name))
+		if index, exists := positions[key]; exists {
+			merged[index] = header
+			continue
+		}
+		positions[key] = len(merged)
+		merged = append(merged, header)
+	}
+	return merged
+}
+
+func sensitiveDiscoveryHeader(name string) bool {
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "cookie", "authorization", "proxy-authorization":
+		return true
+	default:
+		return false
 	}
 }
 

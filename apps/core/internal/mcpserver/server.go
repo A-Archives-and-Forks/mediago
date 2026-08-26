@@ -8,10 +8,14 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
+	"caorushizi.cn/mediago/internal/db"
+	"caorushizi.cn/mediago/internal/discovery"
 	"caorushizi.cn/mediago/internal/service"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -20,6 +24,11 @@ import (
 type DownloadConfig interface {
 	GetLocalDir() string
 	GetDeleteSegments() bool
+}
+
+// DiscoveryDownloader is the credential-safe handoff shared with the HTTP API.
+type DiscoveryDownloader interface {
+	CreateDownloads(context.Context, string, []string, string, bool) ([]*db.Video, error)
 }
 
 // Settings controls the MCP route exposed by the main HTTP server.
@@ -38,17 +47,24 @@ type Status struct {
 
 // Manager owns the Streamable HTTP MCP handler and its live settings.
 type Manager struct {
-	mu       sync.RWMutex
-	download *service.DownloadTaskService
-	config   DownloadConfig
-	settings Settings
-	handler  http.Handler
-	status   Status
+	mu                 sync.RWMutex
+	download           *service.DownloadTaskService
+	config             DownloadConfig
+	discovery          *discovery.Service
+	discoveryDownloads DiscoveryDownloader
+	settings           Settings
+	handler            http.Handler
+	status             Status
 }
 
 // NewManager creates an MCP manager backed by MediaGo's existing task service.
-func NewManager(download *service.DownloadTaskService, config DownloadConfig) *Manager {
-	manager := &Manager{download: download, config: config}
+func NewManager(download *service.DownloadTaskService, config DownloadConfig, discoveryService *discovery.Service, discoveryDownloads DiscoveryDownloader) *Manager {
+	manager := &Manager{
+		download:           download,
+		config:             config,
+		discovery:          discoveryService,
+		discoveryDownloads: discoveryDownloads,
+	}
 	manager.handler = manager.httpHandler()
 	manager.Apply(Settings{})
 	return manager
@@ -85,6 +101,10 @@ func (m *Manager) Apply(settings Settings) {
 		m.status.Error = "download persistence is unavailable"
 		return
 	}
+	if m.discovery == nil {
+		m.status.Error = "discovery service is unavailable"
+		return
+	}
 
 	m.status.Running = true
 }
@@ -104,7 +124,7 @@ func (m *Manager) Status() Status {
 func (m *Manager) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	m.mu.RLock()
 	settings := m.settings
-	downloadAvailable := m.download != nil
+	status := m.status
 	handler := m.handler
 	m.mu.RUnlock()
 
@@ -117,8 +137,12 @@ func (m *Manager) serveHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
-	if !downloadAvailable {
-		http.Error(w, "download persistence is unavailable", http.StatusServiceUnavailable)
+	if !status.Running {
+		message := status.Error
+		if message == "" {
+			message = "MCP server is unavailable"
+		}
+		http.Error(w, message, http.StatusServiceUnavailable)
 		return
 	}
 
@@ -174,9 +198,31 @@ type stopDownloadOutput struct {
 	Status string `json:"status"`
 }
 
+type discoverMediaInput struct {
+	URL               string                  `json:"url" jsonschema:"required,page or media URL to discover"`
+	Mode              discovery.DiscoveryMode `json:"mode,omitempty" jsonschema:"discovery mode: auto, browser, or inspect"`
+	TimeoutMS         int                     `json:"timeoutMs,omitempty" jsonschema:"browser timeout in milliseconds from 3000 to 30000"`
+	UseSessionCookies bool                    `json:"useSessionCookies,omitempty" jsonschema:"opt in to the signed-in desktop browser session for personalized content"`
+	WaitSeconds       *int                    `json:"waitSeconds,omitempty" jsonschema:"seconds to wait for a terminal result from 0 to 25; defaults to 20"`
+}
+
+type discoveryIDInput struct {
+	ID string `json:"id" jsonschema:"required,media discovery job ID"`
+}
+
+type downloadDiscoveredMediaInput struct {
+	ID            string   `json:"id" jsonschema:"required,media discovery job ID"`
+	SourceIDs     []string `json:"sourceIds" jsonschema:"required,one or more discovered source IDs"`
+	Folder        string   `json:"folder,omitempty" jsonschema:"optional subdirectory under the MediaGo download directory"`
+	StartDownload *bool    `json:"startDownload,omitempty" jsonschema:"start created downloads immediately; defaults to true"`
+}
+
 func (m *Manager) registerTools(server *mcp.Server) {
-	readOnly := &mcp.ToolAnnotations{ReadOnlyHint: true}
-	write := &mcp.ToolAnnotations{ReadOnlyHint: false}
+	closedWorld := false
+	openWorld := true
+	nonDestructive := false
+	readOnly := &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: &closedWorld}
+	write := &mcp.ToolAnnotations{ReadOnlyHint: false, DestructiveHint: &nonDestructive, OpenWorldHint: &closedWorld}
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "health_check",
@@ -184,6 +230,67 @@ func (m *Manager) registerTools(server *mcp.Server) {
 		Annotations: readOnly,
 	}, func(context.Context, *mcp.CallToolRequest, emptyInput) (*mcp.CallToolResult, healthOutput, error) {
 		return nil, healthOutput{Status: "ok"}, nil
+	})
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "discover_media",
+		Description: "Discover media sources from a page or inspect a direct HLS URL. " +
+			"Browser discovery uses the Electron executor. Setting useSessionCookies=true opts in to the signed-in desktop browser session and may access personalized content. Returned jobs never include cookies or authorization headers.",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: &openWorld},
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, input discoverMediaInput) (*mcp.CallToolResult, discovery.DiscoveryJob, error) {
+		job, err := m.discovery.Create(ctx, discovery.CreateDiscoveryInput{
+			URL:               input.URL,
+			Mode:              input.Mode,
+			TimeoutMS:         input.TimeoutMS,
+			UseSessionCookies: input.UseSessionCookies,
+		})
+		if err != nil {
+			return nil, discovery.DiscoveryJob{}, discoveryToolError(err)
+		}
+		waitSeconds := 20
+		if input.WaitSeconds != nil {
+			waitSeconds = *input.WaitSeconds
+		}
+		if waitSeconds < 0 {
+			return nil, discovery.DiscoveryJob{}, errors.New("waitSeconds must be between 0 and 25")
+		}
+		waitSeconds = min(waitSeconds, 25)
+		if terminalDiscoveryStatus(job.Status) || waitSeconds == 0 {
+			return nil, job, nil
+		}
+		job, err = waitForDiscovery(ctx, m.discovery, job.ID, time.Duration(waitSeconds)*time.Second)
+		return nil, job, err
+	})
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "get_media_discovery",
+		Description: "Get a redacted MediaGo media discovery job and its normalized sources.",
+		Annotations: readOnly,
+	}, func(_ context.Context, _ *mcp.CallToolRequest, input discoveryIDInput) (*mcp.CallToolResult, discovery.DiscoveryJob, error) {
+		job, err := m.discovery.Get(strings.TrimSpace(input.ID))
+		return nil, job, discoveryToolError(err)
+	})
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "cancel_media_discovery",
+		Description: "Cancel a queued or running MediaGo media discovery job.",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: false, DestructiveHint: &nonDestructive, OpenWorldHint: &closedWorld},
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, input discoveryIDInput) (*mcp.CallToolResult, discovery.DiscoveryJob, error) {
+		job, err := m.discovery.Cancel(ctx, strings.TrimSpace(input.ID))
+		return nil, job, discoveryToolError(err)
+	})
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "download_discovered_media",
+		Description: "Create MediaGo download tasks from selected discovery source IDs. Private browser credentials remain in memory and are never returned.",
+		Annotations: write,
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, input downloadDiscoveredMediaInput) (*mcp.CallToolResult, any, error) {
+		if m.discoveryDownloads == nil {
+			return nil, nil, errors.New("discovery_download_unavailable: discovery download service unavailable")
+		}
+		startDownload := input.StartDownload == nil || *input.StartDownload
+		videos, err := m.discoveryDownloads.CreateDownloads(ctx, strings.TrimSpace(input.ID), input.SourceIDs, input.Folder, startDownload)
+		return nil, videos, err
 	})
 
 	mcp.AddTool(server, &mcp.Tool{
@@ -263,6 +370,41 @@ func (m *Manager) registerTools(server *mcp.Server) {
 		}
 		return nil, stopDownloadOutput{ID: input.ID, Status: "stopped"}, nil
 	})
+}
+
+func waitForDiscovery(ctx context.Context, discoveryService *discovery.Service, id string, timeout time.Duration) (discovery.DiscoveryJob, error) {
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return discovery.DiscoveryJob{}, ctx.Err()
+		case <-timer.C:
+			job, err := discoveryService.Get(id)
+			return job, discoveryToolError(err)
+		case <-ticker.C:
+			job, err := discoveryService.Get(id)
+			if err != nil {
+				return discovery.DiscoveryJob{}, discoveryToolError(err)
+			}
+			if terminalDiscoveryStatus(job.Status) {
+				return job, nil
+			}
+		}
+	}
+}
+
+func terminalDiscoveryStatus(status discovery.DiscoveryStatus) bool {
+	return status == discovery.StatusCompleted || status == discovery.StatusFailed || status == discovery.StatusCancelled
+}
+
+func discoveryToolError(err error) error {
+	if err == nil {
+		return nil
+	}
+	return fmt.Errorf("%s: %w", discovery.ErrorCode(err), err)
 }
 
 func hasValidBearerToken(r *http.Request, token string) bool {

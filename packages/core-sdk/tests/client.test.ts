@@ -128,3 +128,62 @@ describe("MediaGoClient.streamEvents", () => {
     expect(source.closed).toBe(true);
   });
 });
+
+describe("MediaGoClient discovery methods", () => {
+  it("uses the shared discovery routes with bounded timeouts and abort signals", async () => {
+    const client = new MediaGoClient({ baseURL: "http://example.com" });
+    const controller = new AbortController();
+    const post = vi.spyOn(client.api, "post").mockResolvedValue({
+      success: true,
+      code: 202,
+      message: "OK",
+      data: { id: "job-1" },
+    });
+    const get = vi.spyOn(client.api, "get").mockResolvedValue({
+      success: true,
+      code: 200,
+      message: "OK",
+      data: { id: "job-1" },
+    });
+
+    await client.createDiscovery(
+      {
+        url: "https://example.com/watch",
+        mode: "browser",
+        timeoutMs: 30_000,
+      },
+      { signal: controller.signal },
+    );
+    expect(post).toHaveBeenCalledWith(
+      "/api/discoveries",
+      expect.objectContaining({ mode: "browser" }),
+      expect.objectContaining({ signal: controller.signal, timeout: 35_000 }),
+    );
+
+    await client.getDiscovery("job/1", { signal: controller.signal });
+    expect(get).toHaveBeenCalledWith(
+      "/api/discoveries/job%2F1",
+      expect.objectContaining({ signal: controller.signal }),
+    );
+    await client.cancelDiscovery("job/1");
+    expect(post).toHaveBeenCalledWith(
+      "/api/discoveries/job%2F1/cancel",
+      undefined,
+      expect.objectContaining({ timeout: 10_000 }),
+    );
+    await client.createDiscoveryDownloads("job/1", {
+      sourceIds: ["source-1"],
+      startDownload: true,
+    });
+    expect(post).toHaveBeenCalledWith(
+      "/api/discoveries/job%2F1/downloads",
+      expect.objectContaining({ sourceIds: ["source-1"] }),
+      expect.objectContaining({ timeout: 10_000 }),
+    );
+    await client.getDiscoveryExecutorStatus();
+    expect(get).toHaveBeenCalledWith(
+      "/api/discovery-executor/status",
+      expect.objectContaining({ timeout: 10_000 }),
+    );
+  });
+});

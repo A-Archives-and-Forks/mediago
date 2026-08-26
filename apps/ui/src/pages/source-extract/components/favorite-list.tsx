@@ -35,7 +35,7 @@ export function FavoriteList() {
     mutate,
   } = useFavorites();
   const { contextMenu } = usePlatform();
-  const { loadUrl } = useBrowserActions();
+  const { createTab, loadUrl } = useBrowserActions();
   const { t } = useTranslation();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [url, setUrl] = useState("");
@@ -117,11 +117,14 @@ export function FavoriteList() {
   const handleContextMenu = useMemoizedFn(async (item: Favorite) => {
     const action = await contextMenu.show([
       { key: "open", label: t("open") },
+      { key: "open-new-tab", label: t("openInNewTab") },
       { key: "separator", label: "", type: "separator" },
       { key: "delete", label: t("delete") },
     ]);
     if (action === "open") {
       loadUrl(item.url);
+    } else if (action === "open-new-tab") {
+      await createTab(item.url);
     } else if (action === "delete") {
       await removeFavorite(item.id);
     }

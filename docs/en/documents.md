@@ -47,6 +47,18 @@ When enabled, the software will automatically check for testing versions.
 
 Controls whether the software should "hide to the system tray" or "exit the software" when the main window is closed.
 
+## Multi-tab source extraction
+
+The source-extraction page supports multiple independent browser tabs. Each tab keeps its own URL, title, navigation history, running page state, and sniffed sources. Switching tabs does not reload the page or leak sources between tabs.
+
+- Use the pinned `+` action to create a tab. The strip scrolls horizontally when crowded, while `+` remains visible.
+- Use `Ctrl/Cmd+T` to create, `Ctrl/Cmd+W` to close, and `Ctrl+Tab` / `Ctrl+Shift+Tab` to cycle. Middle-click also closes a tab; keyboard users can focus a tab and press `Delete`.
+- Closing the active tab selects the tab on its right, then the one on its left. Closing the final tab creates a fresh home tab.
+- MediaGo has no application-level tab limit. The practical limit depends on system memory, CPU, site load, and Electron native-view resources; many tabs consume more resources.
+- Tabs live in memory for the current desktop session and are not restored after MediaGo restarts.
+
+Agent discovery started through HTTP, MCP, or CLI uses a separate hidden tab. It does not appear in the strip or navigate the visible tab. The hidden task uses an isolated session by default and shares the signed-in desktop session only after explicit opt-in.
+
 ## Browser Settings
 
 ::: tip

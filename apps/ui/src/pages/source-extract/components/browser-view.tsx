@@ -1,6 +1,4 @@
-import { useMemoizedFn } from "ahooks";
 import { CircleAlert } from "lucide-react";
-import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { Button } from "@/components/ui/button";
@@ -19,48 +17,32 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import WebView from "@/components/web-view";
 import { useBrowserActions } from "@/hooks/use-browser-actions";
-import { usePlatform } from "@/hooks/use-platform";
 import {
   BrowserStatus,
   browserErrorSelector,
   browserSourcePanelSelector,
-  setBrowserSelector,
-  type SourceData,
   useBrowserStore,
 } from "@/store/browser";
 import { BrowserViewPanel } from "./browser-view-panel";
 
 export function BrowserView() {
-  const { on, off } = usePlatform();
   const { goto, goHome } = useBrowserActions();
-  const { status, errMsg, errCode } = useBrowserStore(
+  const { tabId, status, errMsg, errCode, url } = useBrowserStore(
     useShallow(browserErrorSelector),
   );
   const { hasSources, sourcePanelCollapsed } = useBrowserStore(
     useShallow(browserSourcePanelSelector),
   );
-  const url = useBrowserStore((s) => s.url);
-  const { addSource } = useBrowserStore(useShallow(setBrowserSelector));
   const { t } = useTranslation();
 
-  const onSourceDetected = useMemoizedFn((...args: unknown[]) => {
-    addSource(args[1] as SourceData);
-  });
-
-  useEffect(() => {
-    on("browser:sourceDetected", onSourceDetected);
-
-    return () => {
-      off("browser:sourceDetected", onSourceDetected);
-    };
-  }, [off, on, onSourceDetected]);
-
-  const renderContent = useMemoizedFn(() => {
+  const renderContent = () => {
     // Loading or Loaded: show the WebView so the native WebContentsView is visible
     if (status === BrowserStatus.Loading || status === BrowserStatus.Loaded) {
       return (
         <div className="relative h-full w-full flex-1">
           <WebView
+            key={tabId}
+            tabId={tabId}
             className="h-full w-full flex-1"
             boundsInset={{ right: 1, bottom: 1, left: 1 }}
           />
@@ -88,8 +70,8 @@ export function BrowserView() {
             </EmptyHeader>
             <EmptyContent>
               <div className="flex flex-row items-center gap-2">
-                <Button onClick={goHome}>{t("backToHome")}</Button>
-                <Button variant="outline" onClick={() => goto(url)}>
+                <Button onClick={() => goHome(tabId)}>{t("backToHome")}</Button>
+                <Button variant="outline" onClick={() => goto(url, tabId)}>
                   {t("refresh")}
                 </Button>
               </div>
@@ -100,7 +82,7 @@ export function BrowserView() {
     }
 
     return null;
-  });
+  };
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">

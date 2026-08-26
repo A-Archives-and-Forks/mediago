@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"caorushizi.cn/mediago/internal/api/dto"
+	"caorushizi.cn/mediago/internal/discovery"
 	"caorushizi.cn/mediago/internal/mcpserver"
 	"caorushizi.cn/mediago/internal/service"
 	"github.com/gin-gonic/gin"
@@ -21,7 +22,12 @@ func (mcpRouteDownloadConfig) GetDeleteSegments() bool { return true }
 
 func TestRegisterMCPRoutesUsesMainGinEngine(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	manager := mcpserver.NewManager(&service.DownloadTaskService{}, mcpRouteDownloadConfig{})
+	manager := mcpserver.NewManager(
+		&service.DownloadTaskService{},
+		mcpRouteDownloadConfig{},
+		discovery.NewService(nil, nil, nil),
+		nil,
+	)
 	manager.Apply(mcpserver.Settings{Enabled: true, Token: "secret"})
 	server := &Server{engine: gin.New()}
 	server.RegisterMCPRoutes(manager.Handler(), func() any { return manager.Status() })

@@ -23,13 +23,18 @@ describe("loopback test page", () => {
   });
 
   test("preserves the media capture page", async () => {
-    const page = await startTestPage(SAMPLE_URL);
+    const page = await startTestPage(SAMPLE_URL, {
+      marker: "tab-a",
+      title: "Fixture Tab A",
+    });
     try {
       const mediaResponse = await fetch(page.url);
       const mediaBody = await mediaResponse.text();
       expect(mediaResponse.status).toBe(200);
       expect(mediaBody).toContain(SAMPLE_URL);
       expect(mediaBody).toContain("fixtureMediaLoaded");
+      expect(mediaBody).toContain("Fixture Tab A");
+      expect(mediaBody).toContain('marker: "tab-a"');
     } finally {
       await page.close();
     }

@@ -1,111 +1,168 @@
-import { useAsyncEffect, useMemoizedFn } from "ahooks";
-import { type FC, useEffect, useRef } from "react";
-import { useShallow } from "zustand/react/shallow";
+import { getConfig } from "@/api/config";
 import PageContainer from "@/components/page-container";
+import { useBrowserActions } from "@/hooks/use-browser-actions";
+import { usePlatform } from "@/hooks/use-platform";
 import { setAppStoreSelector, useAppStore } from "@/store/app";
 import {
-  BrowserStatus,
-  PageMode,
-  setBrowserSelector,
+  activeTabSelector,
+  browserActionsSelector,
+  type SourceData,
   useBrowserStore,
 } from "@/store/browser";
 import { cn } from "@/utils";
+import { useAsyncEffect, useMemoizedFn } from "ahooks";
+import {
+  type BrowserNavigationFailurePayload,
+  type BrowserNavigationPayload,
+  type BrowserSourceDetectedPayload,
+  type BrowserTabsSnapshot,
+  IpcEvent,
+} from "@mediago/shared-common";
+import { type FC, useEffect, useRef } from "react";
+import { useShallow } from "zustand/react/shallow";
+import { BrowserTabStrip } from "./components/browser-tab-strip";
+import {
+  activeTabElementId,
+  getTabShortcut,
+  nextTabId,
+} from "./components/browser-tab-strip-logic";
 import { BrowserView } from "./components/browser-view";
 import { FavoriteList } from "./components/favorite-list";
 import { ToolBar } from "./components/tool-bar";
-import { usePlatform } from "@/hooks/use-platform";
-import { getConfig } from "@/api/config";
 
 interface SourceExtractProps {
   page?: boolean;
 }
 
 const SourceExtract: FC<SourceExtractProps> = ({ page = false }) => {
-  const { on, off, app } = usePlatform();
+  const { app, on, off } = usePlatform();
+  const { activateTab, closeTab, createTab } = useBrowserActions();
   const { setAppStore } = useAppStore(useShallow(setAppStoreSelector));
-  const mode = useBrowserStore((s) => s.mode);
-  const title = useBrowserStore((s) => s.title);
-  const { setBrowserStore } = useBrowserStore(useShallow(setBrowserSelector));
+  const mode = useBrowserStore((state) => activeTabSelector(state).mode);
+  const title = useBrowserStore((state) => activeTabSelector(state).title);
+  const activeTabId = useBrowserStore((state) => state.activeTabId);
+  const { addSource, hydrateSnapshot, updateTab } = useBrowserStore(
+    useShallow(browserActionsSelector),
+  );
   const originTitle = useRef(document.title);
 
-  useEffect(() => {
-    const unsubscribe = useBrowserStore.subscribe(
-      (state) => ({
-        url: state.url,
-        title: state.title,
-        mode: state.mode,
-        status: state.status,
-      }),
-      (selected) => {
-        app.setSharedState(selected);
-      },
-    );
-
-    return () => {
-      unsubscribe();
-    };
-  }, []);
-
   useAsyncEffect(async () => {
-    try {
-      const configData = await getConfig();
-      setAppStore(configData);
-    } catch {
-      // ignore
+    const [configResult, snapshotResult] = await Promise.allSettled([
+      getConfig(),
+      app.getSharedState(),
+    ]);
+    if (configResult.status === "fulfilled") setAppStore(configResult.value);
+    if (snapshotResult.status === "fulfilled") {
+      hydrateSnapshot(snapshotResult.value);
     }
   }, []);
 
-  useAsyncEffect(async () => {
-    const state = await app.getSharedState();
-    if (state) setBrowserStore(state as Partial<BrowserStore>);
-  }, []);
-
-  useEffect(() => {
-    on("browser:domReady", onDomReady);
-    on("browser:failLoad", onFailLoad);
-    on("browser:didNavigate", onDidNavigate);
-    on("browser:didNavigateInPage", onDidNavigateInPage);
-
-    return () => {
-      off("browser:domReady", onDomReady);
-      off("browser:failLoad", onFailLoad);
-      off("browser:didNavigate", onDidNavigate);
-      off("browser:didNavigateInPage", onDidNavigateInPage);
-    };
-  }, []);
-
-  const setPageInfo = useMemoizedFn(({ url, title: pageTitle }: UrlDetail) => {
-    setBrowserStore({ url, title: pageTitle });
+  const onTabsChanged = useMemoizedFn((...args: unknown[]) => {
+    const snapshot = args[1] as BrowserTabsSnapshot | undefined;
+    if (snapshot) hydrateSnapshot(snapshot);
   });
 
-  const onDomReady = useMemoizedFn((...args: unknown[]) => {
-    setPageInfo(args[1] as UrlDetail);
-  });
-
-  const onFailLoad = useMemoizedFn((...args: unknown[]) => {
-    const data = args[1] as { code: number; desc: string };
-    setBrowserStore({
-      status: BrowserStatus.Failed,
-      errCode: data.code,
-      errMsg: data.desc,
+  const onPageInfo = useMemoizedFn((...args: unknown[]) => {
+    const payload = args[1] as BrowserNavigationPayload | undefined;
+    if (!payload) return;
+    updateTab(payload.tabId, {
+      url: payload.url,
+      title: payload.title ?? "",
     });
   });
 
   const onDidNavigate = useMemoizedFn((...args: unknown[]) => {
-    setPageInfo(args[1] as UrlDetail);
-    setBrowserStore({ status: BrowserStatus.Loaded });
+    const payload = args[1] as BrowserNavigationPayload | undefined;
+    if (!payload) return;
+    updateTab(payload.tabId, {
+      url: payload.url,
+      title: payload.title ?? "",
+      status: "loaded",
+      errorCode: undefined,
+      errorMessage: undefined,
+    });
   });
 
-  const onDidNavigateInPage = useMemoizedFn((...args: unknown[]) => {
-    setPageInfo(args[1] as UrlDetail);
+  const onFailLoad = useMemoizedFn((...args: unknown[]) => {
+    const payload = args[1] as BrowserNavigationFailurePayload | undefined;
+    if (!payload) return;
+    updateTab(payload.tabId, {
+      url: payload.url,
+      title: payload.title ?? "",
+      status: "failed",
+      errorCode: payload.errorCode,
+      errorMessage: payload.errorMessage,
+    });
+  });
+
+  const onSourceDetected = useMemoizedFn((...args: unknown[]) => {
+    const payload = args[1] as BrowserSourceDetectedPayload | undefined;
+    if (!payload) return;
+    addSource(payload.tabId, payload.source as SourceData);
   });
 
   useEffect(() => {
-    document.title = title || document.title;
+    on(IpcEvent.browser.tabsChanged, onTabsChanged);
+    on(IpcEvent.browser.domReady, onPageInfo);
+    on(IpcEvent.browser.didFailLoad, onFailLoad);
+    on(IpcEvent.browser.didNavigate, onDidNavigate);
+    on(IpcEvent.browser.didNavigateInPage, onPageInfo);
+    on(IpcEvent.browser.sourceDetected, onSourceDetected);
+
     return () => {
-      document.title = originTitle.current;
+      off(IpcEvent.browser.tabsChanged, onTabsChanged);
+      off(IpcEvent.browser.domReady, onPageInfo);
+      off(IpcEvent.browser.didFailLoad, onFailLoad);
+      off(IpcEvent.browser.didNavigate, onDidNavigate);
+      off(IpcEvent.browser.didNavigateInPage, onPageInfo);
+      off(IpcEvent.browser.sourceDetected, onSourceDetected);
     };
+  }, [
+    off,
+    on,
+    onDidNavigate,
+    onFailLoad,
+    onPageInfo,
+    onSourceDetected,
+    onTabsChanged,
+  ]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
+      const shortcut = getTabShortcut(event);
+      if (!shortcut) return;
+      event.preventDefault();
+      const state = useBrowserStore.getState();
+      if (shortcut === "new") {
+        void createTab();
+        return;
+      }
+      if (shortcut === "close") {
+        void closeTab(state.activeTabId);
+        return;
+      }
+      const targetId = nextTabId(
+        state.tabs.map((tab) => tab.id),
+        state.activeTabId,
+        shortcut === "next" ? 1 : -1,
+      );
+      if (targetId) void activateTab(targetId);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [activateTab, closeTab, createTab]);
+
+  useEffect(() => {
+    document.title = title || originTitle.current;
   }, [title]);
+
+  useEffect(
+    () => () => {
+      document.title = originTitle.current;
+    },
+    [],
+  );
 
   return (
     <PageContainer
@@ -115,9 +172,15 @@ const SourceExtract: FC<SourceExtractProps> = ({ page = false }) => {
       )}
       wrapperClassName={cn(page && "p-0")}
     >
+      <BrowserTabStrip />
       <ToolBar page={page} />
-      <div className="flex flex-1 overflow-hidden">
-        {mode === PageMode.Browser ? <BrowserView /> : <FavoriteList />}
+      <div
+        id={`browser-panel-${activeTabId}`}
+        role="tabpanel"
+        aria-labelledby={activeTabElementId(activeTabId)}
+        className="flex min-h-0 flex-1 overflow-hidden"
+      >
+        {mode === "browser" ? <BrowserView /> : <FavoriteList />}
       </div>
     </PageContainer>
   );

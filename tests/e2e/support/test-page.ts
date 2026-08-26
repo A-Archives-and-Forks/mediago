@@ -8,18 +8,34 @@ export interface StartedTestPage {
   close(): Promise<void>;
 }
 
-function fixtureHTML(sampleURL: string): string {
+export interface StartTestPageOptions {
+  marker?: string;
+  title?: string;
+}
+
+function fixtureHTML(sampleURL: string, options: StartTestPageOptions): string {
   const serializedURL = JSON.stringify(sampleURL).replaceAll("<", "\\u003c");
+  const serializedMarker = JSON.stringify(
+    options.marker ?? "fixture",
+  ).replaceAll("<", "\\u003c");
+  const title = (options.title ?? "MediaGo E2E Fixture")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
   return `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>MediaGo E2E Fixture</title>
+    <title>${title}</title>
   </head>
   <body>
     <main><h1>MediaGo E2E Fixture</h1></main>
     <script>
+      window.fixtureExecutionState = { marker: ${serializedMarker}, ticks: 0 };
+      history.replaceState({ marker: ${serializedMarker} }, "");
+      setInterval(() => { window.fixtureExecutionState.ticks += 1; }, 50);
       window.fixtureMediaLoaded = false;
       fetch(${serializedURL})
         .then((response) => {
@@ -50,8 +66,9 @@ const blankHTML = Buffer.from(`<!doctype html>
 
 export async function startTestPage(
   sampleURL: string,
+  options: StartTestPageOptions = {},
 ): Promise<StartedTestPage> {
-  const mediaHTML = Buffer.from(fixtureHTML(sampleURL));
+  const mediaHTML = Buffer.from(fixtureHTML(sampleURL, options));
   const server = createServer((request, response) => {
     const body =
       request.method === "GET"

@@ -47,6 +47,38 @@ HTTP をしゃべれるツール(curl / Python / Node.js / Postman など)なら
 - **デスクトップ版**:デフォルトで**認証不要**、`localhost:39719` に直接リクエストするだけ
 - **Docker デプロイメント**:認証を有効にした場合、MediaGo の**設定ページ**から API キーを取得し、以降のリクエストに `Authorization: Bearer <key>` ヘッダーを付与します
 
+## メディア検出（スニッフィング / 解析）
+
+メディア検出は非同期ジョブです。`inspect` は HLS を直接解析し、`browser` は Electron メインプロセスに非表示・分離されたブラウザビューを作成させてメディア通信を収集します。ユーザーが表示している素材抽出タブを移動または置換することはありません。
+
+- `auto`: 直接の `.m3u8` URL は `inspect`、その他の HTTP(S) ページは `browser` を使用します。
+- `inspect`: 直接の M3U8 URL のみを受け付け、Electron は不要です。
+- `browser`: Core に接続されたデスクトップ版が必要です。単独の Docker/Core ではページ検出は `discovery_executor_unavailable` になります。
+
+```bash
+curl -X POST http://localhost:39719/api/discoveries \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://example.com/watch/1","mode":"browser","timeoutMs":20000,"useSessionCookies":false}'
+
+curl http://localhost:39719/api/discoveries/<discovery-id>
+curl -X POST http://localhost:39719/api/discoveries/<discovery-id>/cancel
+curl http://localhost:39719/api/discovery-executor/status
+curl -X POST http://localhost:39719/api/discoveries/<discovery-id>/downloads \
+  -H "Content-Type: application/json" \
+  -d '{"sourceIds":["source-1"],"startDownload":true}'
+```
+
+タイムアウトは 3000–30000 ms に制限され、メモリ上の結果は約 10 分で失効します。`useSessionCookies` は既定で `false` です。ログイン済みデスクトップセッションが必要な場合だけ明示的に有効化してください。Cookie、Authorization などの資格情報は公開 API、CLI、MCP の結果には含まれず、再起動後には失効します。DRM やサイトのアクセス制御を回避する機能ではありません。
+
+```bash
+mediago discover "https://example.com/watch/1" --mode browser --json
+mediago discover get <discovery-id> --json
+mediago discover cancel <discovery-id>
+mediago discover download <discovery-id> --source source-1
+```
+
+対応する MCP ツールは `discover_media`、`get_media_discovery`、`cancel_media_discovery`、`download_discovered_media` です。`/mcp` は Bearer token を使用し、設定で有効化する必要があります。
+
 ## クイックスタート
 
 以下の 3 つの curl コマンドで「作成 → ダウンロード開始 → 完了通知」のフローが一通り流れます。

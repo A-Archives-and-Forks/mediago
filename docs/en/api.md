@@ -47,6 +47,60 @@ Example responses below only show the `data` body.
 - **Desktop**: no auth by default, just hit `localhost:39719`
 - **Docker**: when auth is enabled, grab the API key from MediaGo's **Settings** page, then include `Authorization: Bearer <key>` on every request
 
+## Media discovery (sniffing and parsing)
+
+Discovery is an asynchronous job. `inspect` parses HLS directly; `browser` asks the Electron main process to create a hidden, isolated browser view and observe its media requests. It never navigates or replaces the user's visible source-extraction tab.
+
+| Mode      | Behavior                                                                        |
+| --------- | ------------------------------------------------------------------------------- |
+| `auto`    | Uses `inspect` for direct `.m3u8` URLs and `browser` for other HTTP(S) pages    |
+| `inspect` | Accepts direct M3U8 URLs only and does not require an Electron executor         |
+| `browser` | Loads a page and collects media requests; the connected desktop app is required |
+
+Standalone Docker/Core currently has no remote browser executor. It can use `inspect`, or `auto` for direct M3U8 input; page sniffing returns `discovery_executor_unavailable`.
+
+### Create and query a discovery
+
+```bash
+curl -X POST http://localhost:39719/api/discoveries \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://example.com/watch/1",
+    "mode": "browser",
+    "timeoutMs": 20000,
+    "useSessionCookies": false
+  }'
+
+curl http://localhost:39719/api/discoveries/<discovery-id>
+curl -X POST http://localhost:39719/api/discoveries/<discovery-id>/cancel
+curl http://localhost:39719/api/discovery-executor/status
+```
+
+`timeoutMs` is clamped to 3000–30000 ms. Status is `pending`, `running`, `completed`, `failed`, or `cancelled`; in-memory results expire after about 10 minutes. Public HTTP responses, CLI output, and MCP results never include private `Cookie` or `Authorization` headers.
+
+`useSessionCookies` defaults to `false` and uses an isolated session. Set it to `true` only when the signed-in desktop session is required; this may access personalized content. Credentials remain in memory and expire on restart. MediaGo does not bypass DRM or site access controls.
+
+### Create downloads from source IDs
+
+```bash
+curl -X POST http://localhost:39719/api/discoveries/<discovery-id>/downloads \
+  -H "Content-Type: application/json" \
+  -d '{"sourceIds":["source-1"],"startDownload":true}'
+```
+
+Up to 20 source IDs may be selected at once. Only the internal Core download handoff can read short-lived private request headers; they are absent from discovery responses, and sensitive values are not persisted.
+
+### CLI and MCP
+
+```bash
+mediago discover "https://example.com/watch/1" --mode browser --json
+mediago discover get <discovery-id> --json
+mediago discover cancel <discovery-id>
+mediago discover download <discovery-id> --source source-1
+```
+
+Add `--session-cookies` only when signed-in state is required. The built-in MCP equivalents are `discover_media`, `get_media_discovery`, `cancel_media_discovery`, and `download_discovered_media`. MCP uses `/mcp`, a Bearer token, and must be enabled in Settings.
+
 ## Quick start
 
 Three curl commands that walk through the whole "create → download → get notified" flow.

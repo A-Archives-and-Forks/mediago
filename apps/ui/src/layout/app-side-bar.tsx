@@ -84,7 +84,7 @@ export function AppSideBar({ className }: Props) {
     event.stopPropagation();
     if (openInNewWindow) {
       setAppStore({ openInNewWindow: false });
-      await app.combineToHomePage({ url: "", sourceList: [] });
+      await app.combineToHomePage();
       return;
     }
     setAppStore({ openInNewWindow: true });

@@ -99,16 +99,18 @@ func runServer(rt *app.Runtime) error {
 	confStore := handler.WrapConfStore[app.AppStore](rt.AppStore)
 	execPath, _ := os.Executable()
 	server := api.NewServer(rt.Queue, rt.TaskLogs, rt.Database, confStore, api.ServerOptions{
-		EnableAuth: cfg.EnableAuth,
-		StaticDir:  cfg.StaticDir,
-		FFmpegBin:  app.FFmpegBinPath(cfg),
-		VideoRoot:  cfg.LocalDir,
+		EnableAuth:          cfg.EnableAuth,
+		StaticDir:           cfg.StaticDir,
+		FFmpegBin:           app.FFmpegBinPath(cfg),
+		VideoRoot:           cfg.LocalDir,
+		ElectronBridgeToken: cfg.ElectronBridgeToken,
 		EnvPaths: handler.EnvPaths{
 			ConfigDir: cfg.ConfigDir,
 			BinDir:    filepath.Dir(execPath),
 			Platform:  runtime.GOOS,
 		},
 	})
+	defer server.Close()
 	store := rt.AppStore.Store()
 	if strings.TrimSpace(store.MCPToken) == "" {
 		token, err := mcpserver.GenerateToken()
@@ -120,7 +122,12 @@ func runServer(rt *app.Runtime) error {
 		}
 	}
 
-	mcpManager := mcpserver.NewManager(server.DownloadService(), cfg)
+	mcpManager := mcpserver.NewManager(
+		server.DownloadService(),
+		cfg,
+		server.DiscoveryService(),
+		server.DiscoveryDownloads(),
+	)
 	applyMCPSettings := func() {
 		current := rt.AppStore.Store()
 		mcpManager.Apply(mcpserver.Settings{

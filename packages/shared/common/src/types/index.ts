@@ -326,6 +326,82 @@ export interface WebSource {
   headers?: string;
 }
 
+export type BrowserTabKind = "user" | "agent";
+
+export type BrowserPageMode = "home" | "browser";
+
+export type BrowserTabStatus = "default" | "loading" | "loaded" | "failed";
+
+/** A renderer-safe source snapshot. Sensitive request headers are excluded. */
+export interface BrowserTabSourceSnapshot {
+  id: number;
+  url: string;
+  documentURL: string;
+  name: string;
+  type: DownloadType;
+  mediaInfo?: HLSMediaInfo;
+}
+
+/** Visible user-tab event data; stripped before storing a shared snapshot. */
+export interface BrowserDetectedSource extends BrowserTabSourceSnapshot {
+  headers?: string;
+}
+
+export interface BrowserTabSnapshot {
+  id: string;
+  kind: BrowserTabKind;
+  mode: BrowserPageMode;
+  status: BrowserTabStatus;
+  url: string;
+  title: string;
+  favicon?: string;
+  errorCode?: number;
+  errorMessage?: string;
+  sources: BrowserTabSourceSnapshot[];
+}
+
+export interface BrowserTabsSnapshot {
+  tabs: BrowserTabSnapshot[];
+  activeTabId: string;
+  sourcePanelCollapsed: boolean;
+}
+
+export interface CreateBrowserTabInput {
+  activate?: boolean;
+  url?: string;
+}
+
+export interface BrowserTabScopedPayload {
+  tabId: string;
+}
+
+export interface BrowserLoadURLPayload extends BrowserTabScopedPayload {
+  url: string;
+}
+
+export interface BrowserBoundsPayload extends BrowserTabScopedPayload {
+  bounds: Rectangle;
+}
+
+export interface BrowserUserAgentPayload extends BrowserTabScopedPayload {
+  isMobile: boolean;
+}
+
+export interface BrowserNavigationPayload extends BrowserTabScopedPayload {
+  url: string;
+  title?: string;
+}
+
+export interface BrowserNavigationFailurePayload extends BrowserNavigationPayload {
+  errorCode: number;
+  errorMessage: string;
+}
+
+export interface BrowserSourceDetectedPayload extends BrowserTabScopedPayload {
+  source: BrowserDetectedSource;
+}
+
+/** @deprecated Replaced by BrowserTabsSnapshot during the tab-aware IPC migration. */
 export interface BrowserStore {
   url: string;
   sourceList: WebSource[];
@@ -456,17 +532,28 @@ export interface OpenUpdateLogsResult {
 
 export interface PlatformApi {
   browser: {
-    loadURL(url: string): Promise<void>;
-    back(): Promise<boolean>;
-    reload(): Promise<void>;
-    show(): Promise<void>;
-    hide(): Promise<void>;
-    home(): Promise<void>;
-    setBounds(rect: Rectangle): Promise<void>;
-    setUserAgent(isMobile: boolean): Promise<void>;
+    createTab(options?: CreateBrowserTabInput): Promise<BrowserTabSnapshot>;
+    activateTab(tabId: string): Promise<BrowserTabsSnapshot>;
+    closeTab(tabId: string): Promise<BrowserTabsSnapshot>;
+    getTabs(): Promise<BrowserTabsSnapshot>;
+    /** The second argument is optional only during the legacy single-tab UI migration. */
+    loadURL(tabIdOrUrl: string, url?: string): Promise<void>;
+    back(tabId?: string): Promise<boolean>;
+    reload(tabId?: string): Promise<void>;
+    show(tabId?: string): Promise<void>;
+    hide(tabId?: string): Promise<void>;
+    home(tabId?: string): Promise<void>;
+    setBounds(tabIdOrRect: string | Rectangle, rect?: Rectangle): Promise<void>;
+    setUserAgent(
+      tabIdOrIsMobile: string | boolean,
+      isMobile?: boolean,
+    ): Promise<void>;
     clearCache(): Promise<void>;
-    pluginReady(): Promise<void>;
-    showDownloadDialog(data: Omit<DownloadTask, "id">[]): Promise<void>;
+    pluginReady(tabId?: string): Promise<void>;
+    showDownloadDialog(
+      tabIdOrData: string | Omit<DownloadTask, "id">[],
+      data?: Omit<DownloadTask, "id">[],
+    ): Promise<void>;
     dismissOverlayDialog(): Promise<void>;
   };
   app: {
@@ -481,10 +568,13 @@ export interface PlatformApi {
     getExtensionDir(): Promise<string>;
     /** Preferred OS language for application UI, such as `zh-CN`. */
     getPreferredSystemLanguage(): Promise<string>;
-    getSharedState(): Promise<unknown>;
+    getSharedState(): Promise<BrowserTabsSnapshot>;
+    /** Accepts legacy single-tab state until the renderer migration is complete. */
     setSharedState(state: unknown): Promise<void>;
     showBrowserWindow(): Promise<void>;
-    combineToHomePage(store: BrowserStore): Promise<void>;
+    combineToHomePage(
+      store?: BrowserTabsSnapshot | BrowserStore,
+    ): Promise<void>;
     drainShareIntents(): Promise<ShareIntent[]>;
   };
   dialog: {

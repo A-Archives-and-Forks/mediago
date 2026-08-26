@@ -1,6 +1,10 @@
 import { provide } from "@inversifyjs/binding-decorators";
 import {
+  type BrowserBoundsPayload,
+  type BrowserLoadURLPayload,
+  type BrowserUserAgentPayload,
   type Controller,
+  type CreateBrowserTabInput,
   type DownloadTask,
   IPC,
 } from "@mediago/shared-common";
@@ -10,15 +14,15 @@ import OverlayDialogService from "../services/overlay-dialog.service";
 import { TYPES } from "../types/symbols";
 import { type IpcMainEvent } from "electron";
 import { inject, injectable } from "inversify";
+import BrowserTabManagerService from "../services/browser-tab-manager.service";
 import { SniffingHelper } from "../services/sniffing-helper.service";
-import WebviewService from "../services/webview.service";
 
 @injectable()
 @provide(TYPES.Controller)
 export default class WebviewController implements Controller {
   constructor(
-    @inject(WebviewService)
-    private readonly webview: WebviewService,
+    @inject(BrowserTabManagerService)
+    private readonly tabs: BrowserTabManagerService,
     @inject(DownloaderServer)
     private readonly downloaderServer: DownloaderServer,
     @inject(SniffingHelper)
@@ -27,67 +31,112 @@ export default class WebviewController implements Controller {
     private readonly overlayDialog: OverlayDialogService,
   ) {}
 
+  @handle(IPC.browser.createTab)
+  createTab(_event: IpcMainEvent, options?: CreateBrowserTabInput) {
+    return this.tabs.createTab(options);
+  }
+
+  @handle(IPC.browser.activateTab)
+  activateTab(_event: IpcMainEvent, tabId: string) {
+    return this.tabs.activateTab(tabId);
+  }
+
+  @handle(IPC.browser.closeTab)
+  closeTab(_event: IpcMainEvent, tabId: string) {
+    return this.tabs.closeTab(tabId);
+  }
+
+  @handle(IPC.browser.getTabs)
+  getTabs() {
+    return this.tabs.getSnapshot();
+  }
+
   @handle(IPC.browser.setBounds)
-  async setWebviewBounds(e: IpcMainEvent, bounds: Electron.Rectangle) {
-    this.webview.setBounds(bounds);
+  setWebviewBounds(
+    _event: IpcMainEvent,
+    payload: BrowserBoundsPayload | Electron.Rectangle,
+  ) {
+    if ("bounds" in payload) {
+      this.tabs.setBounds(this.tabId(payload.tabId), payload.bounds);
+      return;
+    }
+    this.tabs.setBounds(this.tabId(), payload);
   }
 
   @handle(IPC.browser.loadURL)
-  async browserViewLoadUrl(e: IpcMainEvent, url: string): Promise<void> {
-    await this.webview.loadURL(url);
+  async browserViewLoadUrl(
+    _event: IpcMainEvent,
+    payload: BrowserLoadURLPayload | string,
+  ): Promise<void> {
+    const tabId =
+      typeof payload === "string" ? this.tabId() : this.tabId(payload.tabId);
+    const url = typeof payload === "string" ? payload : payload.url;
+    await this.tabs.loadURL(tabId, url);
   }
 
   @handle(IPC.browser.back)
-  async webviewGoBack(): Promise<boolean> {
-    return this.webview.goBack();
+  async webviewGoBack(_event: IpcMainEvent, tabId?: string): Promise<boolean> {
+    return this.tabs.goBack(this.tabId(tabId));
   }
 
   @handle(IPC.browser.reload)
-  async webviewReload() {
-    await this.webview.reload();
+  async webviewReload(_event: IpcMainEvent, tabId?: string) {
+    await this.tabs.reload(this.tabId(tabId));
   }
 
   @handle(IPC.browser.show)
-  async webviewShow() {
-    this.webview.show();
+  webviewShow(_event: IpcMainEvent, tabId?: string) {
+    this.tabs.show(this.tabId(tabId));
   }
 
   @handle(IPC.browser.hide)
-  async webviewHide() {
-    this.webview.hide();
+  webviewHide(_event: IpcMainEvent, tabId?: string) {
+    this.tabs.hide(this.tabId(tabId));
   }
 
   @handle(IPC.browser.home)
-  async webviewGoHome() {
-    await this.webview.goHome();
+  async webviewGoHome(_event: IpcMainEvent, tabId?: string) {
+    await this.tabs.goHome(this.tabId(tabId));
   }
 
   @handle(IPC.browser.setUserAgent)
-  async webviewChangeUserAgent(e: IpcMainEvent, isMobile: boolean) {
-    this.webview.setUserAgent(isMobile);
+  async webviewChangeUserAgent(
+    _event: IpcMainEvent,
+    payload: BrowserUserAgentPayload | boolean,
+  ) {
+    const isMobile = typeof payload === "boolean" ? payload : payload.isMobile;
+    this.tabs.setUserAgent(isMobile);
     const client = this.downloaderServer.getClient();
     await client.setConfigKey("isMobile", isMobile);
   }
 
   @handle(IPC.browser.pluginReady)
-  async pluginReady() {
-    this.sniffingHelper.pluginReady();
+  pluginReady(_event: IpcMainEvent, tabId?: string) {
+    this.sniffingHelper.pluginReady(this.tabId(tabId));
   }
 
   @handle(IPC.browser.clearCache)
   async clearWebviewCache() {
-    return this.webview.clearCache();
+    return this.tabs.clearCache();
   }
 
   @handle(IPC.browser.showDownloadDialog)
-  async showDownloadDialog(e: IpcMainEvent, data: DownloadTask[]) {
+  async showDownloadDialog(
+    _event: IpcMainEvent,
+    payload: { data: DownloadTask[]; tabId: string } | DownloadTask[],
+  ) {
+    const tabId = this.tabId(
+      Array.isArray(payload) ? undefined : payload.tabId,
+    );
+    const data = Array.isArray(payload) ? payload : payload.data;
     this.overlayDialog.show(
       await Promise.all(
         data.map(async (task) =>
-          this.webview.withBilibiliSessionCookies({
+          this.tabs.withBilibiliSessionCookies(tabId, {
             ...task,
             headers:
-              task.headers || this.sniffingHelper.getPageHeaders(task.type),
+              task.headers ||
+              this.sniffingHelper.getPageHeaders(tabId, task.type),
           }),
         ),
       ),
@@ -97,5 +146,9 @@ export default class WebviewController implements Controller {
   @handle(IPC.browser.dismissOverlayDialog)
   async dismissOverlayDialog() {
     this.overlayDialog.hide();
+  }
+
+  private tabId(tabId?: string): string {
+    return tabId || this.tabs.getActiveTabId();
   }
 }

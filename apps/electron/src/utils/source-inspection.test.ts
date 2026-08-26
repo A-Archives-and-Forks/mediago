@@ -2,6 +2,7 @@ import { expect, test } from "vitest";
 import {
   formattedHeadersToArray,
   inspectionToMediaInfo,
+  splitDiscoveryHeaders,
 } from "./source-inspection";
 
 test("normalizes multiline sniffed headers", () => {
@@ -13,6 +14,27 @@ test("normalizes multiline sniffed headers", () => {
     "Referer: https://example.com/watch/video",
     "User-Agent: Test",
   ]);
+});
+
+test("keeps sensitive discovery headers private and opt-in", () => {
+  const headers = [
+    "Referer: https://example.com/watch",
+    "Cookie: sentinel-cookie",
+    "Authorization: Bearer sentinel-auth",
+    "Proxy-Authorization: Basic sentinel-proxy",
+  ];
+  expect(splitDiscoveryHeaders(headers, false)).toStrictEqual({
+    publicHeaders: ["Referer: https://example.com/watch"],
+    privateHeaders: [],
+  });
+  expect(splitDiscoveryHeaders(headers, true)).toStrictEqual({
+    publicHeaders: ["Referer: https://example.com/watch"],
+    privateHeaders: [
+      "Cookie: sentinel-cookie",
+      "Authorization: Bearer sentinel-auth",
+      "Proxy-Authorization: Basic sentinel-proxy",
+    ],
+  });
 });
 
 test("maps successful and failed inspections to UI metadata", () => {

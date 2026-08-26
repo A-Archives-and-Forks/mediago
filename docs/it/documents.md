@@ -48,6 +48,18 @@ Se abilitato, il software controllerà automaticamente anche le versioni di test
 
 Controlla se il software deve "nascondersi nella tray di sistema" o "uscire dal software" quando la finestra principale viene chiusa.
 
+## Estrazione sorgenti a schede multiple
+
+La pagina di estrazione supporta più schede browser indipendenti. Ogni scheda conserva URL, titolo, cronologia, stato di esecuzione della pagina e sorgenti rilevate; il cambio scheda non ricarica la pagina e non mescola le sorgenti.
+
+- Il pulsante `+` resta visibile mentre la barra scorre orizzontalmente.
+- `Ctrl/Cmd+T` crea una scheda, `Ctrl/Cmd+W` la chiude e `Ctrl+Tab` / `Ctrl+Shift+Tab` cambia scheda. Sono supportati anche clic centrale e tasto `Delete`.
+- Chiudendo l'ultima scheda viene creata una nuova scheda iniziale.
+- MediaGo non impone un limite applicativo al numero di schede; il limite pratico dipende da memoria, CPU, carico dei siti e risorse delle viste native Electron.
+- Le schede restano solo nella memoria della sessione corrente e non vengono ripristinate al riavvio.
+
+La scoperta Agent avviata tramite HTTP, MCP o CLI usa una scheda nascosta separata: non appare nella barra e non naviga la scheda visibile. La sessione è isolata per impostazione predefinita e condivide l'accesso autenticato solo con consenso esplicito.
+
 ## Impostazioni browser
 
 ::: tip
