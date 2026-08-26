@@ -26,6 +26,12 @@ type UpdateInitialization = {
   autoUpgrade: boolean;
 };
 
+type RuntimeUpdateChannel = "beta" | "latest";
+
+function updateChannel(allowBeta: boolean): RuntimeUpdateChannel {
+  return allowBeta ? "beta" : "latest";
+}
+
 function clampProgress(percent: number): number {
   if (!Number.isFinite(percent)) return 0;
   return Math.min(100, Math.max(0, percent));
@@ -46,6 +52,8 @@ function errorDetails(error: unknown): { code: string; message: string } {
 @provide()
 export default class UpdateService {
   private initialized = false;
+  private allowBeta = false;
+  private channel: RuntimeUpdateChannel = "latest";
   private phase: UpdateErrorPhase = "unknown";
   private state: UpdateState = {
     status: "idle",
@@ -68,7 +76,7 @@ export default class UpdateService {
 
     autoUpdater.disableWebInstaller = true;
     autoUpdater.logger = this.logger.logger;
-    autoUpdater.allowPrerelease = allowBeta;
+    this.configureChannel(allowBeta);
     autoUpdater.autoDownload = autoUpgrade;
     if (isDev) autoUpdater.forceDevUpdateConfig = true;
 
@@ -161,7 +169,17 @@ export default class UpdateService {
   }
 
   changeAllowBeta(allowBeta: boolean): void {
-    autoUpdater.allowPrerelease = allowBeta;
+    if (this.allowBeta === allowBeta) return;
+
+    this.configureChannel(allowBeta);
+    if (
+      !this.initialized ||
+      this.state.portable ||
+      ["checking", "downloading", "downloaded"].includes(this.state.status)
+    ) {
+      return;
+    }
+    void this.backgroundCheck();
   }
 
   changeAutoUpgrade(autoUpgrade: boolean): void {
@@ -190,6 +208,8 @@ export default class UpdateService {
       `Architecture: ${process.arch}`,
       `Portable: ${String(this.state.portable)}`,
       `Auto download: ${String(this.state.autoDownload)}`,
+      `Update channel: ${this.channel}`,
+      `Allow prerelease: ${String(this.allowBeta)}`,
       `Packaged: ${String(app.isPackaged)}`,
       `Error phase: ${error?.phase ?? "none"}`,
       `Error code: ${error?.code ?? "none"}`,
@@ -251,6 +271,19 @@ export default class UpdateService {
     autoUpdater.on("error", (error: Error) => {
       this.setError(this.phase, error);
     });
+  }
+
+  private configureChannel(allowBeta: boolean): void {
+    const channel = updateChannel(allowBeta);
+
+    // electron-updater sets allowDowngrade=true whenever channel is assigned.
+    // Reset it afterwards so opting out of Beta never installs an older stable
+    // version over a newer prerelease build.
+    autoUpdater.channel = channel;
+    autoUpdater.allowPrerelease = allowBeta;
+    autoUpdater.allowDowngrade = false;
+    this.allowBeta = allowBeta;
+    this.channel = channel;
   }
 
   private scheduleInitialCheck(): void {
