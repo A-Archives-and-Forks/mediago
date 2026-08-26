@@ -1,7 +1,10 @@
 import { useMemoizedFn, useSize } from "ahooks";
 import { ListVideo, LoaderCircle, RefreshCw } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import videojs from "video.js";
+import itVideoJsMessages from "video.js/dist/lang/it.json";
+import zhCNVideoJsMessages from "video.js/dist/lang/zh-CN.json";
 import "video.js/dist/video-js.css";
 import "@videojs/themes/dist/sea/index.css";
 import "./player-theme.css";
@@ -25,6 +28,10 @@ import {
 } from "./api";
 import { cn, getVideoURL } from "./lib/utils";
 import { usePlayerSize } from "./hooks/usePlayerSize";
+import { playerLanguage } from "./i18n";
+
+videojs.addLanguage("it", itVideoJsMessages);
+videojs.addLanguage("zh-CN", zhCNVideoJsMessages);
 
 interface PlaylistItemProps {
   video: VideoItem;
@@ -93,6 +100,8 @@ function PlayerFeedback({
   loading = false,
   onRetry,
 }: PlayerFeedbackProps) {
+  const { t } = useTranslation();
+
   return (
     <div className="flex h-full w-full items-center justify-center bg-[#141415] px-6 text-white">
       <div className="flex max-w-sm flex-col items-center gap-4 text-center">
@@ -117,7 +126,7 @@ function PlayerFeedback({
             className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-blue-500 px-4 text-sm font-medium text-white transition-colors hover:bg-blue-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
           >
             <RefreshCw className="size-4" />
-            Refresh
+            {t("refresh")}
           </button>
         ) : null}
       </div>
@@ -126,6 +135,7 @@ function PlayerFeedback({
 }
 
 export default function PlayerPage() {
+  const { t } = useTranslation();
   const [currentVideo, setCurrentVideo] = useState("");
   const [open, setOpen] = useState(false);
   const videoRef = useRef<HTMLDivElement>(null);
@@ -172,6 +182,7 @@ export default function PlayerPage() {
         videoElement,
         {
           controls: true,
+          language: playerLanguage,
         },
         () => {
           videojs.log("player is ready");
@@ -243,8 +254,8 @@ export default function PlayerPage() {
     return (
       <PlayerFeedback
         loading
-        title="Loading videos"
-        description="Preparing your media library…"
+        title={t("loadingTitle")}
+        description={t("loadingDescription")}
       />
     );
   }
@@ -253,8 +264,8 @@ export default function PlayerPage() {
     return (
       <PlayerFeedback
         illustration={errorPlayer}
-        title="Could not load videos"
-        description="Check the MediaGo server and try again."
+        title={t("errorTitle")}
+        description={t("errorDescription")}
         onRetry={() => void mutate()}
       />
     );
@@ -264,8 +275,8 @@ export default function PlayerPage() {
     return (
       <PlayerFeedback
         illustration={emptyPlayer}
-        title="No videos available"
-        description="Completed video downloads will appear here for playback."
+        title={t("emptyTitle")}
+        description={t("emptyDescription")}
         onRetry={() => void mutate()}
       />
     );
@@ -282,7 +293,7 @@ export default function PlayerPage() {
             onClick={handleOpen}
           >
             <ListVideo className="size-4 shrink-0 stroke-[1.75]" />
-            <span className="hidden sm:inline">Playlist</span>
+            <span className="hidden sm:inline">{t("playlist")}</span>
           </button>
         </SheetTrigger>
 
@@ -293,7 +304,7 @@ export default function PlayerPage() {
           onInteractOutside={onClose}
         >
           <SheetHeader>
-            <SheetTitle>Playlist</SheetTitle>
+            <SheetTitle>{t("playlist")}</SheetTitle>
           </SheetHeader>
           <ScrollArea className="mt-4 h-[calc(100vh-8rem)]">
             <ul className="flex flex-col gap-1 pr-4">
@@ -325,7 +336,7 @@ export default function PlayerPage() {
       {/* Mobile: Bottom video list (visible only on small screens) */}
       <div className="block flex-1 overflow-hidden border-t border-border bg-background md:hidden">
         <div className="flex h-full flex-col p-4">
-          <h3 className="mb-3 text-sm font-semibold">Playlist</h3>
+          <h3 className="mb-3 text-sm font-semibold">{t("playlist")}</h3>
           <ScrollArea className="flex-1">
             <ul className="flex flex-col gap-2 pr-4">
               {videoList?.map((video) => (

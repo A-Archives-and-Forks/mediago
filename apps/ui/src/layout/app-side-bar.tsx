@@ -64,6 +64,7 @@ export function AppSideBar({ className }: Props) {
   const resizeHandleRef = useRef<HTMLDivElement>(null);
   const resizeSessionRef = useRef<SidebarResizeSession | null>(null);
   const helpIconOnly = isWeb || collapsed;
+  const sidebarToggleLabel = t(collapsed ? "expandSidebar" : "collapseSidebar");
 
   useEffect(() => {
     const wasOpenInNewWindow = previousOpenInNewWindow.current;
@@ -380,8 +381,8 @@ export function AppSideBar({ className }: Props) {
           type="button"
           variant="ghost"
           size="icon"
-          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          title={sidebarToggleLabel}
+          aria-label={sidebarToggleLabel}
           className="size-9 shrink-0 p-0 text-muted-foreground max-[1079px]:hidden"
           onClick={toggleSidebar}
         >
@@ -395,16 +396,18 @@ export function AppSideBar({ className }: Props) {
       <div
         ref={resizeHandleRef}
         role="separator"
-        aria-label="Resize sidebar"
+        aria-label={t("resizeSidebar")}
         aria-orientation="vertical"
         aria-valuemin={SIDEBAR_COLLAPSED_WIDTH}
         aria-valuemax={SIDEBAR_MAX_WIDTH}
         aria-valuenow={renderedSidebarWidth}
         aria-valuetext={
-          compact ? "Sidebar collapsed" : `${renderedSidebarWidth} pixels`
+          compact
+            ? t("sidebarCollapsed")
+            : t("sidebarWidthPixels", { width: renderedSidebarWidth })
         }
         tabIndex={0}
-        title="Resize sidebar"
+        title={t("resizeSidebar")}
         className="absolute inset-y-0 -right-3 z-20 w-6 cursor-col-resize touch-none focus-visible:bg-ring/10 focus-visible:outline-none max-[1079px]:hidden"
         onKeyDown={handleResizeKeyDown}
         onLostPointerCapture={(event) => finishSidebarResize(event.pointerId)}

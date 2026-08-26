@@ -10,6 +10,7 @@ import type {
   HLSPlaylistType,
   HLSVariantInfo,
 } from "@mediago/shared-common";
+import { resolveLanguage } from "../i18n/language";
 import { validateDownloadImportResponse } from "./mediago-response";
 
 /* --------------------------- helpers --------------------------- */
@@ -55,6 +56,14 @@ interface ImportResult {
 interface HttpConfig {
   serverUrl: string;
   apiKey?: string;
+  language: "en" | "zh" | "it";
+}
+
+function requestHeaders(config: HttpConfig, headers: HeadersInit): HeadersInit {
+  return withApiKey(
+    { ...headers, "Accept-Language": config.language },
+    config.apiKey,
+  );
 }
 
 interface InspectSourceResponse {
@@ -117,13 +126,10 @@ export async function inspectSources(
       requests.push(
         fetch(joinUrl(config.serverUrl, "/api/sources/inspect"), {
           method: "POST",
-          headers: withApiKey(
-            {
-              "Content-Type": "application/json",
-              Accept: "application/json",
-            },
-            config.apiKey,
-          ),
+          headers: requestHeaders(config, {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          }),
           body: JSON.stringify({
             sources: chunk.map((source) => ({
               id: source.id,
@@ -164,7 +170,7 @@ async function probeHttp(config: HttpConfig): Promise<ServerStatus> {
   try {
     const res = await fetch(joinUrl(config.serverUrl, "/healthy"), {
       method: "GET",
-      headers: withApiKey({ Accept: "application/json" }, config.apiKey),
+      headers: requestHeaders(config, { Accept: "application/json" }),
       signal: AbortSignal.timeout(1500),
     });
     if (!res.ok) {
@@ -191,10 +197,10 @@ async function importViaHttp(
   try {
     const res = await fetch(joinUrl(config.serverUrl, "/api/downloads"), {
       method: "POST",
-      headers: withApiKey(
-        { "Content-Type": "application/json", Accept: "application/json" },
-        config.apiKey,
-      ),
+      headers: requestHeaders(config, {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      }),
       body: JSON.stringify({
         tasks: sourcesToTasks(sources),
         startDownload: opts.startDownload,
@@ -327,14 +333,16 @@ async function probeSchemaPing(): Promise<ServerStatus> {
  * by the popup's status badge and the test button.
  */
 export function httpConfigFor(settings: ExtensionSettings): HttpConfig | null {
+  const language = resolveLanguage(settings.language);
   if (settings.mode === "desktop-http") {
-    return { serverUrl: DESKTOP_HTTP_BASE };
+    return { serverUrl: DESKTOP_HTTP_BASE, language };
   }
   if (settings.mode === "docker-http") {
     if (!settings.serverUrl) return null;
     return {
       serverUrl: settings.serverUrl,
       apiKey: settings.apiKey || undefined,
+      language,
     };
   }
   return null;
@@ -344,11 +352,12 @@ export async function probe(
   mode: ExtensionSettings["mode"],
   serverUrl: string,
   apiKey?: string,
+  language = resolveLanguage(undefined),
 ): Promise<ServerStatus> {
   if (mode === "desktop-schema") return probeSchemaPing();
   const base = mode === "desktop-http" ? DESKTOP_HTTP_BASE : serverUrl;
   if (!base) return { ok: false, message: { key: "errors.serverUrlRequired" } };
-  return probeHttp({ serverUrl: base, apiKey });
+  return probeHttp({ serverUrl: base, apiKey, language });
 }
 
 /**
@@ -366,9 +375,16 @@ export async function importSources(
     case "desktop-schema":
       return importViaSchema(sources);
     case "desktop-http":
-      return importViaHttp({ serverUrl: DESKTOP_HTTP_BASE }, sources, {
-        startDownload: settings.downloadNow,
-      });
+      return importViaHttp(
+        {
+          serverUrl: DESKTOP_HTTP_BASE,
+          language: resolveLanguage(settings.language),
+        },
+        sources,
+        {
+          startDownload: settings.downloadNow,
+        },
+      );
     case "docker-http":
       if (!settings.serverUrl) {
         return {
@@ -378,7 +394,11 @@ export async function importSources(
         };
       }
       return importViaHttp(
-        { serverUrl: settings.serverUrl, apiKey: settings.apiKey || undefined },
+        {
+          serverUrl: settings.serverUrl,
+          apiKey: settings.apiKey || undefined,
+          language: resolveLanguage(settings.language),
+        },
         sources,
         { startDownload: settings.downloadNow },
       );

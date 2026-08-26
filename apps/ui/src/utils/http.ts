@@ -1,3 +1,4 @@
+import i18n from "@/i18n";
 import { useAppStore } from "@/store/app";
 import axios, { type InternalAxiosRequestConfig } from "axios";
 
@@ -6,6 +7,13 @@ const http = axios.create({});
 
 function shouldSkipAuthRedirect(config?: InternalAxiosRequestConfig) {
   return config?.suppressAuthRedirect === true;
+}
+
+function applyLanguageHeader(config: InternalAxiosRequestConfig) {
+  const language = document.documentElement.lang || navigator.language;
+  if (language) {
+    config.headers.set("Accept-Language", language);
+  }
 }
 
 /**
@@ -18,6 +26,7 @@ export function setupHttp(baseURL: string) {
 
 // Request interceptor: auto-inject apiKey from Zustand store on every request
 http.interceptors.request.use((config) => {
+  applyLanguageHeader(config);
   const { apiKey } = useAppStore.getState();
   if (apiKey) {
     config.headers.set("X-API-Key", apiKey);
@@ -36,7 +45,7 @@ http.interceptors.response.use(
       if (res.code === 401 && !shouldSkipAuthRedirect(response.config)) {
         window.location.pathname = "/signin";
       }
-      return Promise.reject(new Error(res.message || "Request failed"));
+      return Promise.reject(new Error(res.message || i18n.t("unknownError")));
     }
     // Non-standard response (e.g. raw data), return as-is
     return res;
@@ -72,6 +81,7 @@ const api = axios.create({
 
 api.interceptors.request.use(
   (config) => {
+    applyLanguageHeader(config);
     if (!config.data) {
       config.data = {};
     }

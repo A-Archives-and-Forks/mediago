@@ -479,6 +479,8 @@ export interface PlatformApi {
      * from the Settings page.
      */
     getExtensionDir(): Promise<string>;
+    /** Preferred OS language for application UI, such as `zh-CN`. */
+    getPreferredSystemLanguage(): Promise<string>;
     getSharedState(): Promise<unknown>;
     setSharedState(state: unknown): Promise<void>;
     showBrowserWindow(): Promise<void>;

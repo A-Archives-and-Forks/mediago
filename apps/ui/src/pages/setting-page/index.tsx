@@ -183,10 +183,10 @@ const SettingPage = () => {
     try {
       const result = await update.openLogDirectory();
       if (!result.opened) {
-        toast.error(result.error || t("openUpdateLogsFailed"));
+        toast.error(t("openUpdateLogsFailed"));
       }
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : String(error));
+    } catch {
+      toast.error(t("openUpdateLogsFailed"));
     }
   });
 
@@ -195,8 +195,8 @@ const SettingPage = () => {
       const diagnosticInfo = await update.getDiagnosticInfo();
       await navigator.clipboard.writeText(diagnosticInfo);
       toast.success(t("updateDiagnosticsCopied"));
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : String(error));
+    } catch {
+      toast.error(t("updateDiagnosticsCopyFailed"));
     }
   });
 
@@ -265,7 +265,7 @@ const SettingPage = () => {
             {updateState.status === "error" ? (
               <div className="space-y-3 rounded-md border border-destructive/30 bg-destructive/5 p-3">
                 <p className="break-words text-sm text-destructive">
-                  {updateState.error?.message || t("unknownError")}
+                  {t("updateErrorDetailsHint")}
                 </p>
                 {updateState.error?.code ? (
                   <p className="font-mono text-xs text-muted-foreground">

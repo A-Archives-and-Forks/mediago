@@ -11,6 +11,7 @@ import ElectronUpdater from "../vendor/ElectronUpdater";
 import BrowserWindow from "../windows/browser.window";
 import MainWindow from "../windows/main.window";
 import ShareIntentService from "../services/share-intent.service";
+import { getPreferredSystemLanguage } from "../core/system-language";
 
 @injectable()
 @provide(TYPES.Controller)
@@ -59,6 +60,11 @@ export default class HomeController implements Controller {
   @handle(IPC.app.getExtensionDir)
   async getExtensionDir(): Promise<string> {
     return resolveExtensionDir().extensionDir;
+  }
+
+  @handle(IPC.app.getPreferredSystemLanguage)
+  getPreferredSystemLanguage(): string {
+    return getPreferredSystemLanguage();
   }
 
   @handle(IPC.app.showBrowserWindow)

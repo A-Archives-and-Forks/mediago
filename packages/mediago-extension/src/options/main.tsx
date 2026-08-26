@@ -13,6 +13,12 @@ applySystemTheme();
 
 void (async () => {
   const i18n = await bootstrapExtensionI18n();
+  const updateDocumentTitle = () => {
+    document.title = i18n.t("options.pageTitle");
+  };
+  updateDocumentTitle();
+  i18n.on("languageChanged", updateDocumentTitle);
+
   const rootElement = document.getElementById("root");
   if (!rootElement) throw new Error("Options root element not found");
   const root = createRoot(rootElement);

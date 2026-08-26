@@ -3,16 +3,19 @@ package i18n
 // Message key constants for i18n translations.
 const (
 	// Common
-	MsgOK        = "common.ok"
-	MsgDeleted   = "common.deleted"
-	MsgImported  = "common.imported"
-	MsgInvalidID = "common.invalid_id"
+	MsgOK                  = "common.ok"
+	MsgDeleted             = "common.deleted"
+	MsgImported            = "common.imported"
+	MsgInvalidID           = "common.invalid_id"
+	MsgInvalidRequest      = "common.invalid_request"
+	MsgInternalError       = "common.internal_error"
+	MsgSourcesCountInvalid = "common.sources_count_invalid"
 
 	// Auth
-	MsgUnauthorized    = "auth.unauthorized"
-	MsgAPIKeyRequired  = "auth.api_key_required"
+	MsgUnauthorized     = "auth.unauthorized"
+	MsgAPIKeyRequired   = "auth.api_key_required"
 	MsgAPIKeyAlreadySet = "auth.api_key_already_set"
-	MsgInvalidAPIKey   = "auth.invalid_api_key"
+	MsgInvalidAPIKey    = "auth.invalid_api_key"
 
 	// Task
 	MsgTaskCreated          = "task.created"
@@ -47,5 +50,5 @@ const (
 
 	// DB errors
 	MsgVideoNotFound      = "db.video_not_found"      // fmt arg: %d
-	MsgConversionNotFound = "db.conversion_not_found"  // fmt arg: %d
+	MsgConversionNotFound = "db.conversion_not_found" // fmt arg: %d
 )

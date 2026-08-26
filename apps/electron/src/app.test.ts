@@ -3,6 +3,7 @@ import { beforeEach, expect, test, vi } from "vitest";
 const electronMocks = vi.hoisted(() => ({
   app: {
     getLocale: vi.fn(() => "en"),
+    getPreferredSystemLanguages: vi.fn(() => ["zh-CN", "en-US"]),
     on: vi.fn(),
   },
   nativeTheme: { themeSource: "system" },
@@ -16,6 +17,12 @@ const i18nMocks = vi.hoisted(() => ({
 
 const applicationMenuMocks = vi.hoisted(() => ({
   installApplicationMenu: vi.fn(),
+}));
+
+const sharedMocks = vi.hoisted(() => ({
+  resolveAppLanguage: vi.fn((language: string, systemLanguage?: string) =>
+    language === "system" && systemLanguage?.startsWith("zh") ? "zh" : language,
+  ),
 }));
 
 vi.mock("electron", () => ({
@@ -33,7 +40,7 @@ vi.mock("./core/i18n", () => ({
 
 vi.mock("@mediago/shared-common", () => ({
   IpcEvent: { app: { shareIntentAvailable: "share-intent-available" } },
-  resolveAppLanguage: vi.fn((language: string) => language),
+  resolveAppLanguage: sharedMocks.resolveAppLanguage,
 }));
 
 vi.mock("../assets/tray.ico", () => ({ default: "tray.ico" }));
@@ -85,6 +92,10 @@ const { default: ElectronApp } = await import("./app");
 beforeEach(() => {
   vi.clearAllMocks();
   electronMocks.nativeTheme.themeSource = "system";
+  electronMocks.app.getPreferredSystemLanguages.mockReturnValue([
+    "zh-CN",
+    "en-US",
+  ]);
 });
 
 test("seeds initial config before prewarming an enabled ad blocker", async () => {
@@ -129,6 +140,19 @@ test("rebuilds the application menu when the resolved language changes", async (
   languageListener?.();
 
   expect(applicationMenuMocks.installApplicationMenu).toHaveBeenCalledTimes(2);
+});
+
+test("resolves follow-system language from the OS preferred language", async () => {
+  const { app } = createApp({ blockAds: false, language: "system" });
+
+  await app.init();
+
+  expect(sharedMocks.resolveAppLanguage).toHaveBeenCalledWith(
+    "system",
+    "zh-CN",
+  );
+  expect(i18nMocks.changeLanguage).toHaveBeenCalledWith("zh");
+  expect(electronMocks.app.getLocale).not.toHaveBeenCalled();
 });
 
 test("restores the main window when an ordinary second instance is launched", () => {

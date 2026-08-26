@@ -139,7 +139,7 @@ export default class UpdateService {
     }
     if (this.state.status === "downloading") return this.getState();
     if (this.state.status !== "available") {
-      this.setError("download", new Error("Please check update first"));
+      this.setError("download", new Error(i18n.t("updateCheckRequired")));
       return this.getState();
     }
 
@@ -155,7 +155,7 @@ export default class UpdateService {
 
   async install(): Promise<UpdateState> {
     if (this.state.status !== "downloaded") {
-      this.setError("install", new Error("Update has not been downloaded"));
+      this.setError("install", new Error(i18n.t("updateNotDownloaded")));
       return this.getState();
     }
 

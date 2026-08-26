@@ -38,7 +38,9 @@
         root.classList.toggle("dark", dark);
         root.style.colorScheme = dark ? "dark" : "light";
 
-        const systemLanguage = navigator.language.toLowerCase();
+        const systemLanguage = (
+          navigator.languages?.[0] || navigator.language
+        ).toLowerCase();
         const language =
           preferredLanguage === "system"
             ? systemLanguage.startsWith("zh")

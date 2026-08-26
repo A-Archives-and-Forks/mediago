@@ -1,5 +1,5 @@
 import { type PlatformApi } from "@mediago/shared-common";
-import { isWeb } from "@/utils";
+import { isWeb } from "@/environment";
 import { electronPlatformAdapter, electronIpcAdapter } from "./electron";
 import { webPlatformStubs } from "./platform-stubs";
 import type { IpcListener } from "./utils";

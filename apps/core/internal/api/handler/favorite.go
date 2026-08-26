@@ -28,7 +28,7 @@ func (h *FavoriteHandler) List(c *gin.Context) {
 	favs, err := h.svc.GetFavorites()
 	if err != nil {
 		logger.Error("Failed to get favorites", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Success: false, Code: http.StatusInternalServerError, Message: err.Error()})
+		writeInternalError(c)
 		return
 	}
 
@@ -39,7 +39,7 @@ func (h *FavoriteHandler) List(c *gin.Context) {
 func (h *FavoriteHandler) Create(c *gin.Context) {
 	var req dto.AddFavoriteReq
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Success: false, Code: http.StatusBadRequest, Message: err.Error()})
+		writeInvalidRequest(c)
 		return
 	}
 
@@ -64,7 +64,7 @@ func (h *FavoriteHandler) Create(c *gin.Context) {
 			return
 		}
 		logger.Error("Failed to add favorite", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Success: false, Code: http.StatusInternalServerError, Message: err.Error()})
+		writeInternalError(c)
 		return
 	}
 
@@ -81,7 +81,7 @@ func (h *FavoriteHandler) Delete(c *gin.Context) {
 
 	if err := h.svc.RemoveFavorite(id); err != nil {
 		logger.Error("Failed to remove favorite", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Success: false, Code: http.StatusInternalServerError, Message: err.Error()})
+		writeInternalError(c)
 		return
 	}
 
@@ -93,7 +93,7 @@ func (h *FavoriteHandler) Export(c *gin.Context) {
 	json, err := h.svc.ExportFavorites()
 	if err != nil {
 		logger.Error("Failed to export favorites", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Success: false, Code: http.StatusInternalServerError, Message: err.Error()})
+		writeInternalError(c)
 		return
 	}
 
@@ -104,7 +104,7 @@ func (h *FavoriteHandler) Export(c *gin.Context) {
 func (h *FavoriteHandler) Import(c *gin.Context) {
 	var req dto.ImportFavoritesReq
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Success: false, Code: http.StatusBadRequest, Message: err.Error()})
+		writeInvalidRequest(c)
 		return
 	}
 
@@ -119,7 +119,7 @@ func (h *FavoriteHandler) Import(c *gin.Context) {
 
 	if err := h.svc.ImportFavorites(inputs); err != nil {
 		logger.Error("Failed to import favorites", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Success: false, Code: http.StatusInternalServerError, Message: err.Error()})
+		writeInternalError(c)
 		return
 	}
 

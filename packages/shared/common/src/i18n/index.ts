@@ -3,6 +3,7 @@ export {
   DEFAULT_FALLBACK_LNG,
   resolveAppLanguage,
 } from "./config";
+export type { ResolvedAppLanguage } from "./config";
 export {
   SUPPORTED_LANGUAGES,
   DEFAULT_BACKEND_NAMESPACE,

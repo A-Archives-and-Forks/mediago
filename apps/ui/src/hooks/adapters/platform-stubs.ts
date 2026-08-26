@@ -39,6 +39,10 @@ export const webPlatformStubs: PlatformApi = {
     // just returns an empty string so type-wise the shared contract
     // holds.
     getExtensionDir: async () => "",
+    getPreferredSystemLanguage: async () => {
+      if (typeof navigator === "undefined") return "";
+      return navigator.languages?.[0] ?? navigator.language;
+    },
     getSharedState: async () => ({}),
     setSharedState: noop,
     showBrowserWindow: noop,

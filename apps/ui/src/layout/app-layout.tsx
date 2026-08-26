@@ -1,5 +1,6 @@
 import { Plus } from "lucide-react";
 import { type FC, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Outlet, useLocation } from "react-router-dom";
 import { GlobalDownloadForm } from "@/components/global-download-form";
 import { ShareIntentConsumer } from "@/components/share-intent-consumer";
@@ -21,6 +22,7 @@ function PageAnalytics() {
 }
 
 const App: FC = () => {
+  const { t } = useTranslation();
   const location = useLocation();
   const openNew = useDownloadDialogStore((state) => state.openNew);
   const showNewDownload =
@@ -39,8 +41,8 @@ const App: FC = () => {
       {showNewDownload ? (
         <button
           type="button"
-          title="New download"
-          aria-label="New download"
+          title={t("newDownload")}
+          aria-label={t("newDownload")}
           onClick={() => openNew()}
           className="fixed bottom-20 right-4 z-20 flex size-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 active:scale-95 min-[720px]:hidden"
         >

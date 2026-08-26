@@ -17,6 +17,7 @@ import {
   useFormContext,
   type UseFormGetValues,
 } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -106,6 +107,7 @@ function getInitialSettings(): AppStore {
 }
 
 export function SettingsFormProvider({ children }: { children: ReactNode }) {
+  const { t } = useTranslation();
   const setAppStore = useAppStore((state) => state.setAppStore);
   const initialSettings = useRef(getInitialSettings());
   const confirmedSettings = useRef({ ...initialSettings.current });
@@ -153,7 +155,7 @@ export function SettingsFormProvider({ children }: { children: ReactNode }) {
             }
           }
         }
-      } catch (error: unknown) {
+      } catch {
         const pending = settingConfigWriter.getPending(name);
         const hasNewerValue = pending.pending;
 
@@ -174,10 +176,10 @@ export function SettingsFormProvider({ children }: { children: ReactNode }) {
           }
         }
 
-        toast.error((error as Error).message);
+        toast.error(t("settingsSaveFailed"));
       }
     },
-    [form, setAppStore],
+    [form, setAppStore, t],
   );
 
   const setSettingDrafting = useCallback<SetSettingDrafting>(

@@ -349,20 +349,21 @@ export const SkillsSettingsCard = memo(function SkillsSettingsCard() {
     ? envPath.playerUrl.replace(/\/player\/$/, "")
     : "";
   const installCommand = t("skillsInstallCmd");
+  const fallbackCoreUrl = isWeb
+    ? coreUrl || "http://localhost:8899"
+    : coreUrl || "http://localhost:39719";
   const setupCommand = isWeb
     ? apiKey
-      ? `Set mediago url to ${coreUrl || "http://localhost:8899"}, api key to ${apiKey}`
-      : `Set mediago url to ${coreUrl || "http://localhost:8899"}`
-    : coreUrl
-      ? `Set mediago url to ${coreUrl}`
-      : "Set mediago url to http://localhost:39719";
+      ? t("skillsSetupWithApiKey", { url: fallbackCoreUrl, apiKey })
+      : t("skillsSetupWithoutApiKey", { url: fallbackCoreUrl })
+    : t("skillsSetupWithoutApiKey", { url: fallbackCoreUrl });
 
   const copy = async (value: string) => {
     try {
       await navigator.clipboard.writeText(value);
       toast.success(t("skillsCopied"));
-    } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : String(error));
+    } catch {
+      toast.error(t("clipboardCopyFailed"));
     }
   };
 
@@ -437,10 +438,8 @@ export const CLISettingsCard = memo(function CLISettingsCard() {
     void cli
       .getStatus()
       .then(setStatus)
-      .catch((error: unknown) =>
-        toast.error(error instanceof Error ? error.message : String(error)),
-      );
-  }, [cli]);
+      .catch(() => toast.error(t("cliStatusFailed")));
+  }, [cli, t]);
 
   const install = async () => {
     setInstalling(true);
@@ -448,8 +447,8 @@ export const CLISettingsCard = memo(function CLISettingsCard() {
       const nextStatus = await cli.install({ baseUrl: coreUrl, apiKey });
       setStatus(nextStatus);
       toast.success(t("cliInstallSuccess"));
-    } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : String(error));
+    } catch {
+      toast.error(t("cliInstallFailed"));
     } finally {
       setInstalling(false);
     }
@@ -499,11 +498,7 @@ export const CLISettingsCard = memo(function CLISettingsCard() {
               void navigator.clipboard
                 .writeText("mediago download <url>")
                 .then(() => toast.success(t("cliCommandCopied")))
-                .catch((error: unknown) =>
-                  toast.error(
-                    error instanceof Error ? error.message : String(error),
-                  ),
-                );
+                .catch(() => toast.error(t("clipboardCopyFailed")));
             }}
             className="absolute right-1 top-1/2 size-7 -translate-y-1/2"
           >
@@ -566,8 +561,8 @@ export const MCPSettingsCard = memo(function MCPSettingsCard() {
     try {
       await navigator.clipboard.writeText(agentConfig);
       toast.success(t("mcpConfigCopied"));
-    } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : String(error));
+    } catch {
+      toast.error(t("clipboardCopyFailed"));
     }
   };
 

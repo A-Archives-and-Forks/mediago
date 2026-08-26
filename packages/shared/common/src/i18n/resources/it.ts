@@ -85,6 +85,11 @@ export const it = {
     "Dopo l'installazione, per completare l'installazione, incolla questo comando nel codice Claude",
   skillsCopy: "Copia",
   skillsCopied: "Copiato negli appunti",
+  skillsSetupWithApiKey:
+    "Imposta l'url mediago su {{url}} e la chiave api su {{apiKey}}",
+  skillsSetupWithoutApiKey: "Imposta l'url mediago su {{url}}",
+  clipboardCopyFailed: "Impossibile copiare negli appunti",
+  settingsSaveFailed: "Impossibile salvare l'impostazione",
   moreSettings: "Avanzate",
   openSourceProject: "Open source",
   openSourceDescription:
@@ -117,6 +122,11 @@ export const it = {
     "Le registrazioni live non contano ai fini del limite download simultanei",
   expand: "Espandi",
   collapse: "Riduci",
+  expandSidebar: "Espandi barra laterale",
+  collapseSidebar: "Comprimi barra laterale",
+  resizeSidebar: "Ridimensiona barra laterale",
+  sidebarCollapsed: "Barra laterale compressa",
+  sidebarWidthPixels: "Larghezza barra laterale: {{width}} pixel",
   sniffedResourceCount: "{{count}} risorse",
   editDownload: "Modifica download",
   batchDownload: "Download batch",
@@ -273,12 +283,19 @@ export const it = {
   updateCheckFailed: "Impossibile controllare gli aggiornamenti",
   updateDownloadFailed: "Impossibile scaricare l'aggiornamento",
   updateInstallFailed: "Impossibile installare l'aggiornamento",
+  updateCheckRequired:
+    "Controlla gli aggiornamenti prima di avviare il download",
+  updateNotDownloaded: "Scarica l'aggiornamento prima di installarlo",
+  updateErrorDetailsHint:
+    "Apri i registri o copia la diagnostica per maggiori dettagli.",
   updateVersionDescription:
     "Versione corrente {{current}}, nuova versione {{target}}",
   openUpdateLogs: "Apri cartella registri",
   openUpdateLogsFailed: "Impossibile aprire la cartella registri",
   copyUpdateDiagnostics: "Copia diagnostica",
   updateDiagnosticsCopied: "Diagnostica aggiornamento copiata",
+  updateDiagnosticsCopyFailed:
+    "Impossibile copiare la diagnostica dell'aggiornamento",
   closeMainWindow: "Chiudi finestra",
   minimizeToTray: "Minimizza nella barra sistema",
   failReason: "Motivo errore",
@@ -418,6 +435,8 @@ export const it = {
   cliUpdate: "Aggiorna CLI",
   cliReinstall: "Reinstalla",
   cliInstallSuccess: "CLI installata",
+  cliStatusFailed: "Impossibile leggere lo stato di installazione della CLI",
+  cliInstallFailed: "Impossibile installare la CLI",
   cliUsage: "Utilizzo",
   cliCommandCopied: "Comando CLI copiato",
   cliRestartTerminalHint:

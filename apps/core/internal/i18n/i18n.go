@@ -16,10 +16,13 @@ const DefaultLang = "en"
 var catalogs = map[string]map[string]string{
 	"en": {
 		// Common
-		MsgOK:        "OK",
-		MsgDeleted:   "Deleted",
-		MsgImported:  "Imported",
-		MsgInvalidID: "invalid id",
+		MsgOK:                  "OK",
+		MsgDeleted:             "Deleted",
+		MsgImported:            "Imported",
+		MsgInvalidID:           "invalid id",
+		MsgInvalidRequest:      "Invalid request",
+		MsgInternalError:       "An internal error occurred",
+		MsgSourcesCountInvalid: "sources must contain between 1 and 20 items",
 
 		// Auth
 		MsgUnauthorized:     "unauthorized",
@@ -64,10 +67,13 @@ var catalogs = map[string]map[string]string{
 	},
 	"zh": {
 		// Common
-		MsgOK:        "操作成功",
-		MsgDeleted:   "已删除",
-		MsgImported:  "已导入",
-		MsgInvalidID: "无效 ID",
+		MsgOK:                  "操作成功",
+		MsgDeleted:             "已删除",
+		MsgImported:            "已导入",
+		MsgInvalidID:           "无效 ID",
+		MsgInvalidRequest:      "请求参数无效",
+		MsgInternalError:       "发生内部错误",
+		MsgSourcesCountInvalid: "来源数量必须在 1 到 20 个之间",
 
 		// Auth
 		MsgUnauthorized:     "未授权",
@@ -109,6 +115,57 @@ var catalogs = map[string]map[string]string{
 		// DB
 		MsgVideoNotFound:      "未找到 ID 为 %d 的视频",
 		MsgConversionNotFound: "未找到 ID 为 %d 的转换记录",
+	},
+	"it": {
+		// Common
+		MsgOK:                  "Operazione riuscita",
+		MsgDeleted:             "Eliminato",
+		MsgImported:            "Importato",
+		MsgInvalidID:           "ID non valido",
+		MsgInvalidRequest:      "Richiesta non valida",
+		MsgInternalError:       "Si è verificato un errore interno",
+		MsgSourcesCountInvalid: "Le sorgenti devono essere da 1 a 20",
+
+		// Auth
+		MsgUnauthorized:     "Non autorizzato",
+		MsgAPIKeyRequired:   "apiKey è obbligatoria",
+		MsgAPIKeyAlreadySet: "apiKey è già configurata",
+		MsgInvalidAPIKey:    "apiKey non valida",
+
+		// Task
+		MsgTaskCreated:          "Attività creata correttamente",
+		MsgTaskEnqueued:         "Attività aggiunta alla coda",
+		MsgTaskNotFound:         "Attività non trovata",
+		MsgTaskStopped:          "Attività interrotta",
+		MsgTaskLogNotConfigured: "Archiviazione dei log non configurata",
+		MsgTaskLogNotFound:      "Log dell'attività non trovato",
+		MsgTaskLogReadFailed:    "Impossibile leggere il log dell'attività",
+
+		// Download
+		MsgDownloadStarted: "Download avviato",
+		MsgDownloadStopped: "Download interrotto",
+		MsgStatusUpdated:   "Stato aggiornato",
+
+		// Config
+		MsgConfigUpdated:    "Configurazione aggiornata",
+		MsgConfigKeyUpdated: "Chiave di configurazione '%s' aggiornata",
+
+		// Util
+		MsgURLRequired: "Il parametro url è obbligatorio",
+
+		// Favorite
+		MsgURLAlreadyExists: "L'URL esiste già",
+
+		// Event
+		MsgEventStreamFailed: "Impossibile creare il flusso di eventi",
+
+		// Core
+		MsgUnsupportedType: "Tipo di download non supportato",
+		MsgBinNotFound:     "File eseguibile non trovato per questo tipo",
+
+		// DB
+		MsgVideoNotFound:      "Video con ID %d non trovato",
+		MsgConversionNotFound: "Conversione con ID %d non trovata",
 	},
 }
 

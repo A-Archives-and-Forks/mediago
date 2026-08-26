@@ -31,6 +31,7 @@ import ElectronLogger from "./vendor/ElectronLogger";
 import { AppTheme, IpcEvent, resolveAppLanguage } from "@mediago/shared-common";
 import { installApplicationMenu } from "./core/application-menu";
 import ShareIntentService from "./services/share-intent.service";
+import { getPreferredSystemLanguage } from "./core/system-language";
 
 @injectable()
 @provide()
@@ -157,7 +158,9 @@ export default class ElectronApp {
 
       // 4. Apply initial config
       nativeTheme.themeSource = (config.theme || "system") as AppTheme;
-      i18n.changeLanguage(resolveAppLanguage(config.language, app.getLocale()));
+      i18n.changeLanguage(
+        resolveAppLanguage(config.language, getPreferredSystemLanguage()),
+      );
     } catch (err) {
       this.logger.error("[ElectronApp] Failed to start Go core service:", err);
     }
@@ -196,7 +199,7 @@ export default class ElectronApp {
           },
           language: (v) => {
             i18n.changeLanguage(
-              resolveAppLanguage(v as string, app.getLocale()),
+              resolveAppLanguage(v as string, getPreferredSystemLanguage()),
             );
           },
           allowBeta: (v) => {

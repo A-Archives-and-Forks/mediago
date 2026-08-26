@@ -41,10 +41,12 @@ async function handle(
       return { type: "OK" };
     }
     case "TEST_CONNECTION": {
+      const settings = await loadSettings();
       const status = await probe(
         message.mode,
         message.serverUrl,
         message.apiKey || undefined,
+        settings.language === "system" ? undefined : settings.language,
       );
       return { type: "STATUS", status };
     }

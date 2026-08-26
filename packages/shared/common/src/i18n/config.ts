@@ -12,9 +12,9 @@ export type ResolvedAppLanguage = "zh" | "en" | "it";
  * Resolve a stored AppStore.language value to a real i18n key.
  *
  * The persisted language may be `"system"` (meta value meaning "follow OS locale").
- * Each process resolves it at apply-time by passing its own locale source:
- *   - Renderer: navigator.language
- *   - Electron main: app.getLocale()
+ * Each process resolves it at apply-time using the same OS-preferred locale.
+ * Electron provides that value through `app.getPreferredSystemLanguages()`;
+ * browser-only builds use `navigator.languages` as their fallback.
  *
  * Pure function — callers are responsible for reading the raw locale.
  */

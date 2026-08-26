@@ -8,16 +8,12 @@ import (
 // supported language tags for the matcher.
 var (
 	supported = []language.Tag{
-		language.English,            // index 0, fallback
-		language.SimplifiedChinese,  // index 1
+		language.English,           // index 0, fallback
+		language.SimplifiedChinese, // index 1
+		language.Italian,           // index 2
 	}
-	matcher = language.NewMatcher(supported)
-
-	// tagToCode maps matched tags to our catalog keys.
-	tagToCode = map[language.Tag]string{
-		language.English:           "en",
-		language.SimplifiedChinese: "zh",
-	}
+	matcher        = language.NewMatcher(supported)
+	supportedCodes = []string{"en", "zh", "it"}
 )
 
 // Middleware resolves the request language and stores it in gin.Context.
@@ -40,19 +36,17 @@ func Middleware(getConfigLang func() string) gin.HandlerFunc {
 		if accept := c.GetHeader("Accept-Language"); accept != "" {
 			tags, _, _ := language.ParseAcceptLanguage(accept)
 			if len(tags) > 0 {
-				tag, _, _ := matcher.Match(tags...)
-				if code, ok := tagToCode[tag]; ok {
-					c.Set(LangContextKey, code)
-					c.Next()
-					return
-				}
+				_, index, _ := matcher.Match(tags...)
+				c.Set(LangContextKey, supportedCodes[index])
+				c.Next()
+				return
 			}
 		}
 
 		// 3. Config store
 		if getConfigLang != nil {
 			if configLang := getConfigLang(); configLang != "" {
-				c.Set(LangContextKey, configLang)
+				c.Set(LangContextKey, resolveCode(configLang))
 				c.Next()
 				return
 			}
@@ -64,15 +58,12 @@ func Middleware(getConfigLang func() string) gin.HandlerFunc {
 	}
 }
 
-// resolveCode normalizes a language string to a catalog key ("en" or "zh").
+// resolveCode normalizes a language string to a supported catalog key.
 func resolveCode(lang string) string {
 	tag, err := language.Parse(lang)
 	if err != nil {
 		return DefaultLang
 	}
-	matched, _, _ := matcher.Match(tag)
-	if code, ok := tagToCode[matched]; ok {
-		return code
-	}
-	return DefaultLang
+	_, index, _ := matcher.Match(tag)
+	return supportedCodes[index]
 }

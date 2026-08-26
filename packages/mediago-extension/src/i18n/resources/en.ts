@@ -141,6 +141,7 @@ const resource: ExtensionResources = {
     },
     about: {
       title: "About",
+      productName: "MediaGo Extension",
       description: "Media capture companion for MediaGo",
       version: "Version {{version}}",
     },

@@ -23,7 +23,9 @@ export function AboutCard({ version }: { version: string }) {
       <CardContent>
         <div className="flex items-center justify-between gap-4 rounded-lg border border-border bg-surface-subtle px-3.5 py-3">
           <div>
-            <p className="text-[13px] font-medium">MediaGo Extension</p>
+            <p className="text-[13px] font-medium">
+              {t("options.about.productName")}
+            </p>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {t("options.about.description")}
             </p>

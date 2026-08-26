@@ -26,14 +26,14 @@ func NewConversionHandler(svc *service.ConversionService) *ConversionHandler {
 func (h *ConversionHandler) List(c *gin.Context) {
 	var req dto.ConversionPaginationReq
 	if err := c.ShouldBindQuery(&req); err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Success: false, Code: http.StatusBadRequest, Message: err.Error()})
+		writeInvalidRequest(c)
 		return
 	}
 
 	result, err := h.svc.GetConversions(req.Current, req.PageSize)
 	if err != nil {
 		logger.Error("Failed to get conversions", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Success: false, Code: http.StatusInternalServerError, Message: err.Error()})
+		writeInternalError(c)
 		return
 	}
 
@@ -44,7 +44,7 @@ func (h *ConversionHandler) List(c *gin.Context) {
 func (h *ConversionHandler) Create(c *gin.Context) {
 	var req dto.AddConversionReq
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Success: false, Code: http.StatusBadRequest, Message: err.Error()})
+		writeInvalidRequest(c)
 		return
 	}
 
@@ -56,7 +56,7 @@ func (h *ConversionHandler) Create(c *gin.Context) {
 	})
 	if err != nil {
 		logger.Error("Failed to add conversion", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Success: false, Code: http.StatusInternalServerError, Message: err.Error()})
+		writeInternalError(c)
 		return
 	}
 
@@ -73,7 +73,7 @@ func (h *ConversionHandler) Delete(c *gin.Context) {
 
 	if err := h.svc.DeleteConversion(id); err != nil {
 		logger.Error("Failed to delete conversion", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Success: false, Code: http.StatusInternalServerError, Message: err.Error()})
+		writeInternalError(c)
 		return
 	}
 
@@ -90,7 +90,7 @@ func (h *ConversionHandler) Get(c *gin.Context) {
 
 	conv, err := h.svc.FindByIDOrFail(id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, dto.ErrorResponse{Success: false, Code: http.StatusNotFound, Message: err.Error()})
+		writeConversionNotFound(c, id)
 		return
 	}
 
@@ -107,7 +107,7 @@ func (h *ConversionHandler) Start(c *gin.Context) {
 
 	if err := h.svc.StartConversion(id); err != nil {
 		logger.Error("Failed to start conversion", zap.Int64("id", id), zap.Error(err))
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Success: false, Code: http.StatusInternalServerError, Message: err.Error()})
+		writeInternalError(c)
 		return
 	}
 
@@ -124,7 +124,7 @@ func (h *ConversionHandler) Stop(c *gin.Context) {
 
 	if err := h.svc.StopConversion(id); err != nil {
 		logger.Error("Failed to stop conversion", zap.Int64("id", id), zap.Error(err))
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Success: false, Code: http.StatusInternalServerError, Message: err.Error()})
+		writeInternalError(c)
 		return
 	}
 

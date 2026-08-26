@@ -25,15 +25,11 @@ func NewSourceHandler(inspector *service.M3U8Inspector) *SourceHandler {
 func (h *SourceHandler) Inspect(c *gin.Context) {
 	var req dto.InspectSourcesReq
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Success: false, Code: http.StatusBadRequest, Message: err.Error()})
+		writeInvalidRequest(c)
 		return
 	}
 	if len(req.Sources) == 0 || len(req.Sources) > maxInspectSources {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Success: false,
-			Code:    http.StatusBadRequest,
-			Message: "sources must contain between 1 and 20 items",
-		})
+		writeSourcesCountInvalid(c)
 		return
 	}
 

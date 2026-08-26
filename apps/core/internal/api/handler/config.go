@@ -99,7 +99,7 @@ func (h *ConfigHandler) Update(c *gin.Context) {
 		logger.Warn("Invalid config update request",
 			zap.String("clientIP", c.ClientIP()),
 			zap.Error(err))
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Success: false, Code: http.StatusBadRequest, Message: err.Error()})
+		writeInvalidRequest(c)
 		return
 	}
 
@@ -113,7 +113,7 @@ func (h *ConfigHandler) Update(c *gin.Context) {
 
 	if err := h.conf.Update(req); err != nil {
 		logger.Error("Failed to update config", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Success: false, Code: http.StatusInternalServerError, Message: err.Error()})
+		writeInternalError(c)
 		return
 	}
 
@@ -166,13 +166,13 @@ func (h *ConfigHandler) SetKey(c *gin.Context) {
 
 	var req dto.SetKeyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Success: false, Code: http.StatusBadRequest, Message: err.Error()})
+		writeInvalidRequest(c)
 		return
 	}
 
 	if err := h.conf.Set(key, req.Value); err != nil {
 		logger.Error("Failed to set config key", zap.String("key", key), zap.Error(err))
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Success: false, Code: http.StatusInternalServerError, Message: err.Error()})
+		writeInternalError(c)
 		return
 	}
 

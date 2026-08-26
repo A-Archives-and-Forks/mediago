@@ -30,7 +30,7 @@ func NewDownloadHandler(svc *service.DownloadTaskService, conf ConfigStore, hub 
 func (h *DownloadHandler) Create(c *gin.Context) {
 	var req dto.AddDownloadBatchReq
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Success: false, Code: http.StatusBadRequest, Message: err.Error()})
+		writeInvalidRequest(c)
 		return
 	}
 
@@ -52,7 +52,7 @@ func (h *DownloadHandler) Create(c *gin.Context) {
 			return
 		}
 		logger.Error("Failed to add download tasks", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Success: false, Code: http.StatusInternalServerError, Message: err.Error()})
+		writeInternalError(c)
 		return
 	}
 
@@ -88,7 +88,7 @@ func (h *DownloadHandler) Create(c *gin.Context) {
 func (h *DownloadHandler) List(c *gin.Context) {
 	var req dto.DownloadPaginationReq
 	if err := c.ShouldBindQuery(&req); err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Success: false, Code: http.StatusBadRequest, Message: err.Error()})
+		writeInvalidRequest(c)
 		return
 	}
 
@@ -96,7 +96,7 @@ func (h *DownloadHandler) List(c *gin.Context) {
 	result, err := h.svc.GetDownloadTasks(req.Current, req.PageSize, req.Filter, localPath)
 	if err != nil {
 		logger.Error("Failed to get download tasks", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Success: false, Code: http.StatusInternalServerError, Message: err.Error()})
+		writeInternalError(c)
 		return
 	}
 
@@ -118,7 +118,7 @@ func (h *DownloadHandler) Get(c *gin.Context) {
 			return
 		}
 		logger.Error("Failed to get download task", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Success: false, Code: http.StatusInternalServerError, Message: err.Error()})
+		writeInternalError(c)
 		return
 	}
 
@@ -134,7 +134,7 @@ func (h *DownloadHandler) Edit(c *gin.Context) {
 
 	var req dto.EditDownloadReq
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Success: false, Code: http.StatusBadRequest, Message: err.Error()})
+		writeInvalidRequest(c)
 		return
 	}
 
@@ -163,7 +163,7 @@ func (h *DownloadHandler) Edit(c *gin.Context) {
 			return
 		}
 		logger.Error("Failed to edit download task", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Success: false, Code: http.StatusInternalServerError, Message: err.Error()})
+		writeInternalError(c)
 		return
 	}
 
@@ -179,7 +179,7 @@ func (h *DownloadHandler) Delete(c *gin.Context) {
 
 	if err := h.svc.DeleteDownloadTask(id); err != nil {
 		logger.Error("Failed to delete download task", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Success: false, Code: http.StatusInternalServerError, Message: err.Error()})
+		writeInternalError(c)
 		return
 	}
 
@@ -195,7 +195,7 @@ func (h *DownloadHandler) Start(c *gin.Context) {
 
 	var req dto.StartDownloadReq
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Success: false, Code: http.StatusBadRequest, Message: err.Error()})
+		writeInvalidRequest(c)
 		return
 	}
 
@@ -212,7 +212,7 @@ func (h *DownloadHandler) Start(c *gin.Context) {
 			return
 		}
 		logger.Error("Failed to start download", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Success: false, Code: http.StatusInternalServerError, Message: err.Error()})
+		writeInternalError(c)
 		return
 	}
 
@@ -228,7 +228,7 @@ func (h *DownloadHandler) Stop(c *gin.Context) {
 
 	if err := h.svc.StopDownload(id); err != nil {
 		logger.Error("Failed to stop download", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Success: false, Code: http.StatusInternalServerError, Message: err.Error()})
+		writeInternalError(c)
 		return
 	}
 
@@ -244,7 +244,7 @@ func (h *DownloadHandler) Logs(c *gin.Context) {
 
 	content, err := h.svc.GetDownloadLog(id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Success: false, Code: http.StatusInternalServerError, Message: err.Error()})
+		writeInternalError(c)
 		return
 	}
 
@@ -259,7 +259,7 @@ func (h *DownloadHandler) Folders(c *gin.Context) {
 	folders, err := h.svc.GetTaskFolders()
 	if err != nil {
 		logger.Error("Failed to get task folders", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Success: false, Code: http.StatusInternalServerError, Message: err.Error()})
+		writeInternalError(c)
 		return
 	}
 
@@ -271,7 +271,7 @@ func (h *DownloadHandler) Export(c *gin.Context) {
 	text, err := h.svc.ExportDownloadList()
 	if err != nil {
 		logger.Error("Failed to export download list", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Success: false, Code: http.StatusInternalServerError, Message: err.Error()})
+		writeInternalError(c)
 		return
 	}
 
@@ -282,13 +282,13 @@ func (h *DownloadHandler) Export(c *gin.Context) {
 func (h *DownloadHandler) UpdateStatus(c *gin.Context) {
 	var req dto.UpdateStatusReq
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Success: false, Code: http.StatusBadRequest, Message: err.Error()})
+		writeInvalidRequest(c)
 		return
 	}
 
 	if err := h.svc.SetStatus(req.IDs, req.Status); err != nil {
 		logger.Error("Failed to update status", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Success: false, Code: http.StatusInternalServerError, Message: err.Error()})
+		writeInternalError(c)
 		return
 	}
 
@@ -304,7 +304,7 @@ func (h *DownloadHandler) UpdateIsLive(c *gin.Context) {
 
 	var req dto.UpdateIsLiveReq
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Success: false, Code: http.StatusBadRequest, Message: err.Error()})
+		writeInvalidRequest(c)
 		return
 	}
 
@@ -315,7 +315,7 @@ func (h *DownloadHandler) UpdateIsLive(c *gin.Context) {
 			return
 		}
 		logger.Error("Failed to update isLive", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Success: false, Code: http.StatusInternalServerError, Message: err.Error()})
+		writeInternalError(c)
 		return
 	}
 
@@ -327,7 +327,7 @@ func (h *DownloadHandler) Active(c *gin.Context) {
 	tasks, err := h.svc.FindActiveTasks()
 	if err != nil {
 		logger.Error("Failed to find active tasks", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Success: false, Code: http.StatusInternalServerError, Message: err.Error()})
+		writeInternalError(c)
 		return
 	}
 

@@ -10,9 +10,13 @@ import (
 )
 
 const (
-	errorCodeInvalidID        = "invalid_id"
-	errorCodeDownloadNotFound = "download_not_found"
-	errorCodeTaskNotFound     = "task_not_found"
+	errorCodeInvalidID           = "invalid_id"
+	errorCodeInvalidRequest      = "invalid_request"
+	errorCodeInternalError       = "internal_error"
+	errorCodeDownloadNotFound    = "download_not_found"
+	errorCodeConversionNotFound  = "conversion_not_found"
+	errorCodeTaskNotFound        = "task_not_found"
+	errorCodeSourcesCountInvalid = "sources_count_invalid"
 )
 
 func parseDownloadID(c *gin.Context) (int64, bool) {
@@ -40,8 +44,24 @@ func writeInvalidID(c *gin.Context) {
 	writeErrorResponse(c, http.StatusBadRequest, errorCodeInvalidID, i18n.T(c, i18n.MsgInvalidID))
 }
 
+func writeInvalidRequest(c *gin.Context) {
+	writeErrorResponse(c, http.StatusBadRequest, errorCodeInvalidRequest, i18n.T(c, i18n.MsgInvalidRequest))
+}
+
+func writeInternalError(c *gin.Context) {
+	writeErrorResponse(c, http.StatusInternalServerError, errorCodeInternalError, i18n.T(c, i18n.MsgInternalError))
+}
+
 func writeDownloadNotFound(c *gin.Context, id int64) {
 	writeErrorResponse(c, http.StatusNotFound, errorCodeDownloadNotFound, i18n.T(c, i18n.MsgVideoNotFound, id))
+}
+
+func writeConversionNotFound(c *gin.Context, id int64) {
+	writeErrorResponse(c, http.StatusNotFound, errorCodeConversionNotFound, i18n.T(c, i18n.MsgConversionNotFound, id))
+}
+
+func writeSourcesCountInvalid(c *gin.Context) {
+	writeErrorResponse(c, http.StatusBadRequest, errorCodeSourcesCountInvalid, i18n.T(c, i18n.MsgSourcesCountInvalid))
 }
 
 func writeTaskNotFound(c *gin.Context) {

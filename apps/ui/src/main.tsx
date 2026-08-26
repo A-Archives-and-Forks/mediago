@@ -7,6 +7,8 @@ import { isWeb, tdApp } from "./utils";
 import "./i18n";
 import "./globals.css";
 import { BrowserRouter } from "react-router-dom";
+import { syncAppLanguage } from "./i18n/app-language";
+import { useAppStore } from "./store/app";
 tdApp.init();
 if (isWeb) registerPwaServiceWorker();
 
@@ -17,6 +19,20 @@ const application = (
 );
 const shouldUseStrictMode = isWeb || import.meta.env.PROD;
 
-createRoot(document.getElementById("root") as HTMLElement).render(
-  shouldUseStrictMode ? <StrictMode>{application}</StrictMode> : application,
-);
+async function startApplication() {
+  // Resolve the persisted preference once before React renders. In Electron,
+  // this asks the main process for the OS language, so stale browser language
+  // detector caches cannot decide the visible interface language.
+  try {
+    await syncAppLanguage(useAppStore.getState().language);
+  } catch {
+    // Keep the language selected during i18n initialization rather than
+    // blocking the entire UI if the startup synchronization ever fails.
+  }
+
+  createRoot(document.getElementById("root") as HTMLElement).render(
+    shouldUseStrictMode ? <StrictMode>{application}</StrictMode> : application,
+  );
+}
+
+void startApplication();

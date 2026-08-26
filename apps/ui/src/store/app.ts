@@ -1,10 +1,9 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { persist } from "zustand/middleware";
-import i18n from "../i18n";
 import { migrateAppStore } from "./app-store-migration";
-import { resolveAppLanguage } from "../utils";
 import { AppLanguage, type AppStore, AppTheme } from "@mediago/shared-common";
+import { syncAppLanguage } from "../i18n/app-language";
 
 const initialState: AppStore = {
   local: "",
@@ -45,18 +44,18 @@ export const useAppStore = create<AppStore & Actions>()(
       (set, get) => ({
         ...initialState,
         setAppStore: (values) => {
+          // Initial config reconciliation intentionally sends the language even
+          // when the persisted value is unchanged. "system" must be resolved
+          // again because the OS language may have changed since last launch.
+          if (values.language !== undefined) {
+            void syncAppLanguage(values.language);
+          }
+
           const current = get();
           const changedEntries = Object.entries(values).filter(
             ([key, value]) => !Object.is(current[key as keyof AppStore], value),
           );
           if (changedEntries.length === 0) return;
-
-          const language = changedEntries.find(
-            ([key]) => key === "language",
-          )?.[1] as AppLanguage | undefined;
-          if (language !== undefined) {
-            void i18n.changeLanguage(resolveAppLanguage(language));
-          }
 
           set((state) => {
             changedEntries.forEach(([key, value]) => {

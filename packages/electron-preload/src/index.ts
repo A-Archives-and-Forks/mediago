@@ -69,6 +69,9 @@ const electronApi: PlatformApi = {
     getExtensionDir(): Promise<string> {
       return ipcRenderer.invoke(IPC.app.getExtensionDir);
     },
+    getPreferredSystemLanguage(): Promise<string> {
+      return ipcRenderer.invoke(IPC.app.getPreferredSystemLanguage);
+    },
     getSharedState(): Promise<unknown> {
       return ipcRenderer.invoke(IPC.app.getSharedState);
     },

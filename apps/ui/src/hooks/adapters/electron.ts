@@ -5,7 +5,8 @@ import type { PlatformApi } from "@mediago/shared-common";
  * Simply delegates to window.electron which exposes the nested PlatformApi.
  */
 export const electronPlatformAdapter: PlatformApi =
-  (window.electron as PlatformApi) ?? ({} as PlatformApi);
+  (typeof window !== "undefined" && (window.electron as PlatformApi)) ||
+  ({} as PlatformApi);
 
 /**
  * Electron IPC event adapter — uses on/off from window.electron.

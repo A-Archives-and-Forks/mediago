@@ -35,11 +35,7 @@ func NewAuthHandler(conf ConfigStore) *AuthHandler {
 func (h *AuthHandler) Setup(c *gin.Context) {
 	var req dto.SetupAuthRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Success: false,
-			Code:    http.StatusBadRequest,
-			Message: err.Error(),
-		})
+		writeInvalidRequest(c)
 		return
 	}
 
@@ -58,11 +54,7 @@ func (h *AuthHandler) Setup(c *gin.Context) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		logger.Error("Failed to hash password", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
-			Success: false,
-			Code:    http.StatusInternalServerError,
-			Message: err.Error(),
-		})
+		writeInternalError(c)
 		return
 	}
 
@@ -75,11 +67,7 @@ func (h *AuthHandler) Setup(c *gin.Context) {
 		"apiKey":       apiKey,
 	}); err != nil {
 		logger.Error("Failed to save auth config", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
-			Success: false,
-			Code:    http.StatusInternalServerError,
-			Message: err.Error(),
-		})
+		writeInternalError(c)
 		return
 	}
 
@@ -103,11 +91,7 @@ func (h *AuthHandler) Setup(c *gin.Context) {
 func (h *AuthHandler) Signin(c *gin.Context) {
 	var req dto.SigninRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Success: false,
-			Code:    http.StatusBadRequest,
-			Message: err.Error(),
-		})
+		writeInvalidRequest(c)
 		return
 	}
 

@@ -129,6 +129,7 @@ const resource = {
     },
     about: {
       title: "关于",
+      productName: "MediaGo 扩展",
       description: "MediaGo 的浏览器资源检测助手",
       version: "版本 {{version}}",
     },

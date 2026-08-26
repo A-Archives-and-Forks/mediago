@@ -49,7 +49,7 @@ func (h *TaskHandler) Create(c *gin.Context) {
 		logger.Warn("Invalid task creation request",
 			zap.String("clientIP", c.ClientIP()),
 			zap.Error(err))
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Success: false, Code: http.StatusBadRequest, Message: err.Error()})
+		writeInvalidRequest(c)
 		return
 	}
 
@@ -161,7 +161,7 @@ func (h *TaskHandler) Stop(c *gin.Context) {
 			writeTaskNotFound(c)
 			return
 		}
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Success: false, Code: http.StatusInternalServerError, Message: err.Error()})
+		writeInternalError(c)
 		return
 	}
 

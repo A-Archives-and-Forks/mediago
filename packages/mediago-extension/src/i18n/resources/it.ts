@@ -142,6 +142,7 @@ const resource: ExtensionResources = {
     },
     about: {
       title: "Informazioni",
+      productName: "Estensione MediaGo",
       description: "Assistente di acquisizione multimediale per MediaGo",
       version: "Versione {{version}}",
     },

@@ -5,10 +5,9 @@ import "dayjs/locale/it";
 import "dayjs/locale/zh-cn";
 import { twMerge } from "tailwind-merge";
 import { isUrl } from "./url";
-import {
-  DownloadType,
-  resolveAppLanguage as sharedResolveAppLanguage,
-} from "@mediago/shared-common";
+import { DownloadType } from "@mediago/shared-common";
+
+export { isWeb } from "../environment";
 
 dayjs.extend(relativeTime);
 
@@ -99,8 +98,6 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export const isWeb = import.meta.env.APP_TARGET === "server";
-
 export function isDownloadType(value: string | null): value is DownloadType {
   if (!value) return false;
 
@@ -123,18 +120,3 @@ export const urlDownloadType = (url: string): DownloadType => {
 export const convertPlainObject = (obj: unknown) => {
   return JSON.parse(JSON.stringify(obj));
 };
-
-export function getBrowserLang(): string {
-  const lang =
-    navigator.languages && navigator.languages.length
-      ? navigator.languages[0]
-      : navigator.language;
-
-  return lang.toLowerCase();
-}
-
-export function resolveAppLanguage(
-  language: string | undefined,
-): ReturnType<typeof sharedResolveAppLanguage> {
-  return sharedResolveAppLanguage(language, getBrowserLang());
-}
