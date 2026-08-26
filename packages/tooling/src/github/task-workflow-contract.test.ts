@@ -530,7 +530,7 @@ describe("build-docs.yml Task workflow contract", () => {
       pages: "write",
       "id-token": "write",
     });
-    expect(workflow.definition.env).toEqual({ DOCS_BASE: "/mediago/" });
+    expect(workflow.definition.env).toEqual({ DOCS_BASE: "/" });
     expect(JSON.stringify(workflow.definition)).not.toContain("ossutil");
     expect(JSON.stringify(workflow.definition)).not.toContain("ACCESS_KEY");
   });
