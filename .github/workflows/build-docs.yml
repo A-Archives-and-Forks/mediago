@@ -23,7 +23,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  DOCS_BASE: /mediago/
+  DOCS_BASE: /
 
 jobs:
   build:
