@@ -31,4 +31,20 @@ describe("urlDownloadType", () => {
   it("does not classify the X homepage as a downloadable status", () => {
     expect(urlDownloadType("https://x.com/home")).toBe(DownloadType.direct);
   });
+
+  it.each([
+    "https://www.tiktok.com/@creator/video/7480123456789012345",
+    "https://vm.tiktok.com/ZTR45GpSF/",
+    "https://www.douyin.com/video/7480123456789012345",
+    "https://v.douyin.com/iF123AbC/",
+  ])("routes TikTok/Douyin post URLs through yt-dlp: %s", (url) => {
+    expect(urlDownloadType(url)).toBe(DownloadType.youtube);
+  });
+
+  it.each([
+    "https://www.tiktok.com/@creator/live",
+    "https://www.douyin.com/user/example",
+  ])("does not classify unsupported short-video routes: %s", (url) => {
+    expect(urlDownloadType(url)).toBe(DownloadType.direct);
+  });
 });

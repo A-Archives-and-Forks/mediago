@@ -2,6 +2,7 @@ import { DownloadType } from "@mediago/shared-common";
 import type { PageCandidate } from "@mediago/browser-extension/site-adapters";
 import {
   matchesBilibiliPageLocation,
+  matchesShortVideoPageLocation,
   matchesTwitterPageLocation,
   matchesYoutubePageLocation,
 } from "@mediago/browser-extension/site-adapter-matches";
@@ -21,3 +22,7 @@ export const matchesYoutube = matchesYoutubePageLocation({
 });
 
 export const matchesTwitter = matchesTwitterPageLocation({ hostname: "x.com" });
+
+export const matchesShortVideo = matchesShortVideoPageLocation({
+  hostname: "www.tiktok.com",
+});

@@ -13,41 +13,41 @@ import (
 )
 
 const (
-	xExcerptMaxDisplayWidth = 64
-	xMinimumSentenceWidth   = 24
-	maxXTitleBytes          = 180
+	socialExcerptMaxDisplayWidth = 64
+	socialMinimumSentenceWidth   = 24
+	maxSocialTitleBytes          = 180
 )
 
 var (
 	xStatusPathPattern = regexp.MustCompile(`^/([A-Za-z0-9_]{1,15})/status/([0-9]+)(?:/|$)`)
-	xLeadingCount      = regexp.MustCompile(`^\([0-9]+\)\s*`)
+	socialLeadingCount = regexp.MustCompile(`^\([0-9]+\)\s*`)
 	xChinesePagePrefix = regexp.MustCompile(`(?i)^X\s*上的\s*.+?[：:]\s*[“"]?`)
 	xLatinPagePrefix   = regexp.MustCompile(`(?i)^.+?\s+(?:on|su)\s+X\s*[：:]\s*[“"]?`)
 	xPageSuffix        = regexp.MustCompile(`(?i)\s+[-—–|/]\s*X\s*$`)
-	xHTTPURL           = regexp.MustCompile(`(?i)https?://[a-z0-9._~:/?#\[\]@!$&'()*+,;=%-]+`)
+	socialHTTPURL      = regexp.MustCompile(`(?i)https?://[a-z0-9._~:/?#\[\]@!$&'()*+,;=%-]+`)
 )
 
-type normalizedXTitle struct {
+type normalizedSocialTitle struct {
 	name     string
 	statusID string
 }
 
-func normalizeXDownloadTitle(rawName, rawURL string) (normalizedXTitle, bool) {
+func normalizeXDownloadTitle(rawName, rawURL string) (normalizedSocialTitle, bool) {
 	handle, statusID, ok := parseXStatusURL(rawURL)
 	if !ok {
-		return normalizedXTitle{}, false
+		return normalizedSocialTitle{}, false
 	}
 
 	body := cleanXSourceTitle(rawName)
 	if body == "" {
 		body = "X video"
 	} else {
-		body = excerptXSourceTitle(body)
+		body = excerptSocialSourceTitle(body)
 	}
 
 	name := fmt.Sprintf("@%s · %s", handle, body)
-	return normalizedXTitle{
-		name:     truncateUTF8Bytes(name, maxXTitleBytes),
+	return normalizedSocialTitle{
+		name:     truncateUTF8Bytes(name, maxSocialTitleBytes),
 		statusID: statusID,
 	}, true
 }
@@ -73,7 +73,7 @@ func parseXStatusURL(rawURL string) (string, string, bool) {
 
 func cleanXSourceTitle(rawName string) string {
 	original := strings.TrimSpace(norm.NFKC.String(rawName))
-	candidate := xLeadingCount.ReplaceAllString(original, "")
+	candidate := socialLeadingCount.ReplaceAllString(original, "")
 
 	switch {
 	case xChinesePagePrefix.MatchString(candidate):
@@ -86,19 +86,24 @@ func cleanXSourceTitle(rawName string) string {
 		candidate = original
 	}
 
-	candidate = xHTTPURL.ReplaceAllString(candidate, " ")
+	return cleanSocialSourceTitle(candidate)
+}
+
+func cleanSocialSourceTitle(rawName string) string {
+	candidate := strings.TrimSpace(norm.NFKC.String(rawName))
+	candidate = socialHTTPURL.ReplaceAllString(candidate, " ")
 	candidate = strings.Join(strings.Fields(candidate), " ")
 	return strings.Trim(candidate, " \t\r\n\"'“”")
 }
 
-func excerptXSourceTitle(value string) string {
+func excerptSocialSourceTitle(value string) string {
 	target := value
 	omitted := false
 	displayWidth := 0
 
 	for index, character := range value {
-		displayWidth += xRuneDisplayWidth(character)
-		if displayWidth < xMinimumSentenceWidth || !isSentenceTerminator(character) {
+		displayWidth += socialRuneDisplayWidth(character)
+		if displayWidth < socialMinimumSentenceWidth || !isSocialSentenceTerminator(character) {
 			continue
 		}
 		end := index + utf8.RuneLen(character)
@@ -109,7 +114,7 @@ func excerptXSourceTitle(value string) string {
 		break
 	}
 
-	shortened, truncated := truncateXDisplayWidth(target, xExcerptMaxDisplayWidth)
+	shortened, truncated := truncateSocialDisplayWidth(target, socialExcerptMaxDisplayWidth)
 	omitted = omitted || truncated
 	if omitted && !strings.HasSuffix(shortened, "…") {
 		shortened += "…"
@@ -117,20 +122,20 @@ func excerptXSourceTitle(value string) string {
 	return shortened
 }
 
-func truncateXDisplayWidth(value string, maximum int) (string, bool) {
+func truncateSocialDisplayWidth(value string, maximum int) (string, bool) {
 	used := 0
 	cutIndex := len(value)
 	boundaryIndex := -1
 	boundaryWidth := 0
 
 	for index, character := range value {
-		characterWidth := xRuneDisplayWidth(character)
+		characterWidth := socialRuneDisplayWidth(character)
 		if used+characterWidth > maximum {
 			cutIndex = index
 			break
 		}
 		used += characterWidth
-		if isTitleBoundary(character) {
+		if isSocialTitleBoundary(character) {
 			boundaryIndex = index + utf8.RuneLen(character)
 			boundaryWidth = used
 		}
@@ -146,7 +151,7 @@ func truncateXDisplayWidth(value string, maximum int) (string, bool) {
 	return shortened, true
 }
 
-func xRuneDisplayWidth(character rune) int {
+func socialRuneDisplayWidth(character rune) int {
 	if character == '\u200d' || unicode.Is(unicode.Mn, character) || unicode.Is(unicode.Me, character) || unicode.Is(unicode.Cf, character) {
 		return 0
 	}
@@ -158,11 +163,11 @@ func xRuneDisplayWidth(character rune) int {
 	}
 }
 
-func isSentenceTerminator(character rune) bool {
+func isSocialSentenceTerminator(character rune) bool {
 	return strings.ContainsRune("。！？!?", character)
 }
 
-func isTitleBoundary(character rune) bool {
+func isSocialTitleBoundary(character rune) bool {
 	return unicode.IsSpace(character) || strings.ContainsRune("，,、;；:：", character)
 }
 
@@ -185,11 +190,11 @@ func truncateUTF8Bytes(value string, maximum int) string {
 	return shortened + ellipsis
 }
 
-func appendXStatusIDSuffix(title, statusID string) string {
+func appendSocialIDSuffix(title, statusID string) string {
 	if len(statusID) > 8 {
 		statusID = statusID[len(statusID)-8:]
 	}
 	suffix := fmt.Sprintf(" [%s]", statusID)
-	base := truncateUTF8Bytes(title, maxXTitleBytes-len(suffix))
+	base := truncateUTF8Bytes(title, maxSocialTitleBytes-len(suffix))
 	return base + suffix
 }

@@ -240,6 +240,37 @@ describe("SniffingHelper tab isolation", () => {
     expect(events).toHaveLength(0);
     expect(inspectSources).not.toHaveBeenCalled();
   });
+
+  it.each([
+    "https://www.tiktok.com/foryou",
+    "https://www.douyin.com/recommend",
+  ])(
+    "ignores raw media requests on supported short-video pages: %s",
+    async (url) => {
+      const { helper, inspectSources } = createHelper();
+      const events: unknown[] = [];
+      helper.on("source", (event) => events.push(event));
+      register(helper, "tab-short-video", 404);
+      helper.update("tab-short-video", { title: "Short video", url });
+
+      const listener = electronMocks.listeners.get("persist:webview");
+      listener?.({
+        requestHeaders: { Referer: url },
+        url: "https://media.example.com/video.mp4",
+        webContentsId: 404,
+      });
+      listener?.({
+        requestHeaders: { Referer: url },
+        url: "https://media.example.com/master.m3u8",
+        webContentsId: 404,
+      });
+
+      await vi.advanceTimersByTimeAsync(150);
+
+      expect(events).toHaveLength(0);
+      expect(inspectSources).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe("cookie-backed page types", () => {
@@ -248,6 +279,11 @@ describe("cookie-backed page types", () => {
     ["https://www.youtube.com/watch?v=video", DownloadType.youtube],
     ["https://x.com/openai/status/123", DownloadType.youtube],
     ["https://twitter.com/openai/status/123", DownloadType.youtube],
+    [
+      "https://www.tiktok.com/@creator/video/7480123456789012345",
+      DownloadType.youtube,
+    ],
+    ["https://www.douyin.com/video/7480123456789012345", DownloadType.youtube],
   ])("maps %s to %s", (url, type) => {
     expect(getCookieBackedType(url)).toBe(type);
   });

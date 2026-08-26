@@ -19,8 +19,8 @@ const (
 )
 
 // InferDownloadType chooses the existing downloader channel for a URL when a
-// caller does not provide an explicit type. X/Twitter status pages share the
-// youtube wire value because both are handled by yt-dlp.
+// caller does not provide an explicit type. Supported social-video pages share
+// the youtube wire value because they are handled by yt-dlp.
 func InferDownloadType(rawURL string) DownloadType {
 	parsed, err := url.Parse(strings.TrimSpace(rawURL))
 	if err != nil {
@@ -36,11 +36,46 @@ func InferDownloadType(rawURL string) DownloadType {
 		return TypeYoutube
 	case isXStatusURL(hostname, pathname):
 		return TypeYoutube
+	case isShortVideoURL(hostname, pathname):
+		return TypeYoutube
 	case strings.HasSuffix(pathname, ".m3u8"):
 		return TypeM3U8
 	default:
 		return TypeDirect
 	}
+}
+
+func isShortVideoURL(hostname, pathname string) bool {
+	parts := strings.Split(strings.Trim(pathname, "/"), "/")
+
+	switch hostname {
+	case "vm.tiktok.com", "vt.tiktok.com", "v.douyin.com":
+		return len(parts) > 0 && parts[0] != ""
+	case "tiktok.com", "www.tiktok.com", "m.tiktok.com", "tiktokv.com", "www.tiktokv.com":
+		if len(parts) >= 3 && strings.HasPrefix(parts[0], "@") && parts[1] == "video" {
+			return isNumericPathSegment(parts[2])
+		}
+		if len(parts) >= 3 && parts[0] == "share" && parts[1] == "video" {
+			return isNumericPathSegment(parts[2])
+		}
+		return len(parts) >= 2 && parts[0] == "t" && parts[1] != ""
+	case "douyin.com", "www.douyin.com":
+		return len(parts) >= 2 && parts[0] == "video" && isNumericPathSegment(parts[1])
+	default:
+		return false
+	}
+}
+
+func isNumericPathSegment(value string) bool {
+	if value == "" {
+		return false
+	}
+	for _, char := range value {
+		if char < '0' || char > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 func isXStatusURL(hostname, pathname string) bool {
@@ -54,12 +89,7 @@ func isXStatusURL(hostname, pathname string) bool {
 	if len(parts) < 3 || parts[0] == "" || parts[1] != "status" || parts[2] == "" {
 		return false
 	}
-	for _, char := range parts[2] {
-		if char < '0' || char > '9' {
-			return false
-		}
-	}
-	return true
+	return isNumericPathSegment(parts[2])
 }
 
 // BinaryNames maps each DownloadType to its executable filename (without extension).

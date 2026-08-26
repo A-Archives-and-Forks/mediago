@@ -473,6 +473,17 @@ func TestExternalOutputContracts(t *testing.T) {
 			t.Fatalf("yt-dlp parser error = %q", result.errors[0])
 		}
 	})
+
+	t.Run("yt-dlp preserves Douyin cookie guidance", func(t *testing.T) {
+		result := parseContractFixture(t, ytDLPschema.ConsoleReg, loadContractFixture(t, "yt-dlp-douyin-cookie-error.json"))
+		if len(result.errors) != 1 {
+			t.Fatalf("yt-dlp parser errors = %q, want exactly one", result.errors)
+		}
+		const want = "ERROR: [Douyin] 7480123456789012345: Fresh cookies (not necessarily logged in) are needed"
+		if result.errors[0] != want {
+			t.Fatalf("yt-dlp parser error = %q, want %q", result.errors[0], want)
+		}
+	})
 }
 
 func TestExternalSchemaContracts(t *testing.T) {

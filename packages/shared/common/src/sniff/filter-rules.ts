@@ -49,6 +49,21 @@ export const SNIFF_FILTERS: SniffFilter[] = [
     },
   },
   {
+    // TikTok and Douyin single-post and share URLs use the same yt-dlp
+    // execution channel. Profiles, search pages, collections, and live
+    // routes are intentionally excluded from page-level discovery.
+    hosts: [
+      /^https?:\/\/(?:(?:www|m)\.)?tiktokv?\.com\/(?:@[^/?#]+\/video\/\d+|share\/video\/\d+|t\/[A-Za-z0-9_-]+)(?:[/?#]|$)/i,
+      /^https?:\/\/(?:vm|vt)\.tiktok\.com\/[A-Za-z0-9_-]+(?:[/?#]|$)/i,
+      /^https?:\/\/(?:www\.)?douyin\.com\/video\/\d+(?:[/?#]|$)/i,
+      /^https?:\/\/v\.douyin\.com\/[A-Za-z0-9_-]+(?:[/?#]|$)/i,
+    ],
+    type: DownloadType.youtube,
+    schema: {
+      name: "title",
+    },
+  },
+  {
     // Match actual video / short / live / embed URLs — not the homepage
     // or subscription feed, which would produce spurious "source found"
     // detections on every navigation.
@@ -123,12 +138,18 @@ export function shouldSuppressRequestSource(
 
   try {
     const hostname = new URL(pageUrl).hostname.toLowerCase();
-    return (
+    const isX =
       hostname === "x.com" ||
       hostname.endsWith(".x.com") ||
       hostname === "twitter.com" ||
-      hostname.endsWith(".twitter.com")
-    );
+      hostname.endsWith(".twitter.com");
+    const isShortVideo =
+      hostname === "tiktok.com" ||
+      hostname === "www.tiktok.com" ||
+      hostname === "m.tiktok.com" ||
+      hostname === "douyin.com" ||
+      hostname === "www.douyin.com";
+    return isX || isShortVideo;
   } catch {
     return false;
   }

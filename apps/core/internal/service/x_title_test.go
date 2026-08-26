@@ -27,8 +27,8 @@ func TestNormalizeXDownloadTitleCleansPageWrapperAndURL(t *testing.T) {
 	if !strings.HasSuffix(result.name, "…") {
 		t.Fatalf("name = %q, want truncation ellipsis", result.name)
 	}
-	if len(result.name) > maxXTitleBytes {
-		t.Fatalf("name byte length = %d, want <= %d", len(result.name), maxXTitleBytes)
+	if len(result.name) > maxSocialTitleBytes {
+		t.Fatalf("name byte length = %d, want <= %d", len(result.name), maxSocialTitleBytes)
 	}
 }
 

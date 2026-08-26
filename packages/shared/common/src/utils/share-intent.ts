@@ -63,6 +63,9 @@ export function inferDownloadType(value: string): DownloadType {
     ) {
       return DownloadType.youtube;
     }
+    if (isSupportedShortVideoURL(hostname, pathname)) {
+      return DownloadType.youtube;
+    }
     if (
       (hostname === "x.com" ||
         hostname.endsWith(".x.com") ||
@@ -77,6 +80,35 @@ export function inferDownloadType(value: string): DownloadType {
     // Invalid values are rejected by normalizeShareIntent.
   }
   return DownloadType.direct;
+}
+
+function isSupportedShortVideoURL(hostname: string, pathname: string): boolean {
+  if (
+    hostname === "vm.tiktok.com" ||
+    hostname === "vt.tiktok.com" ||
+    hostname === "v.douyin.com"
+  ) {
+    return pathname !== "/";
+  }
+
+  if (
+    hostname === "tiktok.com" ||
+    hostname === "www.tiktok.com" ||
+    hostname === "m.tiktok.com" ||
+    hostname === "tiktokv.com" ||
+    hostname === "www.tiktokv.com"
+  ) {
+    return (
+      /^\/@[^/]+\/video\/\d+(?:\/|$)/.test(pathname) ||
+      /^\/share\/video\/\d+(?:\/|$)/.test(pathname) ||
+      /^\/t\/[a-z0-9_-]+(?:\/|$)/i.test(pathname)
+    );
+  }
+
+  return (
+    (hostname === "douyin.com" || hostname === "www.douyin.com") &&
+    /^\/video\/\d+(?:\/|$)/.test(pathname)
+  );
 }
 
 export function extractFirstHttpUrl(

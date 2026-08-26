@@ -18,6 +18,17 @@ export function sourceTypeLabel(source: {
       return "X";
     }
     if (
+      hostname === "tiktok.com" ||
+      hostname.endsWith(".tiktok.com") ||
+      hostname === "tiktokv.com" ||
+      hostname.endsWith(".tiktokv.com")
+    ) {
+      return "TikTok";
+    }
+    if (hostname === "douyin.com" || hostname.endsWith(".douyin.com")) {
+      return "抖音";
+    }
+    if (
       hostname === "youtu.be" ||
       hostname === "youtube.com" ||
       hostname.endsWith(".youtube.com")

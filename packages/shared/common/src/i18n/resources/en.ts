@@ -271,7 +271,7 @@ export const en = {
   streamMedia: "Stream media (m3u8)",
   bilibiliMedia: "Bilibili",
   mediagoMedia: "MediaGo download",
-  youtubeMedia: "yt-dlp (YouTube / X)",
+  youtubeMedia: "yt-dlp (YouTube / X / TikTok / Douyin)",
   checkUpdate: "Check for updates",
   viewReleases: "View Releases",
   allowBetaVersion: "Include beta versions",

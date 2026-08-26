@@ -119,6 +119,46 @@ function installYoutubeCard(
   return thumbnail;
 }
 
+function installTikTokCard(
+  postID = "7480123456789012345",
+  title = "TikTok card title",
+): HTMLElement {
+  document.head.innerHTML = '<base href="https://www.tiktok.com/">';
+  document.body.innerHTML = `
+    <article data-e2e="recommend-list-item-container">
+      <section data-e2e="feed-video">
+        <div id="xgwrapper-0-${postID}"><video></video></div>
+        <a data-e2e="video-author-avatar" href="/@creator"></a>
+        <p data-e2e="video-desc">${title}</p>
+      </section>
+    </article>
+  `;
+  const card = document.querySelector<HTMLElement>(
+    '[data-e2e="recommend-list-item-container"]',
+  );
+  if (!card) throw new Error("Expected a TikTok card fixture");
+  return card;
+}
+
+function installDouyinJingxuanCard(
+  postID = "7673896622496959771",
+  title = "抖音精选标题",
+): HTMLElement {
+  document.head.innerHTML = '<base href="https://www.douyin.com/jingxuan">';
+  document.body.innerHTML = `
+    <div class="discover-video-card-item" data-aweme-id="${postID}">
+      <div class="waterfall-videoCardContainer jingxuanVideoCard">
+        <div class="videoImage">
+          <img class="discover-video-card-img" alt="${title}" />
+        </div>
+      </div>
+    </div>
+  `;
+  const card = document.querySelector<HTMLElement>("[data-aweme-id]");
+  if (!card) throw new Error("Expected a Douyin jingxuan card fixture");
+  return card;
+}
+
 function cardButton(card: HTMLElement): HTMLElement | null {
   return (
     card
@@ -146,6 +186,10 @@ describe("supported page URL matching", () => {
     "https://youtu.be/abc",
     "https://x.com/openai/status/1234567890",
     "https://twitter.com/openai/status/1234567890",
+    "https://www.tiktok.com/@creator/video/7480123456789012345",
+    "https://vm.tiktok.com/ZTR45GpSF/",
+    "https://www.douyin.com/video/7480123456789012345",
+    "https://v.douyin.com/iF123AbC/",
   ])("accepts canonical directly supported route %s", (url) => {
     expect(isSupportedPageUrl(url)).toBe(true);
   });
@@ -157,6 +201,8 @@ describe("supported page URL matching", () => {
     "https://www.youtube.com/feed/subscriptions",
     "https://x.com/home",
     "https://twitter.com/search?q=video",
+    "https://www.tiktok.com/@creator/live",
+    "https://www.douyin.com/user/example",
     "https://example.com/video/1",
   ])("rejects route without a canonical page rule %s", (url) => {
     expect(isSupportedPageUrl(url)).toBe(false);
@@ -427,6 +473,60 @@ describe("site card runtime controller", () => {
       candidate: {
         name: "Current YouTube title",
         url: "https://www.youtube.com/watch?v=current-video&list=feed",
+        type: "youtube",
+      },
+    });
+    controller.destroy();
+  });
+
+  test("shows and activates a download button on current TikTok recommendation cards", async () => {
+    const card = installTikTokCard(
+      "7480123456789012345",
+      " Current TikTok title ",
+    );
+    const fixture = createPorts({ url: "https://www.tiktok.com/" });
+    const controller = await createPageActionController(fixture.ports);
+
+    expect(pageActionButton()).toBeNull();
+    expect(cardButton(card)?.textContent).toBe("下载");
+    cardButton(card)?.click();
+
+    await vi.waitFor(() => {
+      expect(fixture.sendMessage).toHaveBeenCalledOnce();
+    });
+    expect(fixture.sendMessage).toHaveBeenCalledWith({
+      type: "ADD_PAGE_CANDIDATE_TO_POPUP",
+      candidate: {
+        name: "Current TikTok title",
+        url: "https://www.tiktok.com/@creator/video/7480123456789012345",
+        type: "youtube",
+      },
+    });
+    controller.destroy();
+  });
+
+  test("shows and activates a download button on current Douyin jingxuan cards", async () => {
+    const card = installDouyinJingxuanCard(
+      "7673896622496959771",
+      "当前抖音精选标题",
+    );
+    const fixture = createPorts({
+      url: "https://www.douyin.com/jingxuan",
+    });
+    const controller = await createPageActionController(fixture.ports);
+
+    expect(pageActionButton()).toBeNull();
+    expect(cardButton(card)?.textContent).toBe("下载");
+    cardButton(card)?.click();
+
+    await vi.waitFor(() => {
+      expect(fixture.sendMessage).toHaveBeenCalledOnce();
+    });
+    expect(fixture.sendMessage).toHaveBeenCalledWith({
+      type: "ADD_PAGE_CANDIDATE_TO_POPUP",
+      candidate: {
+        name: "当前抖音精选标题",
+        url: "https://www.douyin.com/video/7673896622496959771",
         type: "youtube",
       },
     });

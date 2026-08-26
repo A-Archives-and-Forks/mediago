@@ -23,6 +23,31 @@ test("infers download types from parsed hostnames and paths", () => {
     inferDownloadType("https://twitter.com/openai/status/1234567890"),
   ).toBe(DownloadType.youtube);
   expect(
+    inferDownloadType(
+      "https://www.tiktok.com/@creator/video/7480123456789012345",
+    ),
+  ).toBe(DownloadType.youtube);
+  expect(
+    inferDownloadType(
+      "https://m.tiktok.com/@creator/video/7480123456789012345",
+    ),
+  ).toBe(DownloadType.youtube);
+  expect(inferDownloadType("https://vm.tiktok.com/ZTR45GpSF/")).toBe(
+    DownloadType.youtube,
+  );
+  expect(
+    inferDownloadType("https://www.douyin.com/video/7480123456789012345"),
+  ).toBe(DownloadType.youtube);
+  expect(inferDownloadType("https://v.douyin.com/iF123AbC/")).toBe(
+    DownloadType.youtube,
+  );
+  expect(inferDownloadType("https://www.tiktok.com/@creator/live")).toBe(
+    DownloadType.direct,
+  );
+  expect(inferDownloadType("https://www.douyin.com/user/example")).toBe(
+    DownloadType.direct,
+  );
+  expect(
     inferDownloadType("https://media.example/live/index.m3u8?token=abc"),
   ).toBe(DownloadType.m3u8);
   expect(

@@ -130,12 +130,16 @@ func (s *DownloadTaskService) AddDownloadTasks(inputs []*AddDownloadTaskInput) (
 func (s *DownloadTaskService) prepareDownloadTitle(input *AddDownloadTaskInput, reserved map[string]struct{}) (string, error) {
 	title := input.Name
 	statusID := ""
-	isXTitle := false
+	isSocialTitle := false
 
-	if normalized, ok := normalizeXDownloadTitle(input.Name, input.URL); ok {
+	normalized, normalizedSocial := normalizeXDownloadTitle(input.Name, input.URL)
+	if !normalizedSocial {
+		normalized, normalizedSocial = normalizeShortVideoDownloadTitle(input.Name, input.URL)
+	}
+	if normalizedSocial {
 		title = normalized.name
 		statusID = normalized.statusID
-		isXTitle = true
+		isSocialTitle = true
 	} else {
 		if title == "" && input.Type == "bilibili" {
 			title = GetPageTitle(input.URL, "")
@@ -158,7 +162,7 @@ func (s *DownloadTaskService) prepareDownloadTitle(input *AddDownloadTaskInput, 
 	}
 
 	if statusID != "" {
-		candidate := core.SanitizeFilename(appendXStatusIDSuffix(title, statusID))
+		candidate := core.SanitizeFilename(appendSocialIDSuffix(title, statusID))
 		available, err = s.isDownloadTitleAvailable(candidate, reserved)
 		if err != nil {
 			return "", err
@@ -170,8 +174,8 @@ func (s *DownloadTaskService) prepareDownloadTitle(input *AddDownloadTaskInput, 
 	}
 
 	candidate := fmt.Sprintf("%s-%s", title, RandomName())
-	if isXTitle {
-		candidate = truncateUTF8Bytes(candidate, maxXTitleBytes)
+	if isSocialTitle {
+		candidate = truncateUTF8Bytes(candidate, maxSocialTitleBytes)
 	}
 	reserveDownloadTitle(candidate, reserved)
 	return candidate, nil

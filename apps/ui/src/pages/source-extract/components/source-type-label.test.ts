@@ -18,6 +18,33 @@ describe("sourceTypeLabel", () => {
     ).toBe("X");
   });
 
+  it("labels TikTok and Douyin yt-dlp sources by platform", () => {
+    expect(
+      sourceTypeLabel({
+        type: DownloadType.youtube,
+        url: "https://www.tiktok.com/@creator/video/7480123456789012345",
+      }),
+    ).toBe("TikTok");
+    expect(
+      sourceTypeLabel({
+        type: DownloadType.youtube,
+        url: "https://vm.tiktok.com/ZTR45GpSF/",
+      }),
+    ).toBe("TikTok");
+    expect(
+      sourceTypeLabel({
+        type: DownloadType.youtube,
+        url: "https://www.douyin.com/video/7480123456789012345",
+      }),
+    ).toBe("抖音");
+    expect(
+      sourceTypeLabel({
+        type: DownloadType.youtube,
+        url: "https://v.douyin.com/iF123AbC/",
+      }),
+    ).toBe("抖音");
+  });
+
   it("keeps platform and protocol labels readable", () => {
     expect(
       sourceTypeLabel({

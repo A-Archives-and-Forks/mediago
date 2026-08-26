@@ -11,6 +11,10 @@ const moduleMocks = vi.hoisted(() => ({
   resolve: vi.fn(() => "/tmp/preload.cjs"),
 }));
 
+const fileMocks = vi.hoisted(() => ({
+  readFile: vi.fn(async () => "const mediagoPagePlugin = true;"),
+}));
+
 const electronMocks = vi.hoisted(() => ({
   failNextAllocation: false,
   nextWebContentsId: 1,
@@ -36,6 +40,10 @@ vi.mock("node:module", () => ({
     Object.assign(vi.fn(), {
       resolve: moduleMocks.resolve,
     }),
+}));
+
+vi.mock("node:fs/promises", () => ({
+  readFile: fileMocks.readFile,
 }));
 
 vi.mock("electron", () => ({
@@ -171,11 +179,16 @@ vi.mock("./go-config-cache", () => ({
 
 vi.mock("electron-is-dev", () => ({ default: false }));
 
-const { chromeCompatibleDesktopUserAgent, default: BrowserTabManagerService } =
-  await import("./browser-tab-manager.service");
+const {
+  chromeCompatibleDesktopUserAgent,
+  default: BrowserTabManagerService,
+  isolatePagePluginSource,
+} = await import("./browser-tab-manager.service");
 
 beforeEach(() => {
   vi.clearAllMocks();
+  fileMocks.readFile.mockReset();
+  fileMocks.readFile.mockResolvedValue("const mediagoPagePlugin = true;");
   electronMocks.failNextAllocation = false;
   electronMocks.nextWebContentsId = 1;
   electronMocks.sessions.clear();
@@ -189,6 +202,12 @@ describe("BrowserTabManagerService", () => {
         "Mozilla/5.0 Chrome/150.0.7871.129 Electron/43.2.0 Safari/537.36",
       ),
     ).toBe("Mozilla/5.0 Chrome/150.0.7871.129 Safari/537.36");
+  });
+
+  it("isolates the page plugin from globals defined by the website", () => {
+    expect(isolatePagePluginSource("const controller = true;")).toBe(
+      "(() => {\nconst controller = true;\n})()",
+    );
   });
 
   it("creates tabs lazily and has no fixed tab-count limit", () => {
@@ -255,6 +274,20 @@ describe("BrowserTabManagerService", () => {
     );
     expect(service.getSnapshot().tabs[0].url).toBe(
       "https://x.com/example/status/123",
+    );
+  });
+
+  it.each([
+    "http://www.tiktok.com/@creator/video/7480123456789012345",
+    "http://www.douyin.com/video/7480123456789012345",
+  ])("upgrades known short-video navigation to HTTPS: %s", async (url) => {
+    const { service } = createHarness();
+    const tabId = service.getSnapshot().activeTabId;
+
+    await service.loadURL(tabId, url);
+
+    expect(electronMocks.views[0].webContents.loadURL).toHaveBeenCalledWith(
+      url.replace("http://", "https://"),
     );
   });
 
@@ -579,6 +612,39 @@ describe("BrowserTabManagerService", () => {
     });
   });
 
+  it("injects the page plugin inside an isolated function scope", async () => {
+    const { service } = createHarness();
+    const tabId = service.getSnapshot().activeTabId;
+    await service.loadURL(tabId, "https://www.douyin.com/jingxuan");
+    const view = electronMocks.views[0];
+
+    view.webContents.emit("did-navigate");
+
+    await vi.waitFor(() =>
+      expect(view.webContents.executeJavaScript).toHaveBeenCalledWith(
+        "(() => {\nconst mediagoPagePlugin = true;\n})()",
+      ),
+    );
+  });
+
+  it("logs page plugin injection failures", async () => {
+    const { logger, service } = createHarness();
+    const tabId = service.getSnapshot().activeTabId;
+    await service.loadURL(tabId, "https://www.douyin.com/jingxuan");
+    const view = electronMocks.views[0];
+    const injectionError = new Error("identifier collision");
+    view.webContents.executeJavaScript.mockRejectedValueOnce(injectionError);
+
+    view.webContents.emit("did-navigate");
+
+    await vi.waitFor(() =>
+      expect(logger.error).toHaveBeenCalledWith(
+        "[BrowserTab] page plugin injection failed",
+        injectionError,
+      ),
+    );
+  });
+
   it("preserves the favicon when reloading the current page", async () => {
     const { service } = createHarness();
     const tabId = service.getSnapshot().activeTabId;
@@ -889,6 +955,36 @@ describe("BrowserTabManagerService", () => {
       electronMocks.sessions.get("persist:webview")?.cookies.get,
     ).not.toHaveBeenCalled();
   });
+
+  it.each([
+    {
+      cookieURL: "https://www.tiktok.com",
+      name: "sessionid",
+      url: "https://www.tiktok.com/@creator/video/7480123456789012345",
+    },
+    {
+      cookieURL: "https://www.douyin.com",
+      name: "s_v_web_id",
+      url: "https://www.douyin.com/video/7480123456789012345",
+    },
+  ])("adds current $cookieURL cookies to explicit downloads", async (test) => {
+    const { service } = createHarness();
+    const tabId = service.getSnapshot().activeTabId;
+    const targetSession = electronMocks.sessions.get("persist:webview");
+    targetSession?.cookies.get.mockResolvedValue([
+      { name: test.name, value: "short-video-session" },
+    ]);
+
+    const result = await service.withSessionCookies(tabId, {
+      type: DownloadType.youtube,
+      url: test.url,
+    });
+
+    expect(targetSession?.cookies.get).toHaveBeenCalledWith({
+      url: test.cookieURL,
+    });
+    expect(result.headers).toBe(`Cookie:${test.name}=short-video-session`);
+  });
 });
 
 function createHarness() {
@@ -941,6 +1037,7 @@ function createHarness() {
     browserWindow,
     discoveryExecutor,
     mainNativeWindow,
+    logger,
     service,
     sniffingHelper,
   };

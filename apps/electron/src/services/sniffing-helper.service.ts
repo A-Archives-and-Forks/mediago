@@ -557,7 +557,13 @@ export function getCookieBackedType(url: string): DownloadType | undefined {
       hostname === "x.com" ||
       hostname.endsWith(".x.com") ||
       hostname === "twitter.com" ||
-      hostname.endsWith(".twitter.com")
+      hostname.endsWith(".twitter.com") ||
+      hostname === "tiktok.com" ||
+      hostname.endsWith(".tiktok.com") ||
+      hostname === "tiktokv.com" ||
+      hostname.endsWith(".tiktokv.com") ||
+      hostname === "douyin.com" ||
+      hostname.endsWith(".douyin.com")
     ) {
       return DownloadType.youtube;
     }

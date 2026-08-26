@@ -19,6 +19,30 @@ describe("matchPageUrl", () => {
   ])("does not treat a non-status X page as a download: %s", (url) => {
     expect(matchPageUrl(url)).toBeUndefined();
   });
+
+  it.each([
+    "https://www.tiktok.com/@creator/video/7480123456789012345",
+    "https://m.tiktok.com/@creator/video/7480123456789012345",
+    "https://www.tiktok.com/share/video/7480123456789012345/",
+    "https://www.tiktok.com/t/ZTRC5xgJp",
+    "https://vm.tiktok.com/ZTR45GpSF/",
+    "https://vt.tiktok.com/ZSe4FqkKd",
+    "https://www.douyin.com/video/7480123456789012345",
+    "https://v.douyin.com/iF123AbC/",
+  ])("routes TikTok/Douyin post URLs through yt-dlp: %s", (url) => {
+    expect(matchPageUrl(url)?.type).toBe(DownloadType.youtube);
+  });
+
+  it.each([
+    "https://www.tiktok.com/",
+    "https://www.tiktok.com/@creator",
+    "https://www.tiktok.com/@creator/live",
+    "https://www.douyin.com/",
+    "https://www.douyin.com/user/example",
+    "https://www.douyin.com/search/video",
+  ])("does not treat a short-video browsing page as a download: %s", (url) => {
+    expect(matchPageUrl(url)).toBeUndefined();
+  });
 });
 
 describe("shouldSuppressRequestSource", () => {
@@ -51,5 +75,15 @@ describe("shouldSuppressRequestSource", () => {
         DownloadType.direct,
       ),
     ).toBe(false);
+  });
+
+  it.each([
+    "https://www.tiktok.com/foryou",
+    "https://m.tiktok.com/@creator/video/7480123456789012345",
+    "https://www.douyin.com/recommend",
+    "https://www.douyin.com/video/7480123456789012345",
+  ])("suppresses raw media renditions on short-video pages: %s", (url) => {
+    expect(shouldSuppressRequestSource(url, DownloadType.direct)).toBe(true);
+    expect(shouldSuppressRequestSource(url, DownloadType.m3u8)).toBe(true);
   });
 });

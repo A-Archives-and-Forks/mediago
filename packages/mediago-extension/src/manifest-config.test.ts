@@ -15,6 +15,16 @@ const expectedPageMatches = [
   "*://twitter.com/*",
   "*://www.twitter.com/*",
   "*://mobile.twitter.com/*",
+  "*://tiktok.com/*",
+  "*://www.tiktok.com/*",
+  "*://m.tiktok.com/*",
+  "*://vm.tiktok.com/*",
+  "*://vt.tiktok.com/*",
+  "*://tiktokv.com/*",
+  "*://www.tiktokv.com/*",
+  "*://douyin.com/*",
+  "*://www.douyin.com/*",
+  "*://v.douyin.com/*",
 ];
 
 const basename = (entry: string | undefined) => entry?.split("/").at(-1);

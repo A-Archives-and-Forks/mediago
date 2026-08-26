@@ -275,7 +275,7 @@ export const it = {
   streamMedia: "Stream media (m3u8)",
   bilibiliMedia: "Bilibili",
   mediagoMedia: "MediaGo download",
-  youtubeMedia: "yt-dlp (YouTube / X)",
+  youtubeMedia: "yt-dlp (YouTube / X / TikTok / Douyin)",
   checkUpdate: "Controlla aggiornamenti",
   viewReleases: "Visualizza release",
   allowBetaVersion: "Includi controllo versioni beta",

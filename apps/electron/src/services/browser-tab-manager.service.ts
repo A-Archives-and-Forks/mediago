@@ -73,7 +73,14 @@ interface TabRuntime {
   view: WebContentsView;
 }
 
-const HTTPS_ONLY_HOSTS = ["x.com", "twitter.com", "google.com"] as const;
+const HTTPS_ONLY_HOSTS = [
+  "x.com",
+  "twitter.com",
+  "google.com",
+  "tiktok.com",
+  "tiktokv.com",
+  "douyin.com",
+] as const;
 const INTERNAL_BROWSER_PROTOCOLS = new Set(["http:", "https:"]);
 const EXTERNAL_BROWSER_PROTOCOLS = new Set(["mailto:", "sms:", "tel:"]);
 const ERR_ABORTED = -3;
@@ -84,6 +91,10 @@ const ELECTRON_USER_AGENT_TOKEN = /\sElectron\/[^\s]+/gi;
 
 export function chromeCompatibleDesktopUserAgent(userAgent: string): string {
   return userAgent.replace(ELECTRON_USER_AGENT_TOKEN, "").trim();
+}
+
+export function isolatePagePluginSource(content: string): string {
+  return `(() => {\n${content}\n})()`;
 }
 
 export function normalizeBrowserURL(value: string): string {
@@ -862,10 +873,12 @@ export default class BrowserTabManagerService implements DiscoveryBrowserExecuto
     try {
       const content = await readFile(pluginUrl, "utf-8");
       if (this.isCurrentRuntime(runtime)) {
-        await runtime.view.webContents.executeJavaScript(content);
+        await runtime.view.webContents.executeJavaScript(
+          isolatePagePluginSource(content),
+        );
       }
-    } catch {
-      // Page plugin injection is best-effort.
+    } catch (error) {
+      this.logger.error("[BrowserTab] page plugin injection failed", error);
     }
     if (this.isCurrentRuntime(runtime)) {
       this.sniffingHelper.checkPageInfo(runtime.tabId);
@@ -1226,6 +1239,17 @@ function getSessionCookieURL(
     }
     if (hostname === "twitter.com" || hostname.endsWith(".twitter.com")) {
       return "https://twitter.com";
+    }
+    if (
+      hostname === "tiktok.com" ||
+      hostname.endsWith(".tiktok.com") ||
+      hostname === "tiktokv.com" ||
+      hostname.endsWith(".tiktokv.com")
+    ) {
+      return "https://www.tiktok.com";
+    }
+    if (hostname === "douyin.com" || hostname.endsWith(".douyin.com")) {
+      return "https://www.douyin.com";
     }
     if (
       hostname === "youtu.be" ||

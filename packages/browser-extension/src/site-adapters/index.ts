@@ -5,11 +5,17 @@ export {
 } from "./bilibili";
 export { matchesBilibiliPageLocation } from "./bilibili-match";
 export { matchesTwitterPageLocation } from "./twitter-match";
+export { matchesShortVideoPageLocation } from "./short-video-match";
 export {
   matchesPageAdapterLocation,
   matchesYoutubePageLocation,
 } from "./adapter-matches";
 export { findPageAdapter, PAGE_ADAPTERS } from "./registry";
+export {
+  SHORT_VIDEO_PROCESSED_ATTRIBUTE,
+  SHORT_VIDEO_SELECTORS,
+  shortVideoPageAdapter,
+} from "./short-video";
 export {
   TWITTER_PROCESSED_ATTRIBUTE,
   TWITTER_SELECTORS,

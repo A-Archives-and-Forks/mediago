@@ -108,6 +108,7 @@ function trustedSender(
 
 const BILIBILI_HOMEPAGE_URL = "https://www.bilibili.com/";
 const YOUTUBE_HOMEPAGE_URL = "https://www.youtube.com/";
+const TIKTOK_HOMEPAGE_URL = "https://www.tiktok.com/foryou";
 
 function homepageTab(
   overrides: Partial<chrome.tabs.Tab> = {},
@@ -160,6 +161,26 @@ function youtubeHomepageSender(
   return trustedSender({
     tab: youtubeHomepageTab(),
     url: YOUTUBE_HOMEPAGE_URL,
+    ...overrides,
+  });
+}
+
+function tiktokHomepageTab(
+  overrides: Partial<chrome.tabs.Tab> = {},
+): chrome.tabs.Tab {
+  return supportedTab({
+    url: TIKTOK_HOMEPAGE_URL,
+    title: "TikTok feed",
+    ...overrides,
+  });
+}
+
+function tiktokHomepageSender(
+  overrides: Partial<chrome.runtime.MessageSender> = {},
+): chrome.runtime.MessageSender {
+  return trustedSender({
+    tab: tiktokHomepageTab(),
+    url: TIKTOK_HOMEPAGE_URL,
     ...overrides,
   });
 }
@@ -599,6 +620,37 @@ describe("page candidate command", () => {
         name: "YouTube card",
         url: "https://www.youtube.com/watch?v=card-video",
         documentURL: YOUTUBE_HOMEPAGE_URL,
+        type: DownloadType.youtube,
+        detectedAt: 1_234,
+      },
+    ]);
+    expect(memory.badges).toEqual([1]);
+    expect(ports.openPopup).toHaveBeenCalledWith({ windowId: 12 });
+  });
+
+  test("accepts a TikTok card candidate from the TikTok feed", async () => {
+    const memory = memorySourceService();
+    const ports = pageActionPorts([
+      tiktokHomepageTab({ windowId: 7 }),
+      tiktokHomepageTab({ windowId: 12 }),
+    ]);
+    const handle = createPageActionHandler(memory.service, ports);
+    const candidate = pageCandidate({
+      name: "TikTok card",
+      url: "https://www.tiktok.com/@creator/video/7480123456789012345",
+      type: DownloadType.youtube,
+    });
+
+    await expect(
+      handlePageCandidate(handle, tiktokHomepageSender(), candidate),
+    ).resolves.toEqual({ type: "PAGE_ACTION_RESULT", ok: true });
+
+    expect(memory.sources()).toEqual([
+      {
+        id: "page-action-41-1234",
+        name: "TikTok card",
+        url: "https://www.tiktok.com/@creator/video/7480123456789012345",
+        documentURL: TIKTOK_HOMEPAGE_URL,
         type: DownloadType.youtube,
         detectedAt: 1_234,
       },
