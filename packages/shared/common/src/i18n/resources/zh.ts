@@ -84,6 +84,8 @@ export const zh = {
   skillsSetupWithoutApiKey: "将 mediago url 设置为 {{url}}",
   clipboardCopyFailed: "无法复制到剪贴板",
   settingsSaveFailed: "无法保存设置",
+  settingsPromotion: "推广",
+  dismissPromotion: "隐藏此推广内容",
   moreSettings: "更多设置",
   openSourceProject: "开源项目",
   openSourceDescription:

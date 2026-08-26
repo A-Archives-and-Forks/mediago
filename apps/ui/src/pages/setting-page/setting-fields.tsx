@@ -19,7 +19,13 @@ import {
 } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Field,
   FieldContent,
@@ -264,10 +270,12 @@ export const SettingCard = memo(function SettingCard({
   title,
   children,
   className,
+  headerAction,
 }: {
   title: ReactNode;
   children: ReactNode;
   className?: string;
+  headerAction?: ReactNode;
 }) {
   const titleId = useId();
 
@@ -279,10 +287,13 @@ export const SettingCard = memo(function SettingCard({
         className,
       )}
     >
-      <CardHeader className="flex h-14 items-center border-b px-5 py-0 [.border-b]:pb-0">
-        <CardTitle id={titleId} className="text-sm font-semibold">
+      <CardHeader className="h-14 border-b px-5 py-0 [.border-b]:pb-0">
+        <CardTitle id={titleId} className="self-center text-sm font-semibold">
           {title}
         </CardTitle>
+        {headerAction ? (
+          <CardAction className="self-center">{headerAction}</CardAction>
+        ) : null}
       </CardHeader>
       <CardContent className="@container/settings flex flex-col px-5 py-0">
         {children}

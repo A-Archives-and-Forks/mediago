@@ -90,6 +90,8 @@ export const it = {
   skillsSetupWithoutApiKey: "Imposta l'url mediago su {{url}}",
   clipboardCopyFailed: "Impossibile copiare negli appunti",
   settingsSaveFailed: "Impossibile salvare l'impostazione",
+  settingsPromotion: "Promozione",
+  dismissPromotion: "Nascondi questa promozione",
   moreSettings: "Avanzate",
   openSourceProject: "Open source",
   openSourceDescription:

@@ -89,6 +89,8 @@ export const en = {
   skillsSetupWithoutApiKey: "Set mediago url to {{url}}",
   clipboardCopyFailed: "Could not copy to the clipboard",
   settingsSaveFailed: "Could not save the setting",
+  settingsPromotion: "Promotion",
+  dismissPromotion: "Hide this promotion",
   moreSettings: "Advanced",
   openSourceProject: "Open source",
   openSourceDescription:

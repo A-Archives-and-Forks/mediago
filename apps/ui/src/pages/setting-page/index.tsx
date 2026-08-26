@@ -19,6 +19,7 @@ import { usePlatform } from "@/hooks/use-platform";
 import { useSessionStore } from "@/store/session";
 import { isWeb, tdApp } from "@/utils";
 import { SettingsFormProvider } from "./setting-fields";
+import { SettingsPromoCard } from "./settings-promo-card";
 import {
   BasicSettingsCard,
   BrowserExtensionCard,
@@ -42,6 +43,7 @@ const StableSkillsSettingsCard = memo(SkillsSettingsCard);
 const StableBrowserExtensionCard = memo(BrowserExtensionCard);
 const StableMoreSettingsCard = memo(MoreSettingsCard);
 const StableOpenSourceCard = memo(OpenSourceCard);
+const StableSettingsPromoCard = memo(SettingsPromoCard);
 const SETTINGS_REVEAL_STEPS = isWeb ? 2 : 5;
 
 const SettingsCards = memo(function SettingsCards({
@@ -76,6 +78,7 @@ const SettingsCards = memo(function SettingsCards({
         {!isWeb && allSettingsVisible ? <StableOpenSourceCard /> : null}
       </div>
       <div className="flex min-w-0 flex-col gap-4">
+        <StableSettingsPromoCard />
         {!isWeb ? <StableDockerSettingsCard /> : <StableSkillsSettingsCard />}
         {!isWeb && visibleStep >= 2 ? <StableSkillsSettingsCard /> : null}
         {!isWeb && visibleStep >= 3 ? <StableCLISettingsCard /> : null}
