@@ -125,6 +125,30 @@
       "win32": "yt-dlp.exe"
     }
   },
+  "deno": {
+    "repo": "denoland/deno",
+    "version": "v2.9.5",
+    "assets": {
+      "darwin-x64": "deno-x86_64-apple-darwin.zip",
+      "darwin-arm64": "deno-aarch64-apple-darwin.zip",
+      "linux-x64": "deno-x86_64-unknown-linux-gnu.zip",
+      "linux-arm64": "deno-aarch64-unknown-linux-gnu.zip",
+      "win32-x64": "deno-x86_64-pc-windows-msvc.zip",
+      "win32-arm64": "deno-aarch64-pc-windows-msvc.zip"
+    },
+    "sha256": {
+      "darwin-x64": "befc4fee79127584c0f5c9f76ca6bb73c8e6ff523c01acd52e9c5db1968a09cb",
+      "darwin-arm64": "b5bd08edab254d42d7b05aa5b6cb4c9b8d4dede4975aff76951ce2cce18866fa",
+      "linux-x64": "dc480c462c8c3582524f3e75c160613d0a975e1f66b5465995d58bae236da7d3",
+      "linux-arm64": "e1a70c5eb03b0ebaf761077029ef86b9ba22d50e2b54ca45ce5437457f701b63",
+      "win32-x64": "98f8c2a2d470e4ccb04c935c86ff8050817d877762aec5eaeeb9e409ccb3b9fd",
+      "win32-arm64": "ec503fba3b205fd47777d0e90e84ac7ae74d45d94041b46d31b414894c52ad3b"
+    },
+    "binaryName": {
+      "default": "deno",
+      "win32": "deno.exe"
+    }
+  },
   "mediago": {
     "repo": "caorushizi/mediago-core",
     "version": "v0.2.1",

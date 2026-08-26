@@ -298,8 +298,8 @@ func TestDownloadLogsStructuredDiagnosticsWithoutParameterValues(t *testing.T) {
 	if got := fmt.Sprint(argumentFields["id"]); got != "log-test" {
 		t.Fatalf("Command arguments built id = %q, want log-test", got)
 	}
-	if got := fmt.Sprint(argumentFields["arg_count"]); got != "13" {
-		t.Fatalf("Command arguments built arg_count = %q, want 13", got)
+	if got := fmt.Sprint(argumentFields["arg_count"]); got != "15" {
+		t.Fatalf("Command arguments built arg_count = %q, want 15", got)
 	}
 	if got := fmt.Sprint(argumentFields["url_origin"]); got != "https://media.example:8443" {
 		t.Fatalf("Command arguments built url_origin = %q, want https://media.example:8443", got)
@@ -314,8 +314,8 @@ func TestDownloadLogsStructuredDiagnosticsWithoutParameterValues(t *testing.T) {
 		t.Fatal("Command arguments built unexpectedly includes args")
 	}
 
-	if len(runnerArgs) != 13 {
-		t.Fatalf("runner arguments length = %d, want 13", len(runnerArgs))
+	if len(runnerArgs) != 15 {
+		t.Fatalf("runner arguments length = %d, want 15", len(runnerArgs))
 	}
 	assertStandaloneArgCount(t, "youtube", "URL", runnerArgs, 1, downloadURL)
 	assertAdjacentArgCount(t, "youtube", "local directory", runnerArgs, 1, "--paths", localDir)
@@ -323,6 +323,7 @@ func TestDownloadLogsStructuredDiagnosticsWithoutParameterValues(t *testing.T) {
 	assertAdjacentArgCount(t, "youtube", "first header", runnerArgs, 1, "--add-header", headerOne)
 	assertAdjacentArgCount(t, "youtube", "second header", runnerArgs, 1, "--add-header", headerTwo)
 	assertAdjacentArgCount(t, "youtube", "proxy", runnerArgs, 1, "--proxy", proxyValue)
+	assertAdjacentArgCount(t, "youtube", "Deno runtime", runnerArgs, 1, "--js-runtimes", "deno:"+filepath.Join(tempDir, "deno"))
 	assertAdjacentArgCount(t, "youtube", "common argument", runnerArgs, 1, "--fixed", commonValue)
 }
 

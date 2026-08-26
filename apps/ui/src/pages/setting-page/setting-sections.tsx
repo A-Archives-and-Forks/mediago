@@ -780,7 +780,7 @@ export const MoreSettingsCard = memo(function MoreSettingsCard({
           </Button>
         </div>
       )}
-      <div className="mb-4 flex flex-col gap-3 p-4 @sm/settings:flex-row @sm/settings:items-center @sm/settings:justify-between">
+      <div className="mb-4 flex flex-col gap-3 py-4 @sm/settings:flex-row @sm/settings:items-center @sm/settings:justify-between">
         <div className="min-w-0">
           <p className="text-xs text-muted-foreground">{t("currentVersion")}</p>
           <div className="mt-1.5 flex flex-wrap items-center gap-2">

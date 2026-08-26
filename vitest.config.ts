@@ -11,7 +11,7 @@ export default defineConfig({
         find: "@mediago/browser-extension/site-adapter-matches",
         replacement: path.resolve(
           repositoryRoot,
-          "packages/browser-extension/src/site-adapters/bilibili-match.ts",
+          "packages/browser-extension/src/site-adapters/adapter-matches.ts",
         ),
       },
       {

@@ -395,7 +395,7 @@ A: 编辑 `packages/tooling/src/core-build/` 下的 TypeScript 模块。所有�
 A:
 
 - **Core 包**：包含 mediago-core 的二进制文件和配置
-- **Deps 包**：包含依赖的下载工具（N_m3u8DL-RE、BBDown、aria2c、yt-dlp）
+- **Deps 包**：包含依赖的下载工具（N_m3u8DL-RE、BBDown、aria2c、yt-dlp、Deno）
 - 分开发布可以单独更新，减少不必要的下载
 
 ---

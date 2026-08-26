@@ -290,7 +290,7 @@ await Promise.all([
   ),
 ]);
 
-// Copy dependency binaries (ffmpeg, N_m3u8DL-RE, BBDown, aria2c, yt-dlp)
+// Copy dependency binaries (ffmpeg, N_m3u8DL-RE, BBDown, aria2c, yt-dlp, Deno)
 const platformKey = `${os.platform()}-${os.arch()}`;
 const configuredDepsDir = process.env.MEDIAGO_DEPS_DIR?.trim();
 const localDepsDir = configuredDepsDir

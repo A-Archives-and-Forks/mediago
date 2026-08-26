@@ -4,7 +4,8 @@ function fail(message: string): never {
 
 const WORKER_CONTENT_MARKERS = [
   "bili-video-card__wrap",
-  "bilibili-button",
+  "ytd-rich-item-renderer",
+  "mediago-download-button",
   "data-mg-injected",
   "startPageRuntime",
   "MutationObserver",
@@ -62,7 +63,8 @@ export function verifyArtifactGraphs({
 
   for (const marker of [
     "bili-video-card__wrap",
-    "bilibili-button",
+    "ytd-rich-item-renderer",
+    "mediago-download-button",
     "data-mg-injected",
   ]) {
     if (!contentAsset.includes(marker)) {

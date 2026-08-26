@@ -25,6 +25,7 @@ export const RUNTIME_TOOLS = [
   "BBDown",
   "aria2",
   "yt-dlp",
+  "deno",
   "mediago",
 ] as const;
 
@@ -71,6 +72,7 @@ const EXECUTABLE_NAMES: Readonly<
   BBDown: { unix: "BBDown", windows: "BBDown.exe" },
   aria2: { unix: "aria2c", windows: "aria2c.exe" },
   "yt-dlp": { unix: "yt-dlp", windows: "yt-dlp.exe" },
+  deno: { unix: "deno", windows: "deno.exe" },
   mediago: { unix: "mediago", windows: "mediago.exe" },
 };
 

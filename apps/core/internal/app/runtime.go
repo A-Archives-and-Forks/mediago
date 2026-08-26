@@ -81,6 +81,13 @@ func NewRuntime(cfg *AppConfig) (*Runtime, error) {
 			logger.Warnf("%s binary is not executable: %s", dt, binPath)
 		}
 	}
+	denoPath := filepath.Join(cfg.DepsDir, core.DenoBinaryName+exeExt())
+	logger.Infof("youtube JavaScript runtime: %s", denoPath)
+	if info, err := os.Stat(denoPath); err != nil {
+		logger.Warnf("youtube JavaScript runtime not found: %v", err)
+	} else if info.Mode()&0o111 == 0 {
+		logger.Warnf("youtube JavaScript runtime is not executable: %s", denoPath)
+	}
 
 	r := runner.NewPTYRunner()
 	downloader := core.NewDownloader(binMap, r, schemas, cfg)

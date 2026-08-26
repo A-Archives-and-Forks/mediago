@@ -164,7 +164,26 @@ func (d *DownloaderSvc) buildArgs(p DownloadParams, s schema.Schema) []string {
 		}
 	}
 
+	if p.Type == TypeYoutube {
+		if denoPath := d.youtubeDenoPath(); denoPath != "" {
+			out = append(out, "--js-runtimes", "deno:"+denoPath)
+		}
+	}
+
 	return out
+}
+
+func (d *DownloaderSvc) youtubeDenoPath() string {
+	ytDLPPath := d.binMap[TypeYoutube]
+	if ytDLPPath == "" {
+		return ""
+	}
+
+	denoName := DenoBinaryName
+	if strings.EqualFold(filepath.Ext(ytDLPPath), ".exe") {
+		denoName += ".exe"
+	}
+	return filepath.Join(filepath.Dir(ytDLPPath), denoName)
 }
 
 func headerValue(headers []string, name string) string {

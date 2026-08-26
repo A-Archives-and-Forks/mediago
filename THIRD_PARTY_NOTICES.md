@@ -31,6 +31,17 @@ compatible.
 - Standalone executable notices and license texts:
   <https://github.com/yt-dlp/yt-dlp/blob/2026.07.04/THIRD_PARTY_LICENSES.txt>
 
+## Deno 2.9.5
+
+- Project and corresponding source:
+  <https://github.com/denoland/deno/tree/v2.9.5>
+- Release: <https://github.com/denoland/deno/releases/tag/v2.9.5>
+- License: MIT
+- License text: <https://github.com/denoland/deno/blob/v2.9.5/LICENSE.md>
+
+MediaGo ships the platform-specific Deno executable as the JavaScript runtime
+recommended by yt-dlp for YouTube challenge solving.
+
 ## N_m3u8DL-RE 0.6.0-beta
 
 - Project and corresponding source:

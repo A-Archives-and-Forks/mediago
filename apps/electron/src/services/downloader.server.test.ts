@@ -22,6 +22,7 @@ const doubles = vi.hoisted(() => {
   return {
     bridgeClients: [] as Array<{ options: Record<string, unknown> }>,
     clients: [] as Array<{
+      listTasks: ReturnType<typeof vi.fn>;
       streamEvents: ReturnType<typeof vi.fn>;
     }>,
     events: [] as FakeTaskEvents[],
@@ -42,6 +43,7 @@ const doubles = vi.hoisted(() => {
     }>,
     runnerStart: vi.fn<() => Promise<void>>(),
     runnerStop: vi.fn<() => Promise<void>>(),
+    listTasks: vi.fn(),
   };
 });
 
@@ -65,6 +67,7 @@ vi.mock("@mediago/core-sdk", () => ({
     }
   },
   MediaGoClient: class FakeMediaGoClient {
+    readonly listTasks = vi.fn(() => doubles.listTasks());
     readonly streamEvents = vi.fn(() => {
       const events = new doubles.FakeTaskEvents();
       doubles.events.push(events);
@@ -125,6 +128,7 @@ describe("DownloaderServer.stop", () => {
     doubles.discoveryExecutor.stop.mockReset().mockResolvedValue(undefined);
     doubles.runnerStart.mockReset().mockResolvedValue(undefined);
     doubles.runnerStop.mockReset().mockResolvedValue(undefined);
+    doubles.listTasks.mockReset();
   });
 
   afterEach(() => {
@@ -162,6 +166,42 @@ describe("DownloaderServer.stop", () => {
     expect(doubles.events[0].close).toHaveBeenCalledTimes(1);
     expect(doubles.discoveryExecutor.stop).toHaveBeenCalledTimes(1);
     expect(doubles.runners[0].stop).toHaveBeenCalledTimes(1);
+  });
+
+  it("forwards polled YouTube percent and speed to the renderer", async () => {
+    doubles.listTasks.mockResolvedValue({
+      data: {
+        tasks: [
+          {
+            id: "30",
+            type: "youtube",
+            percent: 15.1,
+            speed: "2.26MiB/s",
+            isLive: false,
+            status: "downloading",
+          },
+        ],
+      },
+    });
+    const server = createServer();
+    const onProgress = vi.fn();
+    server.on("download-progress", onProgress);
+
+    await server.start({ dbPath: "/fake/data/media.db", logDir: "/fake/logs" });
+    doubles.events[0].emit("download-start", { id: "30" });
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(onProgress).toHaveBeenCalledExactlyOnceWith([
+      {
+        id: 30,
+        type: "youtube",
+        percent: "15.1",
+        speed: "2.26MiB/s",
+        isLive: false,
+        status: "downloading",
+      },
+    ]);
+    await server.stop();
   });
 
   it("waits for a pending start before stopping without publishing stale state", async () => {

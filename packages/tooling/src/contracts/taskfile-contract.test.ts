@@ -208,7 +208,7 @@ const implementationGraph = {
   "internal:deps:runtime": {
     deps: ["internal:deps:node"],
     leaves: [
-      "pnpm deps:download:raw --tools ffmpeg,N_m3u8DL-RE,BBDown,aria2,yt-dlp,mediago",
+      "pnpm deps:download:raw --tools ffmpeg,N_m3u8DL-RE,BBDown,aria2,yt-dlp,deno,mediago",
     ],
   },
   "internal:deps:media-integration": {

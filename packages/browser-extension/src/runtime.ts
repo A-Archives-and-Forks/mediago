@@ -4,7 +4,7 @@ import type {
   PageTransport,
 } from "./site-adapters/types";
 
-const BUTTON_TAG = "bilibili-button";
+const BUTTON_TAG = "mediago-download-button";
 
 const STYLES = `
   .mg-button {

@@ -4,7 +4,16 @@ export {
   bilibiliPageAdapter,
 } from "./bilibili";
 export { matchesBilibiliPageLocation } from "./bilibili-match";
+export {
+  matchesPageAdapterLocation,
+  matchesYoutubePageLocation,
+} from "./adapter-matches";
 export { findPageAdapter, PAGE_ADAPTERS } from "./registry";
+export {
+  YOUTUBE_PROCESSED_ATTRIBUTE,
+  YOUTUBE_SELECTORS,
+  youtubePageAdapter,
+} from "./youtube";
 export type {
   PageAdapter,
   PageAdapterLocation,

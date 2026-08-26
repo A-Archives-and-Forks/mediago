@@ -26,6 +26,9 @@ var BinaryNames = map[DownloadType]string{
 // FFmpegBinaryName is the filename for the ffmpeg binary (without extension).
 const FFmpegBinaryName = "ffmpeg"
 
+// DenoBinaryName is the filename for yt-dlp's JavaScript runtime (without extension).
+const DenoBinaryName = "deno"
+
 // TaskID is the unique identifier for a task
 type TaskID string
 

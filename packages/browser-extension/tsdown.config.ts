@@ -30,7 +30,7 @@ export default defineConfig([
   {
     ...sharedConfig,
     entry: {
-      "site-adapter-matches": "src/site-adapters/bilibili-match.ts",
+      "site-adapter-matches": "src/site-adapters/adapter-matches.ts",
     },
   },
 ]);

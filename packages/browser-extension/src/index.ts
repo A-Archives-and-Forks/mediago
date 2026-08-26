@@ -1,7 +1,7 @@
 import { startPageRuntime } from "./runtime";
 import { findPageAdapter } from "./site-adapters/registry";
 
-const RUNTIME_CLEANUP_KEY = "__mediagoBilibiliRuntimeCleanup__";
+const RUNTIME_CLEANUP_KEY = "__mediagoPageRuntimeCleanup__";
 
 type RuntimeWindow = Window & {
   [RUNTIME_CLEANUP_KEY]?: () => void;

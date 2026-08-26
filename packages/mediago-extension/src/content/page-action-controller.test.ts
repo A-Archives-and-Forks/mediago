@@ -97,10 +97,32 @@ function installBilibiliCard(
   return card;
 }
 
+function installYoutubeCard(
+  href = "/watch?v=youtube-card",
+  title = "YouTube card title",
+): HTMLElement {
+  document.head.innerHTML = '<base href="https://www.youtube.com/">';
+  document.body.innerHTML = `
+    <ytd-app>
+      <ytd-rich-item-renderer>
+        <ytd-thumbnail>
+          <a id="thumbnail" href="${href}"></a>
+        </ytd-thumbnail>
+        <a id="video-title-link" href="${href}">
+          <span id="video-title" title="${title}">${title}</span>
+        </a>
+      </ytd-rich-item-renderer>
+    </ytd-app>
+  `;
+  const thumbnail = document.querySelector<HTMLElement>("ytd-thumbnail");
+  if (!thumbnail) throw new Error("Expected YouTube card fixture");
+  return thumbnail;
+}
+
 function cardButton(card: HTMLElement): HTMLElement | null {
   return (
     card
-      .querySelector<HTMLElement>("bilibili-button")
+      .querySelector<HTMLElement>("mediago-download-button")
       ?.shadowRoot?.querySelector<HTMLElement>(".mg-button") ?? null
   );
 }
@@ -325,7 +347,7 @@ describe("page action controller", () => {
   });
 });
 
-describe("Bilibili card runtime controller", () => {
+describe("site card runtime controller", () => {
   test("starts the shared runtime by default on the Bilibili homepage", async () => {
     const card = installBilibiliCard();
     const fixture = createPorts({ url: "https://www.bilibili.com/" });
@@ -381,6 +403,32 @@ describe("Bilibili card runtime controller", () => {
     controller.destroy();
   });
 
+  test("shows and activates a download button on YouTube homepage cards", async () => {
+    const card = installYoutubeCard(
+      "/watch?v=current-video&list=feed",
+      " Current YouTube title ",
+    );
+    const fixture = createPorts({ url: "https://www.youtube.com/" });
+    const controller = await createPageActionController(fixture.ports);
+
+    expect(pageActionButton()).toBeNull();
+    expect(cardButton(card)?.textContent).toBe("下载");
+    cardButton(card)?.click();
+
+    await vi.waitFor(() => {
+      expect(fixture.sendMessage).toHaveBeenCalledOnce();
+    });
+    expect(fixture.sendMessage).toHaveBeenCalledWith({
+      type: "ADD_PAGE_CANDIDATE_TO_POPUP",
+      candidate: {
+        name: "Current YouTube title",
+        url: "https://www.youtube.com/watch?v=current-video&list=feed",
+        type: "youtube",
+      },
+    });
+    controller.destroy();
+  });
+
   test("contains a rejected candidate response without leaving an unhandled rejection", async () => {
     const card = installBilibiliCard();
     const fixture = createPorts({
@@ -401,14 +449,14 @@ describe("Bilibili card runtime controller", () => {
   test("does not start a card runtime when no shared adapter matches", async () => {
     const card = installBilibiliCard();
     const fixture = createPorts({
-      url: "https://www.youtube.com/watch?v=video",
+      url: "https://example.com/video/1",
     });
 
     const controller = await createPageActionController(fixture.ports);
 
     expect(cardButton(card)).toBeNull();
     expect(card.hasAttribute("data-mg-injected")).toBe(false);
-    expect(pageActionButton()).not.toBeNull();
+    expect(pageActionButton()).toBeNull();
     controller.destroy();
   });
 });

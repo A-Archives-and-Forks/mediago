@@ -344,7 +344,11 @@ func TestExternalInputContracts(t *testing.T) {
 			"Proxy-Authorization : Basic test-only",
 			"User-Agent: MediaGo-Contract-Test",
 		}
-		d := &DownloaderSvc{cfg: testDownloaderConfig{localDir: localDir, useProxy: true, proxy: proxy}}
+		ytDLPPath := filepath.Join("/runtime", "yt-dlp")
+		d := &DownloaderSvc{
+			binMap: map[DownloadType]string{TypeYoutube: ytDLPPath},
+			cfg:    testDownloaderConfig{localDir: localDir, useProxy: true, proxy: proxy},
+		}
 		args := d.buildArgs(DownloadParams{
 			Type:    TypeYoutube,
 			URL:     url,
@@ -364,6 +368,7 @@ func TestExternalInputContracts(t *testing.T) {
 			assertAdjacentArgCount(t, tool, fmt.Sprintf("header %d", i+1), args, 1, "--add-header", header)
 		}
 		assertAdjacentArgCount(t, tool, "proxy", args, 1, "--proxy", proxy)
+		assertAdjacentArgCount(t, tool, "Deno runtime", args, 1, "--js-runtimes", "deno:"+filepath.Join("/runtime", "deno"))
 		for _, flag := range []string{"--no-mtime", "--progress", "--newline", "--no-colors"} {
 			assertStandaloneArgCount(t, tool, flag, args, 1, flag)
 		}
@@ -379,6 +384,19 @@ func TestExternalInputContracts(t *testing.T) {
 			emptyArgs := empty.buildArgs(DownloadParams{Type: TypeYoutube, URL: url, Name: unsafeName}, defaultContractSchema(t, string(TypeYoutube)))
 			assertStandaloneArgCount(t, tool, "empty proxy", emptyArgs, 0, "--proxy")
 		})
+	})
+
+	t.Run("yt-dlp resolves an exe-suffixed Deno runtime beside yt-dlp", func(t *testing.T) {
+		ytDLPPath := filepath.Join("/runtime", "yt-dlp.exe")
+		d := &DownloaderSvc{
+			binMap: map[DownloadType]string{TypeYoutube: ytDLPPath},
+			cfg:    testDownloaderConfig{localDir: "/downloads"},
+		}
+		args := d.buildArgs(
+			DownloadParams{Type: TypeYoutube, URL: "https://www.youtube.com/watch?v=contract", Name: "video"},
+			defaultContractSchema(t, string(TypeYoutube)),
+		)
+		assertAdjacentArgCount(t, "yt-dlp", "exe-suffixed Deno runtime", args, 1, "--js-runtimes", "deno:"+filepath.Join("/runtime", "deno.exe"))
 	})
 }
 

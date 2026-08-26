@@ -37,6 +37,7 @@ describe("dependency layout", () => {
       "BBDown",
       "aria2",
       "yt-dlp",
+      "deno",
       "mediago",
     ]);
     expect(MEDIA_INTEGRATION_TOOLS).toEqual([
@@ -125,6 +126,7 @@ describe("dependency layout", () => {
     ["BBDown", "BBDown", "BBDown.exe"],
     ["aria2", "aria2c", "aria2c.exe"],
     ["yt-dlp", "yt-dlp", "yt-dlp.exe"],
+    ["deno", "deno", "deno.exe"],
     ["mediago", "mediago", "mediago.exe"],
   ] as const)(
     "maps %s to its Unix and Windows executable names",

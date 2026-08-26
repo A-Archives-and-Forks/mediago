@@ -7,7 +7,8 @@ const validContentAsset = [
   "mediagoPageAction",
   "failureResetMs",
   "bili-video-card__wrap",
-  "bilibili-button",
+  "ytd-rich-item-renderer",
+  "mediago-download-button",
   "data-mg-injected",
 ].join(" ");
 
@@ -23,13 +24,14 @@ function verify(
 }
 
 describe("extension artifact graph boundaries", () => {
-  test("accepts separated worker and shared Bilibili content graphs", () => {
+  test("accepts separated worker and shared site-adapter content graphs", () => {
     expect(() => verify()).not.toThrow();
   });
 
   test.each([
     "bili-video-card__wrap",
-    "bilibili-button",
+    "ytd-rich-item-renderer",
+    "mediago-download-button",
     "data-mg-injected",
     "startPageRuntime",
     "MutationObserver",

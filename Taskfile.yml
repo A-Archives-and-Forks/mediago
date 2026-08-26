@@ -449,7 +449,7 @@ tasks:
     deps:
       - task: internal:deps:node
     cmds:
-      - pnpm deps:download:raw --tools ffmpeg,N_m3u8DL-RE,BBDown,aria2,yt-dlp,mediago
+      - pnpm deps:download:raw --tools ffmpeg,N_m3u8DL-RE,BBDown,aria2,yt-dlp,deno,mediago
       - 'node -e "console.log(''MEDIAGO_RUNTIME_READY'', process.env.MEDIAGO_DEPS_DIR)"'
 
   internal:deps:media-integration:

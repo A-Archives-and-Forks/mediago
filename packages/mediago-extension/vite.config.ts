@@ -21,7 +21,7 @@ export default defineConfig(({ mode }) => {
         "@": resolve(import.meta.dirname, "src"),
         "@mediago/browser-extension/site-adapter-matches": resolve(
           import.meta.dirname,
-          "../browser-extension/src/site-adapters/bilibili-match.ts",
+          "../browser-extension/src/site-adapters/adapter-matches.ts",
         ),
         "@mediago/browser-extension/site-adapters": resolve(
           import.meta.dirname,

@@ -18,7 +18,7 @@ import {
   type BrowserTabsSnapshot,
   IpcEvent,
 } from "@mediago/shared-common";
-import { type FC, useEffect, useRef } from "react";
+import { type FC, useEffect } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { BrowserTabStrip } from "./components/browser-tab-strip";
 import {
@@ -39,13 +39,10 @@ const SourceExtract: FC<SourceExtractProps> = ({ page = false }) => {
   const { activateTab, closeTab, createTab } = useBrowserActions();
   const { setAppStore } = useAppStore(useShallow(setAppStoreSelector));
   const mode = useBrowserStore((state) => activeTabSelector(state).mode);
-  const title = useBrowserStore((state) => activeTabSelector(state).title);
   const activeTabId = useBrowserStore((state) => state.activeTabId);
   const { addSource, hydrateSnapshot, updateTab } = useBrowserStore(
     useShallow(browserActionsSelector),
   );
-  const originTitle = useRef(document.title);
-
   useAsyncEffect(async () => {
     const [configResult, snapshotResult] = await Promise.allSettled([
       getConfig(),
@@ -152,17 +149,6 @@ const SourceExtract: FC<SourceExtractProps> = ({ page = false }) => {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [activateTab, closeTab, createTab]);
-
-  useEffect(() => {
-    document.title = title || originTitle.current;
-  }, [title]);
-
-  useEffect(
-    () => () => {
-      document.title = originTitle.current;
-    },
-    [],
-  );
 
   return (
     <PageContainer

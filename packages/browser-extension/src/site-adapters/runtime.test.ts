@@ -35,7 +35,7 @@ function getCard() {
 }
 
 function getButtonHost(card = getCard()) {
-  const host = card.querySelector<HTMLElement>("bilibili-button");
+  const host = card.querySelector<HTMLElement>("mediago-download-button");
 
   if (!host) throw new Error("Expected an injected button host");
 
@@ -101,7 +101,7 @@ describe("page runtime", () => {
     document.body.appendChild(document.createElement("div"));
     await flushMutations();
 
-    expect(card.querySelectorAll("bilibili-button")).toHaveLength(1);
+    expect(card.querySelectorAll("mediago-download-button")).toHaveLength(1);
     expect(getShadowButton(card).textContent).toBe("下载");
   });
 
@@ -153,7 +153,9 @@ describe("page runtime", () => {
     document.body.insertAdjacentHTML("beforeend", videoCard());
     await flushMutations();
 
-    expect(getCard().querySelectorAll("bilibili-button")).toHaveLength(1);
+    expect(getCard().querySelectorAll("mediago-download-button")).toHaveLength(
+      1,
+    );
   });
 
   it("releases a removed card and reinjects it when it returns", async () => {
@@ -168,7 +170,7 @@ describe("page runtime", () => {
     oldButton.click();
     expect(transport).not.toHaveBeenCalled();
     expect(card.hasAttribute("data-mg-injected")).toBe(false);
-    expect(card.querySelector("bilibili-button")).toBeNull();
+    expect(card.querySelector("mediago-download-button")).toBeNull();
 
     document.body.append(card);
     await flushMutations();
@@ -185,7 +187,7 @@ describe("page runtime", () => {
     document.body.insertAdjacentHTML("beforeend", videoCard());
     await flushMutations();
 
-    expect(getCard().querySelector("bilibili-button")).toBeNull();
+    expect(getCard().querySelector("mediago-download-button")).toBeNull();
   });
 
   it("disables the old button and installs one usable button after restart", () => {
@@ -197,13 +199,15 @@ describe("page runtime", () => {
     oldButton.click();
 
     expect(first.transport).not.toHaveBeenCalled();
-    expect(getCard().querySelector("bilibili-button")).toBeNull();
+    expect(getCard().querySelector("mediago-download-button")).toBeNull();
     expect(getCard().hasAttribute("data-mg-injected")).toBe(false);
 
     const second = start();
     getShadowButton().click();
 
-    expect(getCard().querySelectorAll("bilibili-button")).toHaveLength(1);
+    expect(getCard().querySelectorAll("mediago-download-button")).toHaveLength(
+      1,
+    );
     expect(first.transport).not.toHaveBeenCalled();
     expect(second.transport).toHaveBeenCalledOnce();
   });
@@ -237,7 +241,7 @@ describe("page runtime", () => {
     cleanup();
 
     expect(normalCard.hasAttribute("data-mg-injected")).toBe(false);
-    expect(normalCard.querySelector("bilibili-button")).toBeNull();
+    expect(normalCard.querySelector("mediago-download-button")).toBeNull();
     expect(adCard.getAttribute("data-mg-injected")).toBe("ad");
     expect(scaleCard.getAttribute("data-mg-injected")).toBe("skip");
   });

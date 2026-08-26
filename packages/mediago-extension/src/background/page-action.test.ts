@@ -105,6 +105,7 @@ function trustedSender(
 }
 
 const BILIBILI_HOMEPAGE_URL = "https://www.bilibili.com/";
+const YOUTUBE_HOMEPAGE_URL = "https://www.youtube.com/";
 
 function homepageTab(
   overrides: Partial<chrome.tabs.Tab> = {},
@@ -137,6 +138,26 @@ function homepageSender(
   return trustedSender({
     tab: homepageTab(),
     url: BILIBILI_HOMEPAGE_URL,
+    ...overrides,
+  });
+}
+
+function youtubeHomepageTab(
+  overrides: Partial<chrome.tabs.Tab> = {},
+): chrome.tabs.Tab {
+  return supportedTab({
+    url: YOUTUBE_HOMEPAGE_URL,
+    title: "YouTube homepage",
+    ...overrides,
+  });
+}
+
+function youtubeHomepageSender(
+  overrides: Partial<chrome.runtime.MessageSender> = {},
+): chrome.runtime.MessageSender {
+  return trustedSender({
+    tab: youtubeHomepageTab(),
+    url: YOUTUBE_HOMEPAGE_URL,
     ...overrides,
   });
 }
@@ -543,6 +564,37 @@ describe("page candidate command", () => {
         url: "https://www.bilibili.com/video/BV1card",
         documentURL: BILIBILI_HOMEPAGE_URL,
         type: DownloadType.bilibili,
+        detectedAt: 1_234,
+      },
+    ]);
+    expect(memory.badges).toEqual([1]);
+    expect(ports.openPopup).toHaveBeenCalledWith({ windowId: 12 });
+  });
+
+  test("accepts a YouTube card candidate from the YouTube homepage", async () => {
+    const memory = memorySourceService();
+    const ports = pageActionPorts([
+      youtubeHomepageTab({ windowId: 7 }),
+      youtubeHomepageTab({ windowId: 12 }),
+    ]);
+    const handle = createPageActionHandler(memory.service, ports);
+    const candidate = pageCandidate({
+      name: "YouTube card",
+      url: "https://www.youtube.com/watch?v=card-video",
+      type: DownloadType.youtube,
+    });
+
+    await expect(
+      handlePageCandidate(handle, youtubeHomepageSender(), candidate),
+    ).resolves.toEqual({ type: "PAGE_ACTION_RESULT", ok: true });
+
+    expect(memory.sources()).toEqual([
+      {
+        id: "page-action-41-1234",
+        name: "YouTube card",
+        url: "https://www.youtube.com/watch?v=card-video",
+        documentURL: YOUTUBE_HOMEPAGE_URL,
+        type: DownloadType.youtube,
         detectedAt: 1_234,
       },
     ]);

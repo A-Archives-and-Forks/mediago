@@ -1,6 +1,9 @@
 import { DownloadType } from "@mediago/shared-common";
 import type { PageCandidate } from "@mediago/browser-extension/site-adapters";
-import { matchesBilibiliPageLocation } from "@mediago/browser-extension/site-adapter-matches";
+import {
+  matchesBilibiliPageLocation,
+  matchesYoutubePageLocation,
+} from "@mediago/browser-extension/site-adapter-matches";
 
 export const candidate: PageCandidate = {
   name: "Example",
@@ -10,4 +13,8 @@ export const candidate: PageCandidate = {
 
 export const matchesHomepage = matchesBilibiliPageLocation({
   hostname: "www.bilibili.com",
+});
+
+export const matchesYoutube = matchesYoutubePageLocation({
+  hostname: "www.youtube.com",
 });

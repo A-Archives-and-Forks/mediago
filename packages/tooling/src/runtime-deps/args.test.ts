@@ -7,6 +7,7 @@ const AVAILABLE_TOOLS = [
   "BBDown",
   "aria2",
   "yt-dlp",
+  "deno",
   "mediago",
 ];
 

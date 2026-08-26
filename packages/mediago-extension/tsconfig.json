@@ -7,7 +7,7 @@
     "jsxImportSource": "react",
     "paths": {
       "@mediago/browser-extension/site-adapter-matches": [
-        "../browser-extension/src/site-adapters/bilibili-match.ts"
+        "../browser-extension/src/site-adapters/adapter-matches.ts"
       ],
       "@mediago/browser-extension/site-adapters": [
         "../browser-extension/src/site-adapters/index.ts"

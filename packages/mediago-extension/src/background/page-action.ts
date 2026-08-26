@@ -1,5 +1,5 @@
 import type { PageCandidate } from "@mediago/browser-extension/site-adapters";
-import { matchesBilibiliPageLocation } from "@mediago/browser-extension/site-adapter-matches";
+import { matchesPageAdapterLocation } from "@mediago/browser-extension/site-adapter-matches";
 import { matchPageUrl } from "@mediago/shared-common";
 
 import type { PageActionErrorCode, PageActionResult } from "../shared/types";
@@ -49,7 +49,7 @@ function failure(error: PageActionErrorCode): PageActionResult {
 
 function isAdapterPageUrl(url: string): boolean {
   try {
-    return matchesBilibiliPageLocation(new URL(url));
+    return matchesPageAdapterLocation(new URL(url));
   } catch {
     return false;
   }
