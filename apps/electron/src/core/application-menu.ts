@@ -1,7 +1,16 @@
-import { app, Menu, type MenuItemConstructorOptions } from "electron";
+import {
+  app,
+  type BrowserWindow,
+  Menu,
+  type MenuItemConstructorOptions,
+} from "electron";
 import { i18n } from "./i18n";
 
 const separator = (): MenuItemConstructorOptions => ({ type: "separator" });
+
+export interface ApplicationMenuActions {
+  reloadVisibleBrowser?: (ignoreCache: boolean) => boolean;
+}
 
 const topLevelLabel = (label: string, accessKey: string, isMac: boolean) =>
   isMac ? label : `${label}(&${accessKey})`;
@@ -9,6 +18,7 @@ const topLevelLabel = (label: string, accessKey: string, isMac: boolean) =>
 export const createApplicationMenuTemplate = (
   applicationName = app.name,
   platform = process.platform,
+  actions: ApplicationMenuActions = {},
 ): MenuItemConstructorOptions[] => {
   const isMac = platform === "darwin";
   const template: MenuItemConstructorOptions[] = [];
@@ -82,8 +92,34 @@ export const createApplicationMenuTemplate = (
     {
       label: topLevelLabel(label("view"), "V", isMac),
       submenu: [
-        { label: label("reload"), role: "reload" },
-        { label: label("forceReload"), role: "forceReload" },
+        actions.reloadVisibleBrowser
+          ? {
+              accelerator: "CmdOrCtrl+R",
+              label: label("reload"),
+              click: (_item, browserWindow) => {
+                if (actions.reloadVisibleBrowser?.(false) || !browserWindow)
+                  return;
+                if ("webContents" in browserWindow) {
+                  (browserWindow as BrowserWindow).webContents.reload();
+                }
+              },
+            }
+          : { label: label("reload"), role: "reload" },
+        actions.reloadVisibleBrowser
+          ? {
+              accelerator: "CmdOrCtrl+Shift+R",
+              label: label("forceReload"),
+              click: (_item, browserWindow) => {
+                if (actions.reloadVisibleBrowser?.(true) || !browserWindow)
+                  return;
+                if ("webContents" in browserWindow) {
+                  (
+                    browserWindow as BrowserWindow
+                  ).webContents.reloadIgnoringCache();
+                }
+              },
+            }
+          : { label: label("forceReload"), role: "forceReload" },
         { label: label("toggleDeveloperTools"), role: "toggleDevTools" },
         separator(),
         { label: label("resetZoom"), role: "resetZoom" },
@@ -120,7 +156,11 @@ export const createApplicationMenuTemplate = (
   return template;
 };
 
-export const installApplicationMenu = (): void => {
-  const menu = Menu.buildFromTemplate(createApplicationMenuTemplate());
+export const installApplicationMenu = (
+  actions: ApplicationMenuActions = {},
+): void => {
+  const menu = Menu.buildFromTemplate(
+    createApplicationMenuTemplate(app.name, process.platform, actions),
+  );
   Menu.setApplicationMenu(menu);
 };

@@ -123,7 +123,10 @@ test("does not apply unrelated initial webview config when ad blocking is off", 
 });
 
 test("rebuilds the application menu when the resolved language changes", async () => {
-  const { app } = createApp({ blockAds: false, language: "system" });
+  const { app, webviewService } = createApp({
+    blockAds: false,
+    language: "system",
+  });
 
   await app.init();
 
@@ -136,10 +139,59 @@ test("rebuilds the application menu when the resolved language changes", async (
     i18nMocks.changeLanguage.mock.invocationCallOrder[0],
   );
   expect(applicationMenuMocks.installApplicationMenu).toHaveBeenCalledOnce();
+  const actions = applicationMenuMocks.installApplicationMenu.mock.calls[0][0];
+  expect(actions.reloadVisibleBrowser(true)).toBe(false);
+  expect(webviewService.reloadActiveVisibleTab).toHaveBeenCalledWith(true);
 
   languageListener?.();
 
   expect(applicationMenuMocks.installApplicationMenu).toHaveBeenCalledTimes(2);
+});
+
+test("refreshes a visible browser tab instead of the main renderer", async () => {
+  const { app, mainWindow, webviewService } = createApp({ blockAds: false });
+  webviewService.reloadActiveVisibleTab.mockReturnValue(true);
+
+  await app.init();
+
+  const listener = mainWindow.window.webContents.on.mock.calls.find(
+    ([event]) => event === "before-input-event",
+  )?.[1];
+  const event = { preventDefault: vi.fn() };
+  listener?.(event, {
+    alt: false,
+    control: false,
+    key: "r",
+    meta: true,
+    shift: false,
+    type: "keyDown",
+  });
+
+  expect(webviewService.reloadActiveVisibleTab).toHaveBeenCalledWith(false);
+  expect(event.preventDefault).toHaveBeenCalledOnce();
+});
+
+test("keeps the main renderer refresh outside the browser page", async () => {
+  const { app, mainWindow, webviewService } = createApp({ blockAds: false });
+  webviewService.reloadActiveVisibleTab.mockReturnValue(false);
+
+  await app.init();
+
+  const listener = mainWindow.window.webContents.on.mock.calls.find(
+    ([event]) => event === "before-input-event",
+  )?.[1];
+  const event = { preventDefault: vi.fn() };
+  listener?.(event, {
+    alt: false,
+    control: false,
+    key: "F5",
+    meta: false,
+    shift: false,
+    type: "keyDown",
+  });
+
+  expect(webviewService.reloadActiveVisibleTab).toHaveBeenCalledWith(false);
+  expect(event.preventDefault).not.toHaveBeenCalled();
 });
 
 test("resolves follow-system language from the OS preferred language", async () => {
@@ -202,10 +254,12 @@ test("destroys browser executors before stopping Core", async () => {
 });
 
 function createApp(config: Record<string, unknown>) {
+  const mainWebContents = { on: vi.fn() };
   const mainWindow = {
     init: vi.fn(),
     send: vi.fn(),
     showWindow: vi.fn(),
+    window: { webContents: mainWebContents },
   };
   const protocol = { create: vi.fn() };
   const updater = {
@@ -225,6 +279,7 @@ function createApp(config: Record<string, unknown>) {
   };
   const webviewService = {
     destroy: vi.fn(),
+    reloadActiveVisibleTab: vi.fn(() => false),
     reparentActiveView: vi.fn(),
     setAudioMuted: vi.fn(),
     setBlocking: vi.fn(),

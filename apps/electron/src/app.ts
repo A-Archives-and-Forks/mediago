@@ -5,10 +5,12 @@ import { DownloaderServer } from "./services/downloader.server";
 import {
   app,
   BrowserWindow,
+  type Input,
   Menu,
   nativeImage,
   nativeTheme,
   Tray,
+  type WebContents,
 } from "electron";
 import { inject, injectable } from "inversify";
 import TrayIcon from "../assets/tray.ico";
@@ -29,15 +31,17 @@ import MainWindow from "./windows/main.window";
 import "./controller";
 import ElectronLogger from "./vendor/ElectronLogger";
 import { AppTheme, IpcEvent, resolveAppLanguage } from "@mediago/shared-common";
-import { installApplicationMenu } from "./core/application-menu";
+import { installApplicationMenu as installNativeApplicationMenu } from "./core/application-menu";
 import ShareIntentService from "./services/share-intent.service";
 import { getPreferredSystemLanguage } from "./core/system-language";
+import { getBrowserRefreshShortcut } from "./services/browser-refresh-shortcut";
 
 @injectable()
 @provide()
 export default class ElectronApp {
   private tray?: Tray;
   private externalPresentationPending = false;
+  private readonly shortcutBoundContents = new WeakSet<WebContents>();
 
   constructor(
     @inject(MainWindow)
@@ -68,8 +72,32 @@ export default class ElectronApp {
 
   private async serviceInit(): Promise<void> {
     this.mainWindow.init();
+    this.bindMainWindowBrowserShortcuts();
     this.overlayDialogService.init();
     this.browserTabs.reparentActiveView();
+  }
+
+  private readonly installApplicationMenu = () => {
+    installNativeApplicationMenu({
+      reloadVisibleBrowser: (ignoreCache) =>
+        this.browserTabs.reloadActiveVisibleTab(ignoreCache),
+    });
+  };
+
+  private bindMainWindowBrowserShortcuts(): void {
+    const webContents = this.mainWindow.window?.webContents;
+    if (!webContents || this.shortcutBoundContents.has(webContents)) return;
+    this.shortcutBoundContents.add(webContents);
+    webContents.on("before-input-event", (event, input: Input) => {
+      const shortcut = getBrowserRefreshShortcut(input);
+      if (
+        !shortcut ||
+        !this.browserTabs.reloadActiveVisibleTab(shortcut === "force-reload")
+      ) {
+        return;
+      }
+      event.preventDefault();
+    });
   }
   handleExternalCommandLine(
     commandLine: readonly string[],
@@ -116,7 +144,7 @@ export default class ElectronApp {
   async init(): Promise<void> {
     this.protocol.create();
     this.router.init();
-    installApplicationMenu();
+    this.installApplicationMenu();
 
     // 1. Show the window immediately — must happen regardless of backend status
     await this.vendorInit();
@@ -124,6 +152,7 @@ export default class ElectronApp {
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) {
         this.mainWindow.init();
+        this.bindMainWindowBrowserShortcuts();
         this.browserTabs.reparentActiveView();
       }
     });
@@ -134,7 +163,7 @@ export default class ElectronApp {
       this.logger.error("[ElectronApp] Failed to initialize system tray:", err);
     }
     i18n.on("languageChanged", () => {
-      installApplicationMenu();
+      this.installApplicationMenu();
       this.refreshTrayMenu();
     });
 

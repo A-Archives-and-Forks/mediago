@@ -21,6 +21,7 @@ import {
 } from "@mediago/shared-common";
 import {
   app,
+  type BrowserWindowConstructorOptions,
   type HandlerDetails,
   type RenderProcessGoneDetails,
   session,
@@ -56,6 +57,7 @@ import {
   type SourceParams,
 } from "./sniffing-helper.service";
 import { enableSessionProxy } from "./webview-proxy";
+import { getBrowserRefreshShortcut } from "./browser-refresh-shortcut";
 
 const require = createRequire(import.meta.url);
 const preload = require.resolve("@mediago/electron-preload");
@@ -65,6 +67,7 @@ interface TabRuntime {
   bounds: Electron.Rectangle | null;
   desktopUserAgent: string;
   kind: "user" | "agent";
+  openerTabId?: string;
   partition: string;
   tabId: string;
   view: WebContentsView;
@@ -77,6 +80,11 @@ const ERR_ABORTED = -3;
 const RENDER_PROCESS_GONE_ERROR_CODE = -1000;
 const WEB_CONTENTS_DESTROYED_ERROR_CODE = -1001;
 const UNSUPPORTED_PROTOCOL_ERROR_CODE = -1002;
+const ELECTRON_USER_AGENT_TOKEN = /\sElectron\/[^\s]+/gi;
+
+export function chromeCompatibleDesktopUserAgent(userAgent: string): string {
+  return userAgent.replace(ELECTRON_USER_AGENT_TOKEN, "").trim();
+}
 
 export function normalizeBrowserURL(value: string): string {
   const trimmed = value.trim();
@@ -102,14 +110,6 @@ export function normalizeBrowserURL(value: string): string {
   }
 
   return normalized;
-}
-
-function isGoogleAuthenticationURL(value: string): boolean {
-  try {
-    return new URL(value).hostname === "accounts.google.com";
-  } catch {
-    return false;
-  }
 }
 
 function getURLProtocol(value: string): string | undefined {
@@ -258,21 +258,33 @@ export default class BrowserTabManagerService implements DiscoveryBrowserExecuto
   }
 
   closeTab(tabId: string): BrowserTabsSnapshot {
-    const index = this.tabs.findIndex((tab) => tab.id === tabId);
-    if (index < 0) return this.getSnapshot();
-    const wasActive = this.activeTabId === tabId;
+    if (!this.tabs.some((tab) => tab.id === tabId)) return this.getSnapshot();
     this.destroyRuntime(tabId);
+    this.removeTabSnapshot(tabId);
+    return this.getSnapshot();
+  }
+
+  private removeTabSnapshot(
+    tabId: string,
+    preferredActiveTabId?: string,
+  ): void {
+    const index = this.tabs.findIndex((tab) => tab.id === tabId);
+    if (index < 0) return;
+    const wasActive = this.activeTabId === tabId;
     this.tabs.splice(index, 1);
     if (this.tabs.length === 0) {
       const replacement = this.createHomeSnapshot();
       this.tabs.push(replacement);
       this.activeTabId = replacement.id;
     } else if (wasActive) {
-      this.activeTabId = this.tabs[Math.min(index, this.tabs.length - 1)].id;
+      const preferredTab = preferredActiveTabId
+        ? this.tabs.find((tab) => tab.id === preferredActiveTabId)
+        : undefined;
+      this.activeTabId =
+        preferredTab?.id ?? this.tabs[Math.min(index, this.tabs.length - 1)].id;
     }
     this.attachRuntime(this.runtimes.get(this.activeTabId));
     this.emitSnapshot();
-    return this.getSnapshot();
   }
 
   async loadURL(tabId: string, url: string): Promise<void> {
@@ -297,9 +309,11 @@ export default class BrowserTabManagerService implements DiscoveryBrowserExecuto
       this.emitSnapshot();
       throw new Error("Unsupported browser URL protocol");
     }
+    const resetFavicon = tab.url !== navigationURL;
     tab.mode = "browser";
     tab.status = "loading";
     tab.url = navigationURL;
+    if (resetFavicon) tab.favicon = undefined;
     tab.errorCode = undefined;
     tab.errorMessage = undefined;
     tab.sources = [];
@@ -335,10 +349,27 @@ export default class BrowserTabManagerService implements DiscoveryBrowserExecuto
     return false;
   }
 
-  async reload(tabId: string): Promise<void> {
+  async reload(tabId: string, ignoreCache = false): Promise<void> {
     const runtime = this.runtimes.get(tabId);
     if (!runtime) throw new Error("Browser tab view not found");
-    runtime.view.webContents.reload();
+    const tab = this.requireTab(tabId);
+    Object.assign(tab, {
+      status: "loading" as const,
+      errorCode: undefined,
+      errorMessage: undefined,
+    });
+    this.emitSnapshot();
+    if (ignoreCache) runtime.view.webContents.reloadIgnoringCache();
+    else runtime.view.webContents.reload();
+  }
+
+  reloadActiveVisibleTab(ignoreCache = false): boolean {
+    const runtime = this.runtimes.get(this.activeTabId);
+    if (!runtime || runtime.kind !== "user" || !runtime.attachedWindow) {
+      return false;
+    }
+    void this.reload(runtime.tabId, ignoreCache);
+    return true;
   }
 
   async goHome(tabId: string): Promise<void> {
@@ -606,10 +637,22 @@ export default class BrowserTabManagerService implements DiscoveryBrowserExecuto
     return tab;
   }
 
-  private ensureUserRuntime(tabId: string): TabRuntime {
+  private ensureUserRuntime(
+    tabId: string,
+    windowOptions?: BrowserWindowConstructorOptions,
+    openerTabId?: string,
+  ): TabRuntime {
     const existing = this.runtimes.get(tabId);
     if (existing) return existing;
-    return this.createRuntime(tabId, "user", this.defaultPartition, true);
+    return this.createRuntime(
+      tabId,
+      "user",
+      this.defaultPartition,
+      true,
+      "",
+      windowOptions,
+      openerTabId,
+    );
   }
 
   private createRuntime(
@@ -618,15 +661,25 @@ export default class BrowserTabManagerService implements DiscoveryBrowserExecuto
     partition: string,
     useSessionCookies: boolean,
     initialURL = "",
+    windowOptions?: BrowserWindowConstructorOptions,
+    openerTabId?: string,
   ): TabRuntime {
-    const view = new WebContentsView({
-      webPreferences: { partition, preload },
-    });
+    const viewOptions: BrowserWindowConstructorOptions = windowOptions ?? {};
+    viewOptions.webPreferences = {
+      ...viewOptions.webPreferences,
+      partition,
+      preload,
+    };
+    const view = new WebContentsView(viewOptions);
+    const desktopUserAgent = chromeCompatibleDesktopUserAgent(
+      view.webContents.getUserAgent(),
+    );
     const runtime: TabRuntime = {
       attachedWindow: null,
       bounds: null,
-      desktopUserAgent: view.webContents.getUserAgent(),
+      desktopUserAgent,
       kind,
+      openerTabId,
       partition,
       tabId,
       view,
@@ -643,9 +696,9 @@ export default class BrowserTabManagerService implements DiscoveryBrowserExecuto
     this.bindRuntime(runtime);
     view.setBackgroundColor("#fff");
     view.webContents.setAudioMuted(this.configCache.get("audioMuted") === true);
-    if (this.configCache.get("isMobile")) {
-      view.webContents.setUserAgent(mobileUA);
-    }
+    view.webContents.setUserAgent(
+      this.configCache.get("isMobile") ? mobileUA : desktopUserAgent,
+    );
     this.applyProxyToPartition(partition);
     if (this.blockingRequested) this.startBlocking(partition);
     if (isDev && process.env.OPEN_DEVTOOLS === "true" && kind === "user") {
@@ -658,6 +711,12 @@ export default class BrowserTabManagerService implements DiscoveryBrowserExecuto
 
   private bindRuntime(runtime: TabRuntime): void {
     const { webContents } = runtime.view;
+    webContents.on("before-input-event", (event, input) => {
+      const shortcut = getBrowserRefreshShortcut(input);
+      if (!shortcut) return;
+      event.preventDefault();
+      void this.reload(runtime.tabId, shortcut === "force-reload");
+    });
     webContents.on("dom-ready", () => this.onDomReady(runtime));
     webContents.on("did-start-navigation", (details) =>
       this.onDidStartNavigation(runtime, details),
@@ -698,10 +757,6 @@ export default class BrowserTabManagerService implements DiscoveryBrowserExecuto
     webContents.setWindowOpenHandler((details: HandlerDetails) => {
       const { disposition, url } = details;
       if (runtime.kind !== "user") return { action: "deny" };
-      if (isGoogleAuthenticationURL(url)) {
-        this.openExternalURL(url, "external authentication");
-        return { action: "deny" };
-      }
       if (!isInternalBrowserURL(url)) {
         if (isExternalBrowserURL(url)) {
           this.openExternalURL(url, "external protocol");
@@ -713,18 +768,27 @@ export default class BrowserTabManagerService implements DiscoveryBrowserExecuto
         activate: disposition !== "background-tab",
         url,
       });
-      try {
-        const childRuntime = this.ensureUserRuntime(tab.id);
-        return {
-          action: "allow",
-          createWindow: () => childRuntime.view.webContents,
-          outlivesOpener: true,
-        };
-      } catch {
-        this.closeTab(tab.id);
-        this.logger.error("[BrowserTab] popup view allocation failed");
-        return { action: "deny" };
-      }
+      return {
+        action: "allow",
+        createWindow: (options: BrowserWindowConstructorOptions) => {
+          try {
+            const childRuntime = this.ensureUserRuntime(
+              tab.id,
+              options,
+              runtime.tabId,
+            );
+            if (disposition === "background-tab") {
+              void childRuntime.view.webContents.loadURL(url);
+            }
+            return childRuntime.view.webContents;
+          } catch (error) {
+            this.closeTab(tab.id);
+            this.logger.error("[BrowserTab] popup view allocation failed");
+            throw error;
+          }
+        },
+        outlivesOpener: true,
+      };
     });
   }
 
@@ -744,13 +808,15 @@ export default class BrowserTabManagerService implements DiscoveryBrowserExecuto
     const tab = this.requireTab(runtime.tabId);
     const resetPageResources =
       !details.isSameDocument || tab.url !== details.url;
+    const resetFavicon = tab.url !== details.url;
     Object.assign(tab, {
       mode: "browser" as const,
       status: "loading" as const,
       url: details.url,
       errorCode: undefined,
       errorMessage: undefined,
-      ...(resetPageResources ? { favicon: undefined, sources: [] } : {}),
+      ...(resetPageResources ? { sources: [] } : {}),
+      ...(resetFavicon ? { favicon: undefined } : {}),
     });
     this.emitSnapshot();
   }
@@ -890,6 +956,10 @@ export default class BrowserTabManagerService implements DiscoveryBrowserExecuto
       return;
     }
     if (!this.releaseRuntime(runtime)) return;
+    if (runtime.openerTabId) {
+      this.removeTabSnapshot(runtime.tabId, runtime.openerTabId);
+      return;
+    }
     const tab = this.requireTab(runtime.tabId);
     this.failUserRuntime(
       runtime,

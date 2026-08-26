@@ -70,29 +70,9 @@ func (s *DownloadTaskService) AddDownloadTask(input *AddDownloadTaskInput) (*db.
 		return nil, ErrDownloadURLAlreadyExists
 	}
 
-	title := input.Name
-
-	if title == "" && input.Type == "bilibili" {
-		title = GetPageTitle(input.URL, "")
-	}
-	if title == "" {
-		title = fmt.Sprintf("untitled-%s", RandomName())
-	}
-
-	// Sanitize BEFORE the de-duplication lookup so the value we check
-	// against the DB is the same filesystem-safe form we'll later hand
-	// to the downloader and use for post-download file-existence
-	// checks. Without this a title like "(2) 主页 / X" slips a '/'
-	// into the filename, aria2 reads it as a path separator, and the
-	// saved file ends up at a different path than the DB row.
-	title = core.SanitizeFilename(title)
-
-	existing, err := s.repo.FindByName(title)
+	title, err := s.prepareDownloadTitle(input, nil)
 	if err != nil {
 		return nil, err
-	}
-	if existing != nil {
-		title = fmt.Sprintf("%s-%s", title, RandomName())
 	}
 
 	video := &db.Video{
@@ -113,6 +93,7 @@ func (s *DownloadTaskService) AddDownloadTasks(inputs []*AddDownloadTaskInput) (
 
 	videos := make([]*db.Video, 0, len(inputs))
 	seenURLs := make(map[string]struct{}, len(inputs))
+	reservedTitles := make(map[string]struct{}, len(inputs))
 	for _, input := range inputs {
 		if strings.TrimSpace(input.Type) == "" {
 			input.Type = string(core.InferDownloadType(input.URL))
@@ -129,25 +110,9 @@ func (s *DownloadTaskService) AddDownloadTasks(inputs []*AddDownloadTaskInput) (
 		}
 		seenURLs[input.URL] = struct{}{}
 
-		title := input.Name
-
-		if title == "" && input.Type == "bilibili" {
-			title = GetPageTitle(input.URL, "")
-		}
-		if title == "" {
-			title = fmt.Sprintf("untitled-%s", RandomName())
-		}
-
-		// Sanitize BEFORE the de-duplication lookup (same rationale
-		// as AddDownloadTask above).
-		title = core.SanitizeFilename(title)
-
-		existing, err := s.repo.FindByName(title)
+		title, err := s.prepareDownloadTitle(input, reservedTitles)
 		if err != nil {
 			return nil, err
-		}
-		if existing != nil {
-			title = fmt.Sprintf("%s-%s", title, RandomName())
 		}
 
 		videos = append(videos, &db.Video{
@@ -160,6 +125,73 @@ func (s *DownloadTaskService) AddDownloadTasks(inputs []*AddDownloadTaskInput) (
 	}
 
 	return s.repo.CreateMany(videos)
+}
+
+func (s *DownloadTaskService) prepareDownloadTitle(input *AddDownloadTaskInput, reserved map[string]struct{}) (string, error) {
+	title := input.Name
+	statusID := ""
+	isXTitle := false
+
+	if normalized, ok := normalizeXDownloadTitle(input.Name, input.URL); ok {
+		title = normalized.name
+		statusID = normalized.statusID
+		isXTitle = true
+	} else {
+		if title == "" && input.Type == "bilibili" {
+			title = GetPageTitle(input.URL, "")
+		}
+		if title == "" {
+			title = fmt.Sprintf("untitled-%s", RandomName())
+		}
+	}
+
+	// Sanitize before checking uniqueness so the database name is the same
+	// filesystem-safe value later handed to the downloader.
+	title = core.SanitizeFilename(title)
+	available, err := s.isDownloadTitleAvailable(title, reserved)
+	if err != nil {
+		return "", err
+	}
+	if available {
+		reserveDownloadTitle(title, reserved)
+		return title, nil
+	}
+
+	if statusID != "" {
+		candidate := core.SanitizeFilename(appendXStatusIDSuffix(title, statusID))
+		available, err = s.isDownloadTitleAvailable(candidate, reserved)
+		if err != nil {
+			return "", err
+		}
+		if available {
+			reserveDownloadTitle(candidate, reserved)
+			return candidate, nil
+		}
+	}
+
+	candidate := fmt.Sprintf("%s-%s", title, RandomName())
+	if isXTitle {
+		candidate = truncateUTF8Bytes(candidate, maxXTitleBytes)
+	}
+	reserveDownloadTitle(candidate, reserved)
+	return candidate, nil
+}
+
+func (s *DownloadTaskService) isDownloadTitleAvailable(title string, reserved map[string]struct{}) (bool, error) {
+	if _, exists := reserved[title]; exists {
+		return false, nil
+	}
+	existing, err := s.repo.FindByName(title)
+	if err != nil {
+		return false, err
+	}
+	return existing == nil, nil
+}
+
+func reserveDownloadTitle(title string, reserved map[string]struct{}) {
+	if reserved != nil {
+		reserved[title] = struct{}{}
+	}
 }
 
 // EditDownloadTask edits a download task.

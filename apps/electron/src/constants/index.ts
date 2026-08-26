@@ -28,6 +28,7 @@ export const db = resolve(workspace, "app.db");
 export const logDir = resolve(workspace, "logs");
 
 // Keep the mobile override aligned with Electron's bundled Chromium instead of
-// pinning an increasingly unsupported browser version. Desktop browsing uses
-// the native WebContents user agent and therefore needs no override.
+// pinning an increasingly unsupported browser version. Desktop browsing also
+// uses this Chromium version, with Electron's product token removed by the tab
+// manager so sites identify it as a Chromium browser.
 export const mobileUA = `Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${process.versions.chrome} Mobile Safari/537.36`;

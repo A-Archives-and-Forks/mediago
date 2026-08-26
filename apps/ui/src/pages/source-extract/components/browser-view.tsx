@@ -14,7 +14,6 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { Spinner } from "@/components/ui/spinner";
 import WebView from "@/components/web-view";
 import { useBrowserActions } from "@/hooks/use-browser-actions";
 import {
@@ -24,6 +23,7 @@ import {
   useBrowserStore,
 } from "@/store/browser";
 import { BrowserViewPanel } from "./browser-view-panel";
+import { BrowserLoadingOverlay } from "./browser-loading-overlay";
 
 export function BrowserView() {
   const { goto, goHome } = useBrowserActions();
@@ -47,9 +47,7 @@ export function BrowserView() {
             boundsInset={{ right: 1, bottom: 1, left: 1 }}
           />
           {status === BrowserStatus.Loading ? (
-            <div className="absolute inset-0 flex items-center justify-center bg-white/60 dark:bg-black/40">
-              <Spinner className="size-5" />
-            </div>
+            <BrowserLoadingOverlay url={url} />
           ) : null}
         </div>
       );

@@ -2,6 +2,11 @@ import { DownloadType, IpcEvent } from "@mediago/shared-common";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentCollectionError } from "./sniffing-helper.service";
 
+interface MockWebContentsViewOptions {
+  webContents?: unknown;
+  webPreferences?: { partition?: string; [key: string]: unknown };
+}
+
 const moduleMocks = vi.hoisted(() => ({
   resolve: vi.fn(() => "/tmp/preload.cjs"),
 }));
@@ -12,6 +17,8 @@ const electronMocks = vi.hoisted(() => ({
   openExternal: vi.fn(async () => undefined),
   sessions: new Map<string, ReturnType<typeof createMockSession>>(),
   views: [] as Array<{
+    constructorOptions: MockWebContentsViewOptions | undefined;
+    partition: string | undefined;
     setBounds: ReturnType<typeof vi.fn>;
     webContents: Record<string, any>;
   }>,
@@ -45,15 +52,19 @@ vi.mock("electron", () => ({
     }),
   },
   WebContentsView: class MockWebContentsView {
+    constructorOptions: MockWebContentsViewOptions | undefined;
+    partition: string | undefined;
     setBackgroundColor = vi.fn();
     setBounds = vi.fn();
     webContents: Record<string, any>;
 
-    constructor() {
+    constructor(options?: MockWebContentsViewOptions) {
       if (electronMocks.failNextAllocation) {
         electronMocks.failNextAllocation = false;
         throw new Error("allocation failed");
       }
+      this.constructorOptions = options;
+      this.partition = options?.webPreferences?.partition;
       const handlers = new Map<string, Array<(...args: any[]) => void>>();
       let title = "Page";
       let url = "";
@@ -76,7 +87,12 @@ vi.mock("electron", () => ({
         executeJavaScript: vi.fn(async () => undefined),
         getTitle: vi.fn(() => title),
         getURL: vi.fn(() => url),
-        getUserAgent: vi.fn(() => "native-desktop-user-agent"),
+        getUserAgent: vi.fn(
+          () =>
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) " +
+            "AppleWebKit/537.36 (KHTML, like Gecko) " +
+            "Chrome/150.0.7871.129 Electron/43.2.0 Safari/537.36",
+        ),
         loadURL: vi.fn(async (nextURL: string) => {
           url = nextURL;
         }),
@@ -89,6 +105,7 @@ vi.mock("electron", () => ({
         }),
         openDevTools: vi.fn(),
         reload: vi.fn(),
+        reloadIgnoringCache: vi.fn(),
         setAudioMuted: vi.fn(),
         setTitle: (nextTitle: string) => {
           title = nextTitle;
@@ -154,7 +171,7 @@ vi.mock("./go-config-cache", () => ({
 
 vi.mock("electron-is-dev", () => ({ default: false }));
 
-const { default: BrowserTabManagerService } =
+const { chromeCompatibleDesktopUserAgent, default: BrowserTabManagerService } =
   await import("./browser-tab-manager.service");
 
 beforeEach(() => {
@@ -166,6 +183,14 @@ beforeEach(() => {
 });
 
 describe("BrowserTabManagerService", () => {
+  it("removes Electron's product token from the desktop UA", () => {
+    expect(
+      chromeCompatibleDesktopUserAgent(
+        "Mozilla/5.0 Chrome/150.0.7871.129 Electron/43.2.0 Safari/537.36",
+      ),
+    ).toBe("Mozilla/5.0 Chrome/150.0.7871.129 Safari/537.36");
+  });
+
   it("creates tabs lazily and has no fixed tab-count limit", () => {
     const { service } = createHarness();
 
@@ -287,13 +312,22 @@ describe("BrowserTabManagerService", () => {
     const result = electronMocks.views[0].webContents.triggerWindowOpen(
       "https://example.com/popup",
     );
-    await vi.waitFor(() => expect(electronMocks.views).toHaveLength(2));
 
     expect(result).toMatchObject({ action: "allow", outlivesOpener: true });
-    expect(result?.createWindow()).toBe(electronMocks.views[1].webContents);
+    expect(electronMocks.views).toHaveLength(1);
+    expect(result?.createWindow({ webPreferences: { sandbox: true } })).toBe(
+      electronMocks.views[1].webContents,
+    );
     expect(service.getSnapshot().tabs).toHaveLength(2);
     expect(service.getSnapshot().tabs[1].url).toBe("https://example.com/popup");
     expect(electronMocks.views[1].webContents.loadURL).not.toHaveBeenCalled();
+    expect(
+      electronMocks.views[1].webContents.setUserAgent,
+    ).toHaveBeenCalledWith(
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) " +
+        "AppleWebKit/537.36 (KHTML, like Gecko) " +
+        "Chrome/150.0.7871.129 Safari/537.36",
+    );
   });
 
   it("keeps background-tab popups in the background", async () => {
@@ -307,8 +341,13 @@ describe("BrowserTabManagerService", () => {
     );
 
     expect(result).toMatchObject({ action: "allow" });
+    expect(electronMocks.views).toHaveLength(1);
+    expect(result?.createWindow({})).toBe(electronMocks.views[1].webContents);
     expect(service.getSnapshot().activeTabId).toBe(first);
     expect(service.getSnapshot().tabs).toHaveLength(2);
+    expect(electronMocks.views[1].webContents.loadURL).toHaveBeenCalledWith(
+      "https://example.com/background",
+    );
   });
 
   it("opens safe external protocols outside the embedded browser", async () => {
@@ -360,18 +399,58 @@ describe("BrowserTabManagerService", () => {
     );
   });
 
-  it("opens Google authentication popups in the system browser", async () => {
-    const { service } = createHarness();
+  it("keeps Google authentication popups in the managed browser session and restores the opener", async () => {
+    const { service, sniffingHelper } = createHarness();
     const first = service.getSnapshot().activeTabId;
     await service.loadURL(first, "https://x.com/i/flow/login");
 
     const authURL = "https://accounts.google.com/o/oauth2/v2/auth?client_id=x";
     const result =
       electronMocks.views[0].webContents.triggerWindowOpen(authURL);
+    const pendingWebContents = { id: "google-auth-popup" };
 
-    expect(result).toEqual({ action: "deny" });
-    expect(electronMocks.openExternal).toHaveBeenCalledWith(authURL);
-    expect(service.getSnapshot().tabs).toHaveLength(1);
+    expect(result).toMatchObject({ action: "allow", outlivesOpener: true });
+    expect(electronMocks.views).toHaveLength(1);
+    expect(
+      result?.createWindow({
+        webContents: pendingWebContents,
+        webPreferences: {
+          partition: "untrusted-partition",
+          preload: "/untrusted-preload.cjs",
+          sandbox: true,
+        },
+      }),
+    ).toBe(electronMocks.views[1].webContents);
+    expect(electronMocks.openExternal).not.toHaveBeenCalled();
+    expect(service.getSnapshot().tabs).toHaveLength(2);
+    expect(service.getSnapshot().tabs[1].url).toBe(authURL);
+    expect(electronMocks.views[1].constructorOptions).toMatchObject({
+      webContents: pendingWebContents,
+      webPreferences: {
+        partition: "persist:webview",
+        preload: "/tmp/preload.cjs",
+        sandbox: true,
+      },
+    });
+    expect(electronMocks.views.map((view) => view.partition)).toEqual([
+      "persist:webview",
+      "persist:webview",
+    ]);
+
+    const popupTabId = service.getSnapshot().tabs[1].id;
+    electronMocks.views[1].webContents.emit("destroyed");
+
+    expect(sniffingHelper.unregister).toHaveBeenCalledWith(popupTabId);
+    expect(service.getSnapshot()).toMatchObject({
+      activeTabId: first,
+      tabs: [
+        {
+          errorCode: undefined,
+          id: first,
+          url: "https://x.com/i/flow/login",
+        },
+      ],
+    });
   });
 
   it("reparents the active view when the browser window changes", async () => {
@@ -497,6 +576,31 @@ describe("BrowserTabManagerService", () => {
       status: "loaded",
       title: "Second page",
       url: "https://example.com/second",
+    });
+  });
+
+  it("preserves the favicon when reloading the current page", async () => {
+    const { service } = createHarness();
+    const tabId = service.getSnapshot().activeTabId;
+    await service.loadURL(tabId, "https://www.baidu.com/");
+    const view = electronMocks.views[0];
+    view.webContents.emit("did-stop-loading");
+    view.webContents.emit("page-favicon-updated", {}, [
+      "https://www.baidu.com/favicon.ico",
+    ]);
+
+    await service.reload(tabId);
+    view.webContents.emit("did-start-navigation", {
+      isMainFrame: true,
+      isSameDocument: false,
+      url: "https://www.baidu.com/",
+    });
+    view.webContents.emit("did-stop-loading");
+
+    expect(service.getSnapshot().tabs[0]).toMatchObject({
+      favicon: "https://www.baidu.com/favicon.ico",
+      status: "loaded",
+      url: "https://www.baidu.com/",
     });
   });
 
@@ -671,25 +775,71 @@ describe("BrowserTabManagerService", () => {
     expect(discoveryExecutor.setBrowser).toHaveBeenLastCalledWith(null);
   });
 
-  it("keeps the native desktop UA and restores it after mobile mode", async () => {
+  it("uses a Chrome-compatible desktop UA and restores it after mobile mode", async () => {
     const { service } = createHarness();
     const tabId = service.getSnapshot().activeTabId;
     await service.loadURL(tabId, "https://x.com");
     const webContents = electronMocks.views[0].webContents;
 
-    expect(webContents.setUserAgent).not.toHaveBeenCalled();
+    expect(webContents.setUserAgent).toHaveBeenNthCalledWith(
+      1,
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) " +
+        "AppleWebKit/537.36 (KHTML, like Gecko) " +
+        "Chrome/150.0.7871.129 Safari/537.36",
+    );
 
     service.setUserAgent(true);
     service.setUserAgent(false);
 
     expect(webContents.setUserAgent).toHaveBeenNthCalledWith(
-      1,
+      2,
       "mobile-user-agent",
     );
     expect(webContents.setUserAgent).toHaveBeenNthCalledWith(
-      2,
-      "native-desktop-user-agent",
+      3,
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) " +
+        "AppleWebKit/537.36 (KHTML, like Gecko) " +
+        "Chrome/150.0.7871.129 Safari/537.36",
     );
+  });
+
+  it("reloads only the active browser view while it is visible", async () => {
+    const { service } = createHarness();
+    const tabId = service.getSnapshot().activeTabId;
+    await service.loadURL(tabId, "https://example.com");
+    const webContents = electronMocks.views[0].webContents;
+    service.setBounds(tabId, { x: 0, y: 80, width: 900, height: 600 });
+    webContents.emit("did-stop-loading");
+
+    expect(service.reloadActiveVisibleTab()).toBe(true);
+    expect(webContents.reload).toHaveBeenCalledOnce();
+    expect(service.getSnapshot().tabs[0].status).toBe("loading");
+
+    service.hide(tabId);
+
+    expect(service.reloadActiveVisibleTab()).toBe(false);
+    expect(webContents.reload).toHaveBeenCalledOnce();
+  });
+
+  it("keeps refresh shortcuts inside the focused browser view", async () => {
+    const { service } = createHarness();
+    const tabId = service.getSnapshot().activeTabId;
+    await service.loadURL(tabId, "https://example.com");
+    const webContents = electronMocks.views[0].webContents;
+    const event = { preventDefault: vi.fn() };
+
+    webContents.emit("before-input-event", event, {
+      alt: false,
+      control: false,
+      key: "r",
+      meta: true,
+      shift: true,
+      type: "keyDown",
+    });
+
+    expect(event.preventDefault).toHaveBeenCalledOnce();
+    expect(webContents.reloadIgnoringCache).toHaveBeenCalledOnce();
+    expect(webContents.reload).not.toHaveBeenCalled();
   });
 
   it("uses the operating system proxy when manual proxy is disabled", () => {
