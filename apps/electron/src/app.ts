@@ -77,6 +77,15 @@ export default class ElectronApp {
     return this.acceptExternalInvocation(result.handled, present);
   }
 
+  handleSecondInstance(
+    commandLine: readonly string[],
+    present = true,
+  ): boolean {
+    const handled = this.handleExternalCommandLine(commandLine, present);
+    if (!handled && present) this.mainWindow.showWindow();
+    return handled;
+  }
+
   handleExternalUrl(url: string, present = true): boolean {
     const result = this.shareIntentService.handleProtocolUrl(url);
     return this.acceptExternalInvocation(result.handled, present);
@@ -116,7 +125,11 @@ export default class ElectronApp {
       }
     });
 
-    this.initTray();
+    try {
+      this.initTray();
+    } catch (err) {
+      this.logger.error("[ElectronApp] Failed to initialize system tray:", err);
+    }
     i18n.on("languageChanged", () => {
       installApplicationMenu();
       this.refreshTrayMenu();
@@ -236,7 +249,7 @@ export default class ElectronApp {
     const tray = new Tray(trayIcon);
     tray.setToolTip("Media Go");
     tray.addListener("click", () => {
-      this.mainWindow.init();
+      this.mainWindow.showWindow();
     });
     this.tray = tray;
     this.refreshTrayMenu();
@@ -247,7 +260,7 @@ export default class ElectronApp {
     const contextMenu = Menu.buildFromTemplate([
       {
         label: i18n.t("showMainWindow"),
-        click: () => this.mainWindow.init(),
+        click: () => this.mainWindow.showWindow(),
       },
       {
         label: i18n.t("exitApp"),

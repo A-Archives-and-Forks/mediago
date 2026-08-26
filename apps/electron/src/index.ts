@@ -35,7 +35,7 @@ app.on("open-url", (event, url) => {
 
 app.on("second-instance", (_event, commandLine) => {
   if (mediagoApp) {
-    mediagoApp.handleExternalCommandLine(commandLine, mediagoReady);
+    mediagoApp.handleSecondInstance(commandLine, mediagoReady);
   } else {
     pendingCommandLines.push(commandLine);
   }

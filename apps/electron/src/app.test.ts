@@ -131,6 +131,40 @@ test("rebuilds the application menu when the resolved language changes", async (
   expect(applicationMenuMocks.installApplicationMenu).toHaveBeenCalledTimes(2);
 });
 
+test("restores the main window when an ordinary second instance is launched", () => {
+  const { app, mainWindow, shareIntentService } = createApp({});
+  shareIntentService.handleCommandLine.mockReturnValue({ handled: false });
+
+  expect(app.handleSecondInstance(["/opt/MediaGo/mediago"])).toBe(false);
+
+  expect(mainWindow.showWindow).toHaveBeenCalledOnce();
+});
+
+test("defers restoring a second instance until the app is ready", () => {
+  const { app, mainWindow, shareIntentService } = createApp({});
+  shareIntentService.handleCommandLine.mockReturnValue({ handled: false });
+
+  app.handleSecondInstance(["/opt/MediaGo/mediago"], false);
+
+  expect(mainWindow.showWindow).not.toHaveBeenCalled();
+});
+
+test("continues startup when the system tray is unavailable", async () => {
+  const { app, logger, mainWindow } = createApp({ blockAds: false });
+  const trayError = new Error("system tray unavailable");
+  vi.spyOn(app, "initTray").mockImplementation(() => {
+    throw trayError;
+  });
+
+  await expect(app.init()).resolves.toBeUndefined();
+
+  expect(logger.error).toHaveBeenCalledWith(
+    "[ElectronApp] Failed to initialize system tray:",
+    trayError,
+  );
+  expect(mainWindow.init).toHaveBeenCalledOnce();
+});
+
 function createApp(config: Record<string, unknown>) {
   const mainWindow = {
     init: vi.fn(),
@@ -189,5 +223,12 @@ function createApp(config: Record<string, unknown>) {
   );
   vi.spyOn(app, "initTray").mockImplementation(() => undefined);
 
-  return { app, configCache, webviewService };
+  return {
+    app,
+    configCache,
+    logger,
+    mainWindow,
+    shareIntentService,
+    webviewService,
+  };
 }
