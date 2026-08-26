@@ -3,7 +3,7 @@
 MediaGo downloads the following executables from pinned upstream GitHub Releases
 while preparing build dependencies. The executables are not stored in this
 repository. Exact release tags and asset names are recorded in
-[`scripts/deps-versions.json`](scripts/deps-versions.json).
+[`packages/tooling/manifests/runtime-deps.json`](packages/tooling/manifests/runtime-deps.json).
 
 ## aria2-next 2.5.5
 

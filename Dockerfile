@@ -2,10 +2,10 @@
 #   docker build -t mediago .
 
 # ===== Stage 1: Node Builder (runs natively on build machine) =====
-FROM --platform=$BUILDPLATFORM node:22-bookworm-slim AS node-builder
+FROM --platform=$BUILDPLATFORM node:24.14.0-bookworm-slim AS node-builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends unzip && rm -rf /var/lib/apt/lists/*
-RUN corepack enable && corepack prepare pnpm@10.15.0 --activate
+RUN corepack enable && corepack prepare pnpm@11.23.0 --activate
 
 # Map Docker TARGETARCH to Node arch naming for deps download
 ARG TARGETARCH
@@ -24,7 +24,13 @@ COPY apps/player-ui/package.json apps/player-ui/package.json
 COPY apps/server/package.json apps/server/package.json
 COPY apps/core/package.json apps/core/package.json
 COPY apps/electron/package.json apps/electron/package.json
-COPY packages/ packages/
+COPY packages/browser-extension/package.json packages/browser-extension/package.json
+COPY packages/core-sdk/package.json packages/core-sdk/package.json
+COPY packages/electron-preload/package.json packages/electron-preload/package.json
+COPY packages/mediago-extension/package.json packages/mediago-extension/package.json
+COPY packages/node-service/package.json packages/node-service/package.json
+COPY packages/shared/common/package.json packages/shared/common/package.json
+COPY packages/tooling/package.json packages/tooling/package.json
 RUN pnpm install --frozen-lockfile
 
 # Copy source files and root configs needed by builds
@@ -32,7 +38,7 @@ COPY tsconfig*.json turbo.json .env* ./
 COPY apps/ui/ apps/ui/
 COPY apps/player-ui/ apps/player-ui/
 COPY apps/electron/app/package.json apps/electron/app/package.json
-COPY scripts/ scripts/
+COPY packages/ packages/
 
 # Build player-ui (will be embedded in Go core binary)
 RUN pnpm --filter @mediago/player-ui run build
@@ -103,7 +109,7 @@ RUN mkdir -p /app/mediago/data /app/mediago/logs /app/mediago/downloads
 # Entrypoint script — isolates the invocation flags from the Dockerfile
 # so editing the default args doesn't require rebuilding the full image
 # layer and so callers can still append overrides via `docker run`.
-COPY scripts/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+COPY docker/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 EXPOSE 8899

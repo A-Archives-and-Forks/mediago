@@ -9,5 +9,5 @@
     "allowSyntheticDefaultImports": true,
     "rootDir": "../.."
   },
-  "include": ["vite.config.ts", "../../scripts/load-profile-env.ts"]
+  "include": ["vite.config.ts"]
 }

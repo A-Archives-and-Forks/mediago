@@ -12,9 +12,9 @@
     "reflect-metadata": "^0.2.2"
   },
   "devDependencies": {
+    "@mediago/tooling": "workspace:*",
     "@types/node": "^26.3.0",
     "cross-env": "^10.1.0",
-    "dotenv-flow": "^4.1.0",
     "tsdown": "^0.22.14",
     "typescript": "^7.0.2"
   },

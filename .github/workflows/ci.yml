@@ -86,7 +86,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .deps
-          key: media-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/deps-versions.json') }}
+          key: media-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('packages/tooling/manifests/runtime-deps.json') }}
       - name: Run media integration tests
         run: task ci:test:media
         env:
@@ -116,7 +116,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .deps
-          key: e2e-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/deps-versions.json') }}-${{ hashFiles('scripts/download-deps.ts', 'scripts/download-deps-args.ts', 'scripts/download-deps-integrity.ts') }}
+          key: e2e-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('packages/tooling/manifests/runtime-deps.json') }}-${{ hashFiles('packages/tooling/src/runtime-deps/download.ts', 'packages/tooling/src/runtime-deps/args.ts', 'packages/tooling/src/runtime-deps/integrity.ts') }}
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         with:

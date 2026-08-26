@@ -63,7 +63,7 @@ docker-compose up -d
 - ✅ **并发控制**（动态调整）
 - ✅ **事件驱动**（SSE 实时推送）
 - ✅ **Swagger 文档**（完整的 API 文档）
-- ✅ **Gulp 构建系统**（模块化 TypeScript 任务）
+- ✅ **类型化构建流程**（Task + packages/tooling）
 - ✅ **Docker 支持**（一键部署）
 
 ---
@@ -75,8 +75,8 @@ docker-compose up -d
 ### 访问 Swagger UI
 
 ```bash
-# 1. 启动服务
-gulp dev
+# 1. 从仓库根目录启动服务
+pnpm core:dev
 
 # 2. 访问 Swagger UI
 # http://localhost:8080/swagger/index.html
@@ -85,13 +85,7 @@ gulp dev
 ### 生成 Swagger 文档
 
 ```bash
-# 安装 swag 工具
-gulp devTools
-
-# 生成文档
-gulp devSwagger
-
-# 或手动生成
+# 安装 swag 工具后，在 apps/core 目录生成文档
 swag init -g cmd/server/main.go -o docs --parseDependency --parseInternal
 ```
 
@@ -142,11 +136,12 @@ pnpm run npm:publish:core   # 仅发布 Core NPM 包
 pnpm run npm:publish:deps   # 仅发布 Deps NPM 包
 ```
 
-### 帮助命令
+### Core 构建命令
 
 ```bash
-pnpm run help               # 显示所有可用的 Gulp 任务和说明
-pnpm run tasks              # 显示 Gulp 任务树（技术视图）
+pnpm core:dev               # 启动 Core 开发服务
+pnpm core:build             # 编译当前平台开发版本
+pnpm core:build:production  # 编译当前平台生产版本
 ```
 
 ---
@@ -301,17 +296,10 @@ mediago-core/
 │   ├── events/          # 事件系统
 │   └── task/            # 任务管理
 ├── configs/             # 配置文件
-├── scripts/             # 构建脚本 (TypeScript)
-│   ├── config.ts        # 配置常量和平台定义
-│   ├── utils.ts         # 工具函数（文件操作、模板渲染等）
-│   ├── dev.ts           # 开发任务
-│   ├── release.ts       # 发布构建（完整发布包）
-│   └── npm.ts           # NPM 包管理（元数据生成 + 组装 + 发布）
 ├── templates/           # NPM 包模板文件
 │   ├── *.json.tpl       # package.json 模板
 │   ├── *.md.tpl         # README.md 模板
 │   └── *.js.tpl         # install.js 模板
-├── gulpfile.ts          # Gulp 主入口
 ├── .bin/                # 下载器工具（按平台）
 ├── bin/                 # 编译产物（二进制文件）
 ├── npm/                 # NPM 包构建输出
@@ -325,13 +313,14 @@ mediago-core/
 
 ### 构建脚本架构
 
-所有构建脚本都使用 TypeScript 编写，职责清晰：
+Core 构建实现集中在仓库的 `packages/tooling/src/core-build/`，通过类型化
+TypeScript CLI 调用；仓库根目录的 Task 和 pnpm 命令负责提供稳定的公共入口：
 
+- **cli.ts** - Core 开发、构建和发布命令入口
 - **config.ts** - 配置变量、常量和平台定义
 - **utils.ts** - 通用工具函数（文件操作、命令执行、模板渲染等）
 - **dev.ts** - 开发环境任务（开发服务器、快速编译）
 - **release.ts** - 发布构建任务（构建二进制、打包完整发布包）
-- **npm.ts** - NPM 包完整流程（元数据生成、组装、发布）
 
 ---
 
@@ -356,7 +345,7 @@ mediago-core/
 
 - 代码：~700 行（8+ 个 Go 文件）
 - 文档：~70 KB（7+ 份文档）
-- 构建任务：30+ 个 Gulp 任务
+- 构建入口：Task + 类型化 Core CLI
 - API 文档：完整 Swagger 支持
 - 测试：完整客户端页面
 - 脚本：模块化 TypeScript
@@ -367,7 +356,7 @@ mediago-core/
 
 ### Q: 如何只打包特定平台？
 
-A: 可以修改 `scripts/config.ts` 中的 `BUILD_PLATFORMS` 数组，注释掉不需要的平台。
+A: 可以修改 `packages/tooling/src/core-build/config.ts` 中的 `BUILD_PLATFORMS` 数组，注释掉不需要的平台。
 
 ### Q: 下载器工具从哪里来？
 
@@ -383,7 +372,7 @@ A: pnpm 更快、更节省磁盘空间。当然你也可以使用 npm 或 yarn�
 
 ### Q: 如何自定义构建流程？
 
-A: 编辑 `scripts/` 目录下的 TypeScript 文件。所有任务都是模块化的，职责清晰，易于修改和扩展。
+A: 编辑 `packages/tooling/src/core-build/` 下的 TypeScript 模块。所有任务都是模块化的，职责清晰，易于修改和扩展。
 
 ### Q: Core 和 Deps 包有什么区别？
 
@@ -408,4 +397,4 @@ A:
 
 **版本：** v1.0.0
 **最后更新：** 2025-01-24
-**构建工具：** Gulp + TypeScript
+**构建工具：** Task + TypeScript

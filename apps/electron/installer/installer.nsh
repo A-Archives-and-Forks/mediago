@@ -23,7 +23,7 @@
 ; electron-builder's default FileDescription so the installer payload remains
 ; intact.
 ;
-; Wired up through `nsis.include` in apps/electron/scripts/build.ts.
+; Wired up through `nsis.include` in packages/tooling/src/electron/build.ts.
 ; ============================================================================
 
 !macro customHeader

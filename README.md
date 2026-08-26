@@ -156,9 +156,13 @@ task dev:all
 ```
 
 `task setup` installs the Node workspace and the runtime tools needed by the
-application. Their only version source is `scripts/deps-versions.json`; Task
+application. Their only version source is `packages/tooling/manifests/runtime-deps.json`; Task
 does not automatically upgrade them. Running `pnpm install` alone installs
 only Node workspace packages, not runtime binaries such as BBDown.
+
+Use `task` as the single public entry point for development, builds, tests,
+and releases. Turbo, pnpm `:raw` scripts, Go commands, and utilities in
+`packages/tooling` are implementation details used by Task and CI.
 
 Use `task dev:web` for the web surface (`dev:server` is an alias for
 `dev:web`) or `task dev:electron` for desktop-only development. Before

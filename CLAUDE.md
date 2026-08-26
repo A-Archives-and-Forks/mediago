@@ -53,7 +53,7 @@ Commits use Conventional Commits format (e.g. `feat(electron): add queue UI`).
 
 **Apps:**
 
-- **`apps/core/`** — Go (Gin) REST API backend for download orchestration. Runs on port 9900. Uses SQLite (GORM), SSE for real-time events, PTY for capturing download tool output. Built with Gulp + Go cross-compilation.
+- **`apps/core/`** — Go (Gin) REST API backend for download orchestration. Runs on port 9900. Uses SQLite (GORM), SSE for real-time events, PTY for capturing download tool output. Built through the typed Core tooling and Go cross-compilation.
 - **`apps/electron/`** — Electron main process (tsdown build, inversify DI). Launches Go Core via `@mediago/service-runner`.
 - **`apps/server/`** — Node.js launcher (tsdown build). Spawns Go Core via `@mediago/service-runner`.
 - **`apps/ui/`** — Shared React 19 frontend (Vite 8, Ant Design 6, Zustand, TailwindCSS 4, i18next). Used by both Electron and server targets.
@@ -90,7 +90,7 @@ The UI adapter layer (`apps/ui/src/hooks/adapters/`) abstracts this: `electron.t
 - **Package manager**: pnpm 10.15.0 (enforced via `packageManager` field)
 - **Build orchestration**: Turborepo
 - **App bundling**: tsdown for Node/Electron, Vite 8 for UI apps
-- **Go builds**: Gulp orchestrating `go build` / `go run` in `apps/core`
+- **Go builds**: Task and pnpm invoke `packages/tooling/src/core-build/cli.ts`, which orchestrates `go build` / `go run` in `apps/core`
 - **Linter**: oxlint (config in `.oxlintrc.json`)
 - **Formatter**: oxfmt (config in `.oxfmtrc.json`)
 - **Pre-commit**: husky + lint-staged (runs oxlint --fix + oxfmt --write on staged files)

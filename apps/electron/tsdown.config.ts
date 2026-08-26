@@ -1,11 +1,11 @@
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import path, { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { loadProfileEnv } from "@mediago/tooling/env";
 import electron from "electron";
 import { defineConfig } from "tsdown";
 import copy from "rollup-plugin-copy";
 import fs from "node:fs/promises";
-import { loadProfileEnv } from "../../scripts/load-profile-env.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);

@@ -181,12 +181,6 @@ jobs:
           go-version: "1.25.0"
           cache-dependency-path: apps/core/go.sum
 
-      - name: Install dependencies
-        run: task deps:node
-
-      - name: Download third-party dependencies
-        run: task deps:runtime
-
       - name: Build desktop artifacts
         run: task ci:desktop:release
         env:
@@ -268,12 +262,6 @@ jobs:
         with:
           go-version: "1.25.0"
           cache-dependency-path: apps/core/go.sum
-
-      - name: Install dependencies
-        run: task deps:node
-
-      - name: Download third-party dependencies
-        run: task deps:runtime
 
       - name: Build private desktop artifacts
         run: task ci:desktop:release

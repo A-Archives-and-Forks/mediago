@@ -4,10 +4,11 @@
   "private": true,
   "description": "MediaGo Core - Go download backend build scripts",
   "scripts": {
-    "dev": "gulp dev",
-    "build": "gulp devBuild",
-    "release:build": "gulp releaseBuild",
-    "release": "gulp releasePackageFull"
+    "dev": "tsx ../../packages/tooling/src/core-build/cli.ts dev",
+    "build": "tsx ../../packages/tooling/src/core-build/cli.ts build",
+    "build:production": "tsx ../../packages/tooling/src/core-build/cli.ts build:production",
+    "release:build": "tsx ../../packages/tooling/src/core-build/cli.ts release:build",
+    "release": "tsx ../../packages/tooling/src/core-build/cli.ts release"
   },
   "keywords": [
     "video",
@@ -19,9 +20,6 @@
   "author": "caorushizi",
   "license": "MIT",
   "devDependencies": {
-    "@swc/register": "^0.1.10",
-    "@types/gulp": "^4.0.18",
-    "cross-env": "^10.1.0",
-    "gulp": "^5.0.1"
+    "tsx": "^4.23.12"
   }
 }

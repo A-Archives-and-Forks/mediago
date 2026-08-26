@@ -16,7 +16,7 @@ tasks:
       MEDIAGO_REQUIRED_TASK_VERSION: "{{.REQUIRED_TASK_VERSION}}"
       MEDIAGO_DEPS_ROOT: "{{.MEDIAGO_DEPS_ROOT}}"
     cmds:
-      - node scripts/task-doctor.ts
+      - node packages/tooling/src/bootstrap/task-doctor.ts
 
   setup:
     desc: Install Node and current-platform runtime dependencies
@@ -394,7 +394,7 @@ tasks:
       MEDIAGO_TASK_VERSION: "{{.TASK_VERSION}}"
       MEDIAGO_REQUIRED_TASK_VERSION: "{{.REQUIRED_TASK_VERSION}}"
     cmds:
-      - node scripts/task-version-gate.ts
+      - node packages/tooling/src/bootstrap/task-version-gate.ts
 
   internal:setup:
     internal: true
@@ -442,7 +442,7 @@ tasks:
     run: once
     vars: &runtime-vars
       MEDIAGO_PLATFORM_KEY:
-        sh: node scripts/print-platform-key.ts
+        sh: node packages/tooling/src/runtime-deps/print-platform-key.ts
     env: &runtime-env
       MEDIAGO_DEPS_ROOT: "{{.MEDIAGO_DEPS_ROOT}}"
       MEDIAGO_DEPS_DIR: "{{.MEDIAGO_DEPS_ROOT}}/{{.MEDIAGO_PLATFORM_KEY}}"
@@ -457,7 +457,7 @@ tasks:
     vars: &test-runtime-vars
       MEDIAGO_PROFILE: '{{default "test" .MEDIAGO_PROFILE}}'
       MEDIAGO_PLATFORM_KEY:
-        sh: node scripts/print-platform-key.ts
+        sh: node packages/tooling/src/runtime-deps/print-platform-key.ts
     env:
       MEDIAGO_PROFILE: "{{.MEDIAGO_PROFILE}}"
       MEDIAGO_DEPS_ROOT: "{{.MEDIAGO_DEPS_ROOT}}"
@@ -490,7 +490,7 @@ tasks:
     vars: &development-runtime-vars
       MEDIAGO_PROFILE: '{{default "development" .MEDIAGO_PROFILE}}'
       MEDIAGO_PLATFORM_KEY:
-        sh: node scripts/print-platform-key.ts
+        sh: node packages/tooling/src/runtime-deps/print-platform-key.ts
     env: &development-runtime-env
       MEDIAGO_PROFILE: "{{.MEDIAGO_PROFILE}}"
       MEDIAGO_DEPS_ROOT: "{{.MEDIAGO_DEPS_ROOT}}"
@@ -501,7 +501,6 @@ tasks:
       - task: internal:deps:node
       - task: internal:deps:runtime
       - task: internal:core:build
-      - task: internal:build:electron
     cmds:
       - 'node -e "console.log(''MEDIAGO_DEV_PROCESSES_STARTING'')"'
       - pnpm dev:all:raw
@@ -529,7 +528,6 @@ tasks:
       - task: internal:deps:node
       - task: internal:deps:runtime
       - task: internal:core:build
-      - task: internal:build:electron
     cmds:
       - pnpm start:electron
 
@@ -670,6 +668,14 @@ tasks:
     cmds:
       - pnpm core:build
 
+  internal:core:build:production:
+    internal: true
+    run: once
+    deps:
+      - task: internal:deps:node
+    cmds:
+      - pnpm core:build:production
+
   internal:test:e2e:build:
     internal: true
     vars: *test-profile-vars
@@ -702,17 +708,11 @@ tasks:
 
   internal:build:server:
     internal: true
-    vars: *production-profile-vars
-    env: *profile-env
-    dotenv: *profile-dotenv
-    requires: *profile-requires
     deps:
-      - task: internal:deps:node
-      - task: internal:core:build
-    cmds:
-      - pnpm build:server:raw
+      - task: internal:core:build:production
+      - task: internal:build:server:workspace
 
-  internal:build:electron:
+  internal:build:server:workspace:
     internal: true
     vars: *production-profile-vars
     env: *profile-env
@@ -720,7 +720,23 @@ tasks:
     requires: *profile-requires
     deps:
       - task: internal:deps:node
-      - task: internal:core:build
+    cmds:
+      - pnpm build:server:raw
+
+  internal:build:electron:
+    internal: true
+    deps:
+      - task: internal:core:build:production
+      - task: internal:build:electron:workspace
+
+  internal:build:electron:workspace:
+    internal: true
+    vars: *production-profile-vars
+    env: *profile-env
+    dotenv: *profile-dotenv
+    requires: *profile-requires
+    deps:
+      - task: internal:deps:node
     cmds:
       - pnpm build:electron:raw
 
@@ -736,7 +752,7 @@ tasks:
     vars:
       MEDIAGO_PROFILE: '{{default "production" .MEDIAGO_PROFILE}}'
       APP_NAME:
-        sh: node scripts/task-production-metadata.ts APP_NAME
+        sh: node packages/tooling/src/task/task-production-metadata.ts APP_NAME
     env: *profile-env
     dotenv: *profile-dotenv
     requires:
@@ -796,14 +812,14 @@ tasks:
     deps:
       - task: internal:build:extension
     cmds:
-      - pnpm exec tsx scripts/pack-extension.ts
+      - pnpm pack:extension:raw
 
   internal:pack:electron:
     internal: true
     vars: &production-runtime-vars
       MEDIAGO_PROFILE: '{{default "production" .MEDIAGO_PROFILE}}'
       MEDIAGO_PLATFORM_KEY:
-        sh: node scripts/print-platform-key.ts
+        sh: node packages/tooling/src/runtime-deps/print-platform-key.ts
     env: &production-runtime-env
       MEDIAGO_PROFILE: "{{.MEDIAGO_PROFILE}}"
       MEDIAGO_DEPS_ROOT: "{{.MEDIAGO_DEPS_ROOT}}"
@@ -812,7 +828,6 @@ tasks:
     requires: *profile-requires
     deps: &electron-package-deps
       - task: internal:deps:runtime
-      - task: internal:core:build
       - task: internal:build:electron
     cmds:
       - pnpm -F @mediago/electron run pack
@@ -828,11 +843,11 @@ tasks:
     vars: &production-package-metadata-vars
       MEDIAGO_PROFILE: '{{default "production" .MEDIAGO_PROFILE}}'
       APP_NAME:
-        sh: node scripts/task-production-metadata.ts APP_NAME
+        sh: node packages/tooling/src/task/task-production-metadata.ts APP_NAME
       APP_ID:
-        sh: node scripts/task-production-metadata.ts APP_ID
+        sh: node packages/tooling/src/task/task-production-metadata.ts APP_ID
       APP_COPYRIGHT:
-        sh: node scripts/task-production-metadata.ts APP_COPYRIGHT
+        sh: node packages/tooling/src/task/task-production-metadata.ts APP_COPYRIGHT
     env: *profile-env
     dotenv: *profile-dotenv
     requires: &production-package-metadata-requires
@@ -917,32 +932,32 @@ tasks:
   internal:ci:desktop:validate-request:
     internal: true
     cmds:
-      - node scripts/ci/desktop-workflow.ts validate-request
+      - node packages/tooling/src/github/desktop-workflow.ts validate-request
 
   internal:ci:desktop:verify-source:
     internal: true
     cmds:
-      - node scripts/ci/desktop-workflow.ts verify-source
+      - node packages/tooling/src/github/desktop-workflow.ts verify-source
 
   internal:ci:desktop:artifact-prefix:
     internal: true
     cmds:
-      - node scripts/ci/desktop-workflow.ts artifact-prefix
+      - node packages/tooling/src/github/desktop-workflow.ts artifact-prefix
 
   internal:ci:desktop:apply-version:
     internal: true
     cmds:
-      - node scripts/ci/desktop-workflow.ts apply-version
+      - node packages/tooling/src/github/desktop-workflow.ts apply-version
 
   internal:ci:desktop:create-test-stage:
     internal: true
     cmds:
-      - node scripts/ci/desktop-workflow.ts create-test-stage
+      - node packages/tooling/src/github/desktop-workflow.ts create-test-stage
 
   internal:ci:desktop:upload-test-stage:
     internal: true
     cmds:
-      - node scripts/ci/desktop-workflow.ts upload-test-stage
+      - node packages/tooling/src/github/desktop-workflow.ts upload-test-stage
 
   internal:ci:desktop:release:
     internal: true
@@ -951,101 +966,99 @@ tasks:
     dotenv: *profile-dotenv
     requires: *profile-requires
     deps:
-      - task: internal:deps:node
-      - task: internal:deps:runtime
       - task: internal:release:electron
 
   internal:ci:docker:validate-inputs:
     internal: true
     cmds:
-      - node scripts/ci/docker-workflow.ts validate-inputs
+      - node packages/tooling/src/github/docker-workflow.ts validate-inputs
 
   internal:ci:docker:resolve-parameters:
     internal: true
     cmds:
-      - node scripts/ci/docker-workflow.ts resolve-parameters
+      - node packages/tooling/src/github/docker-workflow.ts resolve-parameters
 
   internal:ci:docker:verify-preview-private:
     internal: true
     cmds:
-      - node scripts/ci/docker-workflow.ts verify-preview-private
+      - node packages/tooling/src/github/docker-workflow.ts verify-preview-private
 
   internal:ci:docker:detect-dockerhub:
     internal: true
     cmds:
-      - node scripts/ci/docker-workflow.ts detect-dockerhub
+      - node packages/tooling/src/github/docker-workflow.ts detect-dockerhub
 
   internal:ci:docker:resolve-targets:
     internal: true
     cmds:
-      - node scripts/ci/docker-workflow.ts resolve-targets
+      - node packages/tooling/src/github/docker-workflow.ts resolve-targets
 
   internal:ci:docker:write-summary:
     internal: true
     cmds:
-      - node scripts/ci/docker-workflow.ts write-summary
+      - node packages/tooling/src/github/docker-workflow.ts write-summary
 
   internal:ci:release:validate-request:
     internal: true
     cmds:
-      - node scripts/ci/release-workflow.ts validate-request
+      - node packages/tooling/src/github/release-workflow.ts validate-request
 
   internal:ci:release:detect-release-state:
     internal: true
     cmds:
-      - node scripts/ci/release-workflow.ts detect-release-state
+      - node packages/tooling/src/github/release-workflow.ts detect-release-state
 
   internal:ci:release:reserve-test-version:
     internal: true
     cmds:
-      - node scripts/ci/release-workflow.ts reserve-test-version
+      - node packages/tooling/src/github/release-workflow.ts reserve-test-version
 
   internal:ci:release:calculate-version:
     internal: true
     cmds:
-      - node scripts/ci/release-workflow.ts calculate-version
+      - node packages/tooling/src/github/release-workflow.ts calculate-version
 
   internal:ci:release:commit-version:
     internal: true
     cmds:
-      - node scripts/ci/release-workflow.ts commit-version
+      - node packages/tooling/src/github/release-workflow.ts commit-version
 
   internal:ci:release:resolve-source:
     internal: true
     cmds:
-      - node scripts/ci/release-workflow.ts resolve-source
+      - node packages/tooling/src/github/release-workflow.ts resolve-source
 
   internal:ci:release:write-prepare-summary:
     internal: true
     cmds:
-      - node scripts/ci/release-workflow.ts write-prepare-summary
+      - node packages/tooling/src/github/release-workflow.ts write-prepare-summary
 
   internal:ci:release:collect-electron-artifacts:
     internal: true
     cmds:
-      - 'node scripts/collect-electron-artifacts.ts electron-artifacts release-files "$VERSION" "$UPDATER_CHANNEL"'
+      - 'node packages/tooling/src/electron-artifacts/cli.ts electron-artifacts release-files "$VERSION" "$UPDATER_CHANNEL"'
 
   internal:ci:release:download-test-stages:
     internal: true
     cmds:
-      - node scripts/ci/release-workflow.ts download-test-stages
+      - node packages/tooling/src/github/release-workflow.ts download-test-stages
 
   internal:ci:release:publish-desktop:
     internal: true
     cmds:
-      - node scripts/ci/release-workflow.ts publish-desktop
+      - node packages/tooling/src/github/release-workflow.ts publish-desktop
 
   internal:ci:release:write-desktop-summary:
     internal: true
     cmds:
-      - node scripts/ci/release-workflow.ts write-desktop-summary
+      - node packages/tooling/src/github/release-workflow.ts write-desktop-summary
 
   internal:ci:release:record-test-docker:
     internal: true
     cmds:
-      - node scripts/ci/release-workflow.ts record-test-docker
+      - node packages/tooling/src/github/release-workflow.ts record-test-docker
 
   internal:ci:release:tag-docker-release:
     internal: true
     cmds:
-      - node scripts/ci/release-workflow.ts tag-docker-release
+      - node packages/tooling/src/github/release-workflow.ts tag-docker-release

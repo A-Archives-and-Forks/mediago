@@ -2,8 +2,8 @@ import { type ChildProcessByStdio, spawn } from "node:child_process";
 import path, { dirname } from "node:path";
 import type { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
+import { loadProfileEnv } from "@mediago/tooling/env";
 import { defineConfig } from "tsdown";
-import { loadProfileEnv } from "../../scripts/load-profile-env.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);

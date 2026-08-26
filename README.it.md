@@ -164,7 +164,7 @@ task dev:all
 ```
 
 `task setup` installa sia il workspace Node sia gli strumenti runtime richiesti
-dall'app. L'unica fonte delle loro versioni è `scripts/deps-versions.json` e
+dall'app. L'unica fonte delle loro versioni è `packages/tooling/manifests/runtime-deps.json` e
 non si aggiornano automaticamente. Eseguire solo `pnpm install` installa i
 pacchetti del workspace Node, ma non i binari runtime come BBDown.
 

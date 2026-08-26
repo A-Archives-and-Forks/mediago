@@ -1,11 +1,15 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { loadProfileEnv } from "@mediago/tooling/env";
+import {
+  createDependencyChunks,
+  mediaGoBuildMetadataPlugin,
+} from "@mediago/tooling/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import tailwindcss from "@tailwindcss/vite";
-import { loadProfileEnv } from "../../scripts/load-profile-env.ts";
 
-const projectRoot = path.resolve(__dirname, "../..");
+const projectRoot = path.resolve(import.meta.dirname, "../..");
 loadProfileEnv(projectRoot);
 const appRoot = path.resolve(projectRoot, "apps/electron/app");
 const isWeb = process.env.APP_TARGET === "server";
@@ -21,12 +25,15 @@ export default defineConfig({
     port: isWeb ? 8501 : 8500,
     strictPort: true,
   },
-  define: {
-    "import.meta.env.APP_VERSION": JSON.stringify(pkg.version),
-    "import.meta.env.APP_TARGET": JSON.stringify(process.env.APP_TARGET),
-    "import.meta.env.APP_TD_APPID": JSON.stringify(process.env.APP_TD_APPID),
-  },
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    mediaGoBuildMetadataPlugin({
+      version: pkg.version,
+      target: process.env.APP_TARGET,
+      telemetryId: process.env.APP_TD_APPID,
+    }),
+    react(),
+    tailwindcss(),
+  ],
   envDir: projectRoot,
   envPrefix: [],
   build: {
@@ -34,21 +41,16 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       output: {
-        manualChunks(id) {
-          if (id.includes("zustand") || id.includes("immer")) return "zustand";
-          if (
-            id.includes("react-dom") ||
-            id.includes("react-router-dom") ||
-            id.includes("react/")
-          )
-            return "vendor";
-        },
+        manualChunks: createDependencyChunks({
+          zustand: ["zustand", "immer"],
+          vendor: ["react-dom", "react-router-dom", "react/"],
+        }),
       },
     },
   },
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      "@": path.resolve(import.meta.dirname, "./src"),
     },
   },
 });

@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "cross-env NODE_ENV=development tsdown --watch ./src",
     "build": "cross-env NODE_ENV=production tsdown",
-    "pack": "cross-env NODE_ENV=production tsx scripts/build.ts --dir",
-    "release": "cross-env NODE_ENV=production tsx scripts/build.ts",
+    "pack": "cross-env NODE_ENV=production tsx ../../packages/tooling/src/electron/build.ts --dir",
+    "release": "cross-env NODE_ENV=production tsx ../../packages/tooling/src/electron/build.ts",
+    "icons": "tsx ../../packages/tooling/src/electron/generate-icons.ts",
     "clean": "rimraf app/build && rimraf release",
     "lint": "oxlint .",
     "type:check": "tsc --noEmit"
@@ -15,13 +16,12 @@
   "author": "caorushizi",
   "license": "MIT",
   "devDependencies": {
+    "@mediago/tooling": "workspace:*",
     "@types/lodash": "^4.17.25",
     "@types/mime-types": "^3.0.1",
     "@types/node": "^26.3.0",
     "cross-env": "^10.1.0",
-    "dotenv-flow": "^4.1.0",
     "electron": "43.2.0",
-    "electron-builder": "26.15.3",
     "electron-builder-squirrel-windows": "26.15.3",
     "electron-updater": "^6.8.9",
     "glob": "^13.0.6",

@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - "docs/**"
+      - ".github/actions/setup-ossutil/**"
       - ".github/workflows/build-docs.yml"
     branches: ["master"]
 
@@ -11,18 +12,15 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: "pages"
   cancel-in-progress: false
 
 env:
-  BUCKET: downloader-docs
-  ENDPOINT: oss-cn-beijing.aliyuncs.com
-  ACCESS_KEY: LTAI5tDrRjFUAvufpCJioz3b
-  ACCESS_KEY_SECRET: ${{ secrets.ACCESS_KEY_SECRET }}
+  OSS_BUCKET: downloader-docs
+  OSS_ENDPOINT: oss-cn-beijing.aliyuncs.com
+  OSS_REGION: cn-beijing
 
 jobs:
   build:
@@ -50,11 +48,13 @@ jobs:
       - name: Build with Vitepress
         run: task ci:docs:build
 
-      - name: Install Alibaba Cloud ossutil
-        run: wget http://gosspublic.alicdn.com/ossutil/1.6.10/ossutil64 && chmod +x ossutil64
+      - name: Setup Alibaba Cloud ossutil
+        uses: ./.github/actions/setup-ossutil
+        with:
+          version: "2.3.0"
 
-      - name: Configure Alibaba Cloud ossutil
-        run: ./ossutil64 config -i ${ACCESS_KEY} -k ${ACCESS_KEY_SECRET} -e ${ENDPOINT} -c .ossutilconfig
-
-      - name: Upload the web folder to the chosen OSS bucket
-        run: ./ossutil64 --config-file .ossutilconfig cp ${{ github.workspace }}/docs/.vitepress/dist oss://${BUCKET} -r -f
+      - name: Upload documentation to Alibaba Cloud OSS
+        env:
+          OSS_ACCESS_KEY_ID: ${{ secrets.ACCESS_KEY_ID }}
+          OSS_ACCESS_KEY_SECRET: ${{ secrets.ACCESS_KEY_SECRET }}
+        run: ossutil cp docs/.vitepress/dist "oss://${OSS_BUCKET}" -r -f

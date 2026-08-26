@@ -1,0 +1,54 @@
+name: Setup Alibaba Cloud ossutil
+description: Install a verified ossutil binary on the GitHub Actions runner
+
+inputs:
+  version:
+    description: ossutil version to install
+    required: false
+    default: "2.3.0"
+
+runs:
+  using: composite
+  steps:
+    - name: Download and install ossutil
+      shell: bash
+      env:
+        OSSUTIL_VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+
+        if [[ "${RUNNER_OS}" != "Linux" || "${RUNNER_ARCH}" != "X64" ]]; then
+          echo "setup-ossutil currently supports only Linux X64 runners" >&2
+          exit 1
+        fi
+
+        case "${OSSUTIL_VERSION}" in
+          2.3.0)
+            archive_sha256="3ae4d9fc85a7a6e9f5654d1599766f1a3a42a3692870887b5ae9338d582ef65a"
+            ;;
+          *)
+            echo "Unsupported ossutil version: ${OSSUTIL_VERSION}" >&2
+            exit 1
+            ;;
+        esac
+
+        archive_name="ossutil-${OSSUTIL_VERSION}-linux-amd64.zip"
+        download_url="https://gosspublic.alicdn.com/ossutil/v2/${OSSUTIL_VERSION}/${archive_name}"
+        work_dir="$(mktemp -d "${RUNNER_TEMP}/setup-ossutil.XXXXXX")"
+        install_dir="${RUNNER_TEMP}/mediago-ossutil/${OSSUTIL_VERSION}"
+        archive_path="${work_dir}/${archive_name}"
+        trap 'rm -rf "${work_dir}"' EXIT
+
+        curl --fail --location --silent --show-error \
+          --output "${archive_path}" \
+          "${download_url}"
+        echo "${archive_sha256}  ${archive_path}" | sha256sum --check --status
+
+        unzip -q "${archive_path}" -d "${work_dir}"
+        mkdir -p "${install_dir}"
+        install -m 0755 \
+          "${work_dir}/ossutil-${OSSUTIL_VERSION}-linux-amd64/ossutil" \
+          "${install_dir}/ossutil"
+
+        echo "${install_dir}" >> "${GITHUB_PATH}"
+        "${install_dir}/ossutil" version

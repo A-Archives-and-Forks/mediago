@@ -119,7 +119,7 @@ export function resolvePlayerBinary(): { playerBin: string } {
  * Development: packages/mediago-extension/dist (produced by
  *   `pnpm -F @mediago/extension build`)
  * Production: extraResources/extension (copied by electron-builder
- *   via the scripts/build.ts `extraResources` declaration)
+ *   via the tooling Electron build module's `extraResources` declaration)
  *
  * Override with MEDIAGO_EXTENSION_DIR env var.
  *

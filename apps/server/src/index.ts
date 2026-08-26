@@ -3,7 +3,7 @@ import os from "node:os";
 import path, { dirname } from "node:path";
 import fs from "node:fs";
 import { ServiceRunner } from "@mediago/service-runner";
-import { loadProfileEnv } from "../../../scripts/load-profile-env.ts";
+import { loadProfileEnv } from "@mediago/tooling/env";
 import { resolveCoreBinaries, resolveDepsBinaries } from "./binaryResolver";
 import { resolveServerPaths } from "./server-paths";
 import { fileURLToPath } from "node:url";

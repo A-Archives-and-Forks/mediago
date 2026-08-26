@@ -7,7 +7,7 @@ main [README](./README.md).
 ## Prerequisites
 
 - **Node.js** ≥ 24.14 — install from [nodejs.org](https://nodejs.org/)
-- **pnpm** ≥ 10 — `npm i -g pnpm`
+- **pnpm** 11.23 — activated from the repository's `packageManager` field
 - **Go** ≥ 1.25 — install from [go.dev](https://go.dev/dl/)
 - **Task** ≥ 3.51.1 and < 4.0.0 — the repository task runner
 
@@ -31,7 +31,7 @@ task dev:all
 
 `task setup` installs both the Node workspace and the runtime tools required
 by the application. Runtime versions come only from
-`scripts/deps-versions.json`; Task does not automatically upgrade them.
+`packages/tooling/manifests/runtime-deps.json`; Task does not automatically upgrade them.
 Running `pnpm install` alone installs Node packages, but not BBDown or the
 other runtime binaries.
 
@@ -52,8 +52,11 @@ packages/
   core-sdk/        TypeScript SDK for the Go Core REST API
   electron-preload/
   mediago-extension/  Browser extension (Chrome / Edge)
+  tooling/         Shared bootstrap, build, release, verification and Vite tooling
+.github/
+  actions/         Reusable CI setup actions
+docker/            Container entrypoint and Docker assets
 docs/              VitePress site (zh / en / jp)
-scripts/           Dep downloaders, extension packager, etc.
 ```
 
 Deeper architecture notes live in [`CLAUDE.md`](./CLAUDE.md).
@@ -73,6 +76,12 @@ task dev:electron
 # Run the self-hosted web server in dev mode; dev:server aliases dev:web
 task dev:web
 
+# Build the self-hosted server and web UI
+task build:server
+
+# Build the Electron workspace without creating an installer
+task build:electron
+
 # Build an unpacked Electron directory (fast, for smoke-testing layout)
 task pack:electron
 
@@ -86,9 +95,15 @@ task check
 task test
 ```
 
-The self-hosted web server doesn't have a dedicated packaging script — it
-ships via the Docker image published to GHCR, or you can run the build
-output (`pnpm -F @mediago/server build`) directly under Node.
+Task is the public command interface for setup, development, builds, tests,
+and releases. Turborepo schedules JavaScript workspace builds, while pnpm
+package commands, Go commands, and modules under `packages/tooling/` are
+implementation leaves. Their `:raw` commands are kept
+for Task and CI composition rather than normal developer use.
+
+The self-hosted server ships through the Docker image published to GHCR. Its
+Node and web build outputs can also be produced locally with
+`task build:server`.
 
 ## Commit style
 

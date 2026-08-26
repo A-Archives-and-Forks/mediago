@@ -135,8 +135,11 @@ task dev:all
 ```
 
 `task setup` 会同时安装 Node 工作区依赖和应用所需的运行时工具。运行时依赖的
-版本只来自 `scripts/deps-versions.json`，不会自动升级；单独运行 `pnpm install`
+版本只来自 `packages/tooling/manifests/runtime-deps.json`，不会自动升级；单独运行 `pnpm install`
 只会安装 Node 工作区依赖，不会安装 BBDown 等运行时二进制文件。
+
+开发、构建、测试和发布都以 `task` 命令作为统一入口；Turbo、pnpm 的 `:raw`
+脚本、Go 命令以及 `packages/tooling` 中的工具只作为内部实现，不需要日常直接调用。
 
 只开发 Web 端时使用 `task dev:web`（`dev:server` 是 `dev:web` 的别名），只开发
 桌面端时使用 `task dev:electron`。提交改动前请运行：

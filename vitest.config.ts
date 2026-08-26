@@ -44,7 +44,6 @@ export default defineConfig({
       "apps/**/*.test.ts",
       "docs/**/*.test.ts",
       "packages/**/*.test.ts",
-      "scripts/**/*.test.ts",
       "tests/e2e/support/**/*.test.ts",
       "tests/media-service/**/*.test.ts",
     ],
@@ -59,11 +58,7 @@ export default defineConfig({
       provider: "v8",
       reportsDirectory: "coverage/ts",
       reporter: ["text", "html", "json-summary"],
-      include: [
-        "apps/**/*.{ts,tsx}",
-        "packages/**/*.{ts,tsx}",
-        "scripts/**/*.ts",
-      ],
+      include: ["apps/**/*.{ts,tsx}", "packages/**/*.{ts,tsx}"],
       exclude: [
         "**/*.d.ts",
         "**/*.test.ts",

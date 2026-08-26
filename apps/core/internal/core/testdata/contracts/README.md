@@ -1,7 +1,7 @@
 # External downloader output contracts
 
 These fixtures pin the console-output contracts for the downloader versions in
-[`scripts/deps-versions.json`](../../../../../../scripts/deps-versions.json):
+[`packages/tooling/manifests/runtime-deps.json`](../../../../../../packages/tooling/manifests/runtime-deps.json):
 
 - BBDown `1.6.3`
 - yt-dlp `2026.07.04`

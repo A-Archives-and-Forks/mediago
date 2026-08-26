@@ -5,7 +5,7 @@ import {
   dependencyExecutablePath,
   platformKeyFor,
   resolveDepsRoot,
-} from "../../../scripts/dependency-layout.ts";
+} from "@mediago/tooling/runtime-deps";
 
 const REPOSITORY_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 
