@@ -53,6 +53,37 @@ func TestAddDownloadTaskRejectsExistingURL(t *testing.T) {
 	}
 }
 
+func TestAddDownloadTaskInfersYTDLPForXStatusURL(t *testing.T) {
+	service, _ := newTestDownloadTaskService(t)
+	video, err := service.AddDownloadTask(&AddDownloadTaskInput{
+		Name: "x-video",
+		URL:  "https://x.com/mediago/status/1234567890?s=20",
+	})
+	if err != nil {
+		t.Fatalf("AddDownloadTask() error = %v", err)
+	}
+	if video.Type != string(core.TypeYoutube) {
+		t.Fatalf("stored type = %q, want %q", video.Type, core.TypeYoutube)
+	}
+}
+
+func TestAddDownloadTasksInfersTypesIndependently(t *testing.T) {
+	service, _ := newTestDownloadTaskService(t)
+	videos, err := service.AddDownloadTasks([]*AddDownloadTaskInput{
+		{Name: "stream", URL: "https://cdn.example.com/master.m3u8?token=secret"},
+		{Name: "x-video", URL: "https://twitter.com/mediago/status/1234567890"},
+	})
+	if err != nil {
+		t.Fatalf("AddDownloadTasks() error = %v", err)
+	}
+	want := []string{string(core.TypeM3U8), string(core.TypeYoutube)}
+	for index, video := range videos {
+		if video.Type != want[index] {
+			t.Fatalf("videos[%d].Type = %q, want %q", index, video.Type, want[index])
+		}
+	}
+}
+
 func TestAddDownloadTasksRejectsDuplicateURLWithinBatch(t *testing.T) {
 	service, videoRepo := newTestDownloadTaskService(t)
 	inputs := []*AddDownloadTaskInput{

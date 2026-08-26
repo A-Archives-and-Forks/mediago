@@ -12,6 +12,7 @@ export interface PageActionPorts {
   runtimeId: string;
   getTab(tabId: number): Promise<chrome.tabs.Tab>;
   openPopup(options: { windowId: number }): Promise<void>;
+  reportPopupOpenFailure(error: unknown): void;
   now(): number;
 }
 
@@ -29,6 +30,13 @@ function defaultPorts(): PageActionPorts {
     runtimeId: chrome.runtime.id,
     getTab: (tabId) => chrome.tabs.get(tabId),
     openPopup: (options) => chrome.action.openPopup(options),
+    reportPopupOpenFailure(error) {
+      // eslint-disable-next-line no-console -- Popup UI failures need a diagnostic sink.
+      console.warn(
+        "[MediaGo extension] source added, but the popup could not be opened",
+        error,
+      );
+    },
     now: () => Date.now(),
   };
 }
@@ -204,8 +212,12 @@ export function createPageActionHandler(
 
     try {
       await ports.openPopup({ windowId });
-    } catch {
-      return failure("POPUP_OPEN_FAILED");
+    } catch (error) {
+      try {
+        ports.reportPopupOpenFailure(error);
+      } catch {
+        // Diagnostics must not turn a successfully staged source into a failure.
+      }
     }
     return { type: "PAGE_ACTION_RESULT", ok: true };
   };

@@ -58,6 +58,10 @@ func (s *DownloadTaskService) AddDownloadTask(input *AddDownloadTaskInput) (*db.
 	s.createMu.Lock()
 	defer s.createMu.Unlock()
 
+	if strings.TrimSpace(input.Type) == "" {
+		input.Type = string(core.InferDownloadType(input.URL))
+	}
+
 	existingURL, err := s.repo.FindByURL(input.URL)
 	if err != nil {
 		return nil, err
@@ -110,6 +114,9 @@ func (s *DownloadTaskService) AddDownloadTasks(inputs []*AddDownloadTaskInput) (
 	videos := make([]*db.Video, 0, len(inputs))
 	seenURLs := make(map[string]struct{}, len(inputs))
 	for _, input := range inputs {
+		if strings.TrimSpace(input.Type) == "" {
+			input.Type = string(core.InferDownloadType(input.URL))
+		}
 		if _, exists := seenURLs[input.URL]; exists {
 			return nil, ErrDownloadURLAlreadyExists
 		}

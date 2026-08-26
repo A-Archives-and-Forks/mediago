@@ -8,7 +8,7 @@ import (
 // CreateTaskReq Create task request DTO
 type CreateTaskReq struct {
 	ID      string            `json:"id,omitempty" example:"my-custom-id"`                             // (optional) Custom task ID
-	Type    core.DownloadType `json:"type" binding:"required" example:"m3u8"`                          // Download type
+	Type    core.DownloadType `json:"type,omitempty" example:"m3u8"`                                   // Download type (inferred from URL when omitted)
 	URL     string            `json:"url" binding:"required" example:"https://example.com/video.m3u8"` // Download URL
 	Name    string            `json:"name" binding:"required" example:"video"`                         // File name
 	Folder  string            `json:"folder" example:"movies"`                                         // Sub-folder
@@ -21,9 +21,13 @@ func (r *CreateTaskReq) ToDownloadParams() core.DownloadParams {
 	if id == "" {
 		id = uuid.New().String()
 	}
+	downloadType := r.Type
+	if downloadType == "" {
+		downloadType = core.InferDownloadType(r.URL)
+	}
 	return core.DownloadParams{
 		ID:      core.TaskID(id),
-		Type:    r.Type,
+		Type:    downloadType,
 		URL:     r.URL,
 		Name:    r.Name,
 		Folder:  r.Folder,

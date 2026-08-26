@@ -2,6 +2,7 @@ import { DownloadType } from "@mediago/shared-common";
 import type { PageCandidate } from "@mediago/browser-extension/site-adapters";
 import {
   matchesBilibiliPageLocation,
+  matchesTwitterPageLocation,
   matchesYoutubePageLocation,
 } from "@mediago/browser-extension/site-adapter-matches";
 
@@ -18,3 +19,5 @@ export const matchesHomepage = matchesBilibiliPageLocation({
 export const matchesYoutube = matchesYoutubePageLocation({
   hostname: "www.youtube.com",
 });
+
+export const matchesTwitter = matchesTwitterPageLocation({ hostname: "x.com" });

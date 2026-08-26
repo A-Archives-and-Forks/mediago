@@ -78,6 +78,7 @@ function pageActionPorts(
 ): PageActionPorts & {
   getTab: ReturnType<typeof vi.fn>;
   openPopup: ReturnType<typeof vi.fn>;
+  reportPopupOpenFailure: ReturnType<typeof vi.fn>;
 } {
   return {
     runtimeId: "extension-id",
@@ -87,6 +88,7 @@ function pageActionPorts(
       return next;
     }),
     openPopup: vi.fn(async () => undefined),
+    reportPopupOpenFailure: vi.fn(),
     now: vi.fn(() => 1_234),
     ...overrides,
   };
@@ -423,24 +425,27 @@ describe("page action command", () => {
     expect(ports.openPopup).toHaveBeenCalledOnce();
   });
 
-  test("retains the ensured item and reports a stable error when opening the popup fails", async () => {
+  test("retains the ensured item and succeeds when opening the popup fails", async () => {
     const memory = memorySourceService();
+    const popupError = new Error(
+      "The popup cannot be opened with internal details",
+    );
     const ports = pageActionPorts([supportedTab(), supportedTab()], {
       openPopup: vi.fn(async () => {
-        throw new Error("The popup cannot be opened with internal details");
+        throw popupError;
       }),
     });
     const handle = createPageActionHandler(memory.service, ports);
 
     await expect(handleCurrentPage(handle)).resolves.toEqual({
       type: "PAGE_ACTION_RESULT",
-      ok: false,
-      error: "POPUP_OPEN_FAILED",
+      ok: true,
     });
 
     expect(memory.sources()).toHaveLength(1);
     expect(memory.sources()[0]?.url).toBe(supportedTab().url);
     expect(memory.badges).toEqual([1]);
+    expect(ports.reportPopupOpenFailure).toHaveBeenCalledWith(popupError);
   });
 
   test("does not perform the first live lookup until earlier work in the tab queue finishes", async () => {
@@ -745,21 +750,23 @@ describe("page candidate command", () => {
     expect(ports.openPopup).not.toHaveBeenCalled();
   });
 
-  test("retains the candidate when opening the popup fails", async () => {
+  test("retains the candidate and succeeds when opening the popup fails", async () => {
     const memory = memorySourceService();
+    const popupError = new Error("popup unavailable");
     const ports = pageActionPorts([homepageTab(), homepageTab()], {
       openPopup: vi.fn(async () => {
-        throw new Error("popup unavailable");
+        throw popupError;
       }),
     });
     const handle = createPageActionHandler(memory.service, ports);
 
     await expect(
       handlePageCandidate(handle, homepageSender(), pageCandidate()),
-    ).resolves.toMatchObject({ ok: false, error: "POPUP_OPEN_FAILED" });
+    ).resolves.toEqual({ type: "PAGE_ACTION_RESULT", ok: true });
 
     expect(memory.sources()).toHaveLength(1);
     expect(memory.badges).toEqual([1]);
+    expect(ports.reportPopupOpenFailure).toHaveBeenCalledWith(popupError);
   });
 
   test("runs the first candidate live lookup inside the tab queue", async () => {

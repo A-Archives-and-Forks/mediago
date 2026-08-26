@@ -132,7 +132,7 @@ export default class WebviewController implements Controller {
     this.overlayDialog.show(
       await Promise.all(
         data.map(async (task) =>
-          this.tabs.withBilibiliSessionCookies(tabId, {
+          this.tabs.withSessionCookies(tabId, {
             ...task,
             headers:
               task.headers ||

@@ -9,6 +9,7 @@ import {
   type HLSMediaInfo,
   matchPageUrl,
   matchRequestUrl,
+  shouldSuppressRequestSource,
 } from "@mediago/shared-common";
 import { type OnSendHeadersListenerDetails, session } from "electron";
 import { inject, injectable } from "inversify";
@@ -362,7 +363,7 @@ export class SniffingHelper extends EventEmitter {
     }
 
     const filter = matchRequestUrl(url);
-    if (filter) {
+    if (filter && !shouldSuppressRequestSource(documentURL, filter.type)) {
       this.send(context.tabId, {
         url,
         documentURL,
@@ -548,6 +549,17 @@ export function getCookieBackedType(url: string): DownloadType | undefined {
     const hostname = new URL(url).hostname.toLowerCase();
     if (hostname === "bilibili.com" || hostname.endsWith(".bilibili.com")) {
       return DownloadType.bilibili;
+    }
+    if (
+      hostname === "youtu.be" ||
+      hostname === "youtube.com" ||
+      hostname.endsWith(".youtube.com") ||
+      hostname === "x.com" ||
+      hostname.endsWith(".x.com") ||
+      hostname === "twitter.com" ||
+      hostname.endsWith(".twitter.com")
+    ) {
+      return DownloadType.youtube;
     }
   } catch {
     // Ignore malformed request URLs.

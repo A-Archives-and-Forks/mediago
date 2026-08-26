@@ -1,0 +1,31 @@
+package core
+
+import "testing"
+
+func TestInferDownloadType(t *testing.T) {
+	tests := []struct {
+		name string
+		url  string
+		want DownloadType
+	}{
+		{name: "bilibili", url: "https://www.bilibili.com/video/BV1xx411c7mD", want: TypeBilibili},
+		{name: "bilibili short link", url: "https://b23.tv/example", want: TypeBilibili},
+		{name: "youtube", url: "https://www.youtube.com/watch?v=example", want: TypeYoutube},
+		{name: "youtube short link", url: "https://youtu.be/example", want: TypeYoutube},
+		{name: "x status", url: "https://x.com/mediago/status/1234567890?s=20", want: TypeYoutube},
+		{name: "twitter status suffix", url: "https://mobile.twitter.com/mediago/status/1234567890/video/1", want: TypeYoutube},
+		{name: "x home is not downloadable", url: "https://x.com/home", want: TypeDirect},
+		{name: "x non-numeric status is not downloadable", url: "https://x.com/mediago/status/latest", want: TypeDirect},
+		{name: "hls", url: "https://cdn.example.com/path/master.m3u8?token=secret", want: TypeM3U8},
+		{name: "direct", url: "https://cdn.example.com/video.mp4", want: TypeDirect},
+		{name: "invalid", url: "://bad-url", want: TypeDirect},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := InferDownloadType(test.url); got != test.want {
+				t.Fatalf("InferDownloadType(%q) = %q, want %q", test.url, got, test.want)
+			}
+		})
+	}
+}

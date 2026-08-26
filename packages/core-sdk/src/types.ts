@@ -50,7 +50,8 @@ export interface Task {
  */
 export interface CreateTaskParams {
   id?: string;
-  type: DownloadType;
+  /** Optional override. MediaGo infers the downloader from the URL when omitted. */
+  type?: DownloadType;
   url: string;
   name: string;
   folder?: string;

@@ -27,7 +27,7 @@ export const PRIVACY_WEBVIEW = "webview";
 export const db = resolve(workspace, "app.db");
 export const logDir = resolve(workspace, "logs");
 
-// user agent
-export const pcUA = "";
-export const mobileUA =
-  "Mozilla/5.0 (Linux; Android 11; SAMSUNG SM-G973U) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/14.2 Chrome/87.0.4280.141 Mobile Safari/537.36";
+// Keep the mobile override aligned with Electron's bundled Chromium instead of
+// pinning an increasingly unsupported browser version. Desktop browsing uses
+// the native WebContents user agent and therefore needs no override.
+export const mobileUA = `Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${process.versions.chrome} Mobile Safari/537.36`;

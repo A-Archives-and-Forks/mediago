@@ -5,7 +5,7 @@ import "dayjs/locale/it";
 import "dayjs/locale/zh-cn";
 import { twMerge } from "tailwind-merge";
 import { isUrl } from "./url";
-import { DownloadType } from "@mediago/shared-common";
+import { DownloadType, inferDownloadType } from "@mediago/shared-common";
 
 export { isWeb } from "../environment";
 
@@ -17,7 +17,7 @@ export { tdApp } from "./tdapp";
 export const generateUrl = (url: string) => {
   let result = url;
   if (!/^https?:\/\//.test(url)) {
-    result = `http://${url}`;
+    result = `https://${url}`;
   }
   if (!isUrl(result)) {
     result = `https://www.baidu.com/s?word=${url}`;
@@ -72,16 +72,7 @@ export function isDownloadType(value: string | null): value is DownloadType {
 }
 
 export const urlDownloadType = (url: string): DownloadType => {
-  if (url.includes("bilibili")) {
-    return DownloadType.bilibili;
-  }
-  if (url.includes("youtube.com") || url.includes("youtu.be")) {
-    return DownloadType.youtube;
-  }
-  if (url.includes("m3u8")) {
-    return DownloadType.m3u8;
-  }
-  return DownloadType.direct;
+  return inferDownloadType(url);
 };
 
 export const convertPlainObject = (obj: unknown) => {

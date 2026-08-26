@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"caorushizi.cn/mediago/internal/core"
 	"caorushizi.cn/mediago/internal/db"
 	"caorushizi.cn/mediago/internal/discovery"
 	"caorushizi.cn/mediago/internal/service"
@@ -177,7 +178,7 @@ type healthOutput struct {
 
 type createDownloadInput struct {
 	URL     string   `json:"url" jsonschema:"required,video or stream URL to download"`
-	Type    string   `json:"type,omitempty" jsonschema:"download type: m3u8, bilibili, direct, mediago, or youtube"`
+	Type    string   `json:"type,omitempty" jsonschema:"optional download type: m3u8, bilibili, direct, mediago, or youtube; inferred from the URL when omitted; youtube uses yt-dlp for YouTube and X/Twitter URLs"`
 	Name    string   `json:"name,omitempty" jsonschema:"optional output file name"`
 	Folder  string   `json:"folder,omitempty" jsonschema:"optional subdirectory under the MediaGo download directory"`
 	Headers []string `json:"headers,omitempty" jsonschema:"optional HTTP headers such as User-Agent: value"`
@@ -301,8 +302,8 @@ func (m *Manager) registerTools(server *mcp.Server) {
 		if strings.TrimSpace(input.URL) == "" {
 			return nil, nil, errors.New("url is required")
 		}
-		if input.Type == "" {
-			input.Type = "m3u8"
+		if strings.TrimSpace(input.Type) == "" {
+			input.Type = string(core.InferDownloadType(input.URL))
 		}
 		var folder *string
 		if input.Folder != "" {

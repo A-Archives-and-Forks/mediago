@@ -2,6 +2,7 @@ import {
   DownloadType,
   matchPageUrl,
   matchRequestUrl,
+  shouldSuppressRequestSource,
 } from "@mediago/shared-common";
 import type {
   DetectedSource,
@@ -145,6 +146,7 @@ async function handleRequest(
     /* tab might have closed between event and lookup; best-effort */
   }
   if ((tabGenerations.get(details.tabId) ?? 0) !== generation) return;
+  if (shouldSuppressRequestSource(documentURL, filter.type)) return;
 
   const source: DetectedSource = {
     id: `${details.requestId}-${Date.now()}`,

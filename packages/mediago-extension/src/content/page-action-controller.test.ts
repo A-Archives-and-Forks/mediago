@@ -144,6 +144,8 @@ describe("supported page URL matching", () => {
     "https://m.youtube.com/live/abc",
     "https://music.youtube.com/embed/abc",
     "https://youtu.be/abc",
+    "https://x.com/openai/status/1234567890",
+    "https://twitter.com/openai/status/1234567890",
   ])("accepts canonical directly supported route %s", (url) => {
     expect(isSupportedPageUrl(url)).toBe(true);
   });
@@ -153,6 +155,8 @@ describe("supported page URL matching", () => {
     "https://www.bilibili.com/bangumi/play/ep1",
     "https://www.youtube.com/",
     "https://www.youtube.com/feed/subscriptions",
+    "https://x.com/home",
+    "https://twitter.com/search?q=video",
     "https://example.com/video/1",
   ])("rejects route without a canonical page rule %s", (url) => {
     expect(isSupportedPageUrl(url)).toBe(false);

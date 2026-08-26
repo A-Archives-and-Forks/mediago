@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"caorushizi.cn/mediago/internal/core"
 	"github.com/spf13/cobra"
 )
 
@@ -197,8 +198,12 @@ func newDownloadCommand() *cobra.Command {
 				return fmt.Errorf("MediaGo is unavailable at %s: %w", client.baseURL, err)
 			}
 
+			downloadType := strings.TrimSpace(typ)
+			if downloadType == "" {
+				downloadType = string(core.InferDownloadType(args[0]))
+			}
 			record, err := client.createDownload(cmd.Context(), createDownloadTask{
-				Type:    typ,
+				Type:    downloadType,
 				URL:     args[0],
 				Name:    name,
 				Folder:  optionalString(folder),
@@ -229,7 +234,7 @@ func newDownloadCommand() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&typ, "type", "t", "m3u8", "Download type (m3u8, bilibili, direct, mediago, youtube)")
+	cmd.Flags().StringVarP(&typ, "type", "t", "", "Download type override (m3u8, bilibili, direct, mediago, youtube); inferred from URL when omitted")
 	cmd.Flags().StringVarP(&name, "name", "n", "", "Output file name")
 	cmd.Flags().StringVar(&folder, "folder", "", "Subdirectory under MediaGo's download directory")
 	cmd.Flags().StringArrayVarP(&headers, "header", "H", nil, "HTTP header, can be repeated")

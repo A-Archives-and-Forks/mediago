@@ -4,11 +4,17 @@ export {
   bilibiliPageAdapter,
 } from "./bilibili";
 export { matchesBilibiliPageLocation } from "./bilibili-match";
+export { matchesTwitterPageLocation } from "./twitter-match";
 export {
   matchesPageAdapterLocation,
   matchesYoutubePageLocation,
 } from "./adapter-matches";
 export { findPageAdapter, PAGE_ADAPTERS } from "./registry";
+export {
+  TWITTER_PROCESSED_ATTRIBUTE,
+  TWITTER_SELECTORS,
+  twitterPageAdapter,
+} from "./twitter";
 export {
   YOUTUBE_PROCESSED_ATTRIBUTE,
   YOUTUBE_SELECTORS,

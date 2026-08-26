@@ -2,7 +2,7 @@ package dto
 
 // AddDownloadReq Add download task request.
 type AddDownloadReq struct {
-	Type    string  `json:"type" binding:"required"`
+	Type    string  `json:"type,omitempty"`
 	Name    string  `json:"name"`
 	URL     string  `json:"url" binding:"required"`
 	Headers *string `json:"headers"`

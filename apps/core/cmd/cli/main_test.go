@@ -60,6 +60,44 @@ func TestAPIClientCreatesPersistedDownload(t *testing.T) {
 	}
 }
 
+func TestDownloadCommandInfersYTDLPForXStatusURL(t *testing.T) {
+	typeReceived := make(chan string, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/healthy":
+			w.WriteHeader(http.StatusOK)
+		case "/api/downloads":
+			var request createDownloadRequest
+			if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+				t.Fatal(err)
+			}
+			if len(request.Tasks) != 1 {
+				t.Fatalf("unexpected request: %+v", request)
+			}
+			typeReceived <- request.Tasks[0].Type
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"success":true,"code":200,"data":[{"id":42,"name":"x-video","status":"pending"}]}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	command := newRootCommand()
+	command.SetArgs([]string{
+		"--base-url", server.URL,
+		"--config", filepath.Join(t.TempDir(), "missing.json"),
+		"download", "https://x.com/mediago/status/1234567890",
+		"--no-wait",
+	})
+	if err := command.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if got := <-typeReceived; got != "youtube" {
+		t.Fatalf("download type = %q, want youtube", got)
+	}
+}
+
 func TestDiscoverCommandPrintsOnlyRedactedDataJSON(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {

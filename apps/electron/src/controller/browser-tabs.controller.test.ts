@@ -118,7 +118,7 @@ describe("tab-aware browser controllers", () => {
       "tab-b",
       DownloadType.direct,
     );
-    expect(tabs.withBilibiliSessionCookies).toHaveBeenCalledWith(
+    expect(tabs.withSessionCookies).toHaveBeenCalledWith(
       "tab-b",
       expect.objectContaining({
         headers: "Referer: https://example.com/tab-b",
@@ -189,7 +189,7 @@ function createTabManager() {
     setBounds: vi.fn(),
     setUserAgent: vi.fn(),
     show: vi.fn(),
-    withBilibiliSessionCookies: vi.fn(async (_tabId, task) => task),
+    withSessionCookies: vi.fn(async (_tabId, task) => task),
   };
 }
 

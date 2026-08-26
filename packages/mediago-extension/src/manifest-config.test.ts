@@ -10,6 +10,11 @@ const expectedPageMatches = [
   "*://m.youtube.com/*",
   "*://music.youtube.com/*",
   "*://youtu.be/*",
+  "*://x.com/*",
+  "*://www.x.com/*",
+  "*://twitter.com/*",
+  "*://www.twitter.com/*",
+  "*://mobile.twitter.com/*",
 ];
 
 const basename = (entry: string | undefined) => entry?.split("/").at(-1);

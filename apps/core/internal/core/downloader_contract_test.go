@@ -373,6 +373,19 @@ func TestExternalInputContracts(t *testing.T) {
 			assertStandaloneArgCount(t, tool, flag, args, 1, flag)
 		}
 
+		t.Run("X status URL uses the same executor", func(t *testing.T) {
+			const xURL = "https://x.com/openai/status/1234567890"
+			xArgs := d.buildArgs(DownloadParams{
+				Type:    TypeYoutube,
+				URL:     xURL,
+				Name:    "X video",
+				Headers: []string{"Cookie: auth_token=test-only; ct0=test-only"},
+			}, defaultContractSchema(t, string(TypeYoutube)))
+
+			assertStandaloneArgCount(t, tool, "X URL", xArgs, 1, xURL)
+			assertAdjacentArgCount(t, tool, "X cookie header", xArgs, 1, "--add-header", "Cookie: auth_token=test-only; ct0=test-only")
+		})
+
 		t.Run("disabled proxy with value", func(t *testing.T) {
 			disabled := &DownloaderSvc{cfg: testDownloaderConfig{localDir: localDir, proxy: proxy}}
 			disabledArgs := disabled.buildArgs(DownloadParams{Type: TypeYoutube, URL: url, Name: unsafeName}, defaultContractSchema(t, string(TypeYoutube)))

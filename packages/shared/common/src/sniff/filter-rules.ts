@@ -38,6 +38,17 @@ export const SNIFF_FILTERS: SniffFilter[] = [
     },
   },
   {
+    // X and legacy Twitter status pages are handled by the existing yt-dlp
+    // execution channel. Timeline/search pages are intentionally excluded.
+    hosts: [
+      /^https?:\/\/(?:www\.|mobile\.)?(?:x|twitter)\.com\/[^/?#]+\/status\/\d+(?:[/?#]|$)/i,
+    ],
+    type: DownloadType.youtube,
+    schema: {
+      name: "title",
+    },
+  },
+  {
     // Match actual video / short / live / embed URLs — not the homepage
     // or subscription feed, which would produce spurious "source found"
     // detections on every navigation.
@@ -90,4 +101,35 @@ export function matchPageUrl(pageUrl: string): SniffFilter | undefined {
     }
   }
   return undefined;
+}
+
+/**
+ * Some supported sites expose many short-lived media renditions while their
+ * page adapter can identify the stable, user-facing item instead. X/Twitter
+ * timelines are the clearest example: every autoplayed tweet can request
+ * several MP4 variants, but the adapter resolves each video to one canonical
+ * status URL for yt-dlp.
+ *
+ * Suppress only generic request-level media sources here. Page-level sources
+ * and per-card candidates keep flowing through the specialised extractor.
+ */
+export function shouldSuppressRequestSource(
+  pageUrl: string,
+  type: DownloadType,
+): boolean {
+  if (type !== DownloadType.direct && type !== DownloadType.m3u8) {
+    return false;
+  }
+
+  try {
+    const hostname = new URL(pageUrl).hostname.toLowerCase();
+    return (
+      hostname === "x.com" ||
+      hostname.endsWith(".x.com") ||
+      hostname === "twitter.com" ||
+      hostname.endsWith(".twitter.com")
+    );
+  } catch {
+    return false;
+  }
 }

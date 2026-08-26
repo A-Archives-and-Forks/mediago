@@ -176,6 +176,37 @@ describe("registerSniffer source delegation", () => {
     );
   });
 
+  test("ignores generic media requests on X pages in favor of tweet candidates", async () => {
+    const extension = installChromeDouble();
+    const service = serviceDouble();
+    vi.mocked(chrome.tabs.get).mockResolvedValue({
+      id: 11,
+      url: "https://x.com/home",
+      title: "Home / X",
+      index: 0,
+      pinned: false,
+    });
+    registerSniffer(service);
+
+    extension.requestListener()({
+      tabId: 11,
+      requestId: "request-x-mp4",
+      url: "https://video.twimg.com/ext_tw_video/example/video.mp4",
+      initiator: "https://x.com",
+    } as chrome.webRequest.OnSendHeadersDetails);
+    extension.requestListener()({
+      tabId: 11,
+      requestId: "request-x-hls",
+      url: "https://video.twimg.com/amplify_video/example/playlist.m3u8",
+      initiator: "https://x.com",
+    } as chrome.webRequest.OnSendHeadersDetails);
+
+    await settleAsyncWork();
+
+    expect(service.addSource).not.toHaveBeenCalled();
+    expect(inspectSources).not.toHaveBeenCalled();
+  });
+
   test("inspected request batches add through TabSourceService", async () => {
     vi.useFakeTimers();
     const extension = installChromeDouble();

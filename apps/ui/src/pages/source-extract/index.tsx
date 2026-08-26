@@ -74,7 +74,6 @@ const SourceExtract: FC<SourceExtractProps> = ({ page = false }) => {
     updateTab(payload.tabId, {
       url: payload.url,
       title: payload.title ?? "",
-      status: "loaded",
       errorCode: undefined,
       errorMessage: undefined,
     });

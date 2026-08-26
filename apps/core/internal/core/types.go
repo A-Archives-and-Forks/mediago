@@ -1,7 +1,11 @@
 // Package core contains the core type definitions for the download system
 package core
 
-import "context"
+import (
+	"context"
+	"net/url"
+	"strings"
+)
 
 // DownloadType is the download type enum
 type DownloadType string
@@ -13,6 +17,50 @@ const (
 	TypeMediago  DownloadType = "mediago"
 	TypeYoutube  DownloadType = "youtube"
 )
+
+// InferDownloadType chooses the existing downloader channel for a URL when a
+// caller does not provide an explicit type. X/Twitter status pages share the
+// youtube wire value because both are handled by yt-dlp.
+func InferDownloadType(rawURL string) DownloadType {
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil {
+		return TypeDirect
+	}
+
+	hostname := strings.ToLower(parsed.Hostname())
+	pathname := strings.ToLower(parsed.EscapedPath())
+	switch {
+	case hostname == "b23.tv", hostname == "bilibili.com", strings.HasSuffix(hostname, ".bilibili.com"):
+		return TypeBilibili
+	case hostname == "youtu.be", hostname == "youtube.com", strings.HasSuffix(hostname, ".youtube.com"):
+		return TypeYoutube
+	case isXStatusURL(hostname, pathname):
+		return TypeYoutube
+	case strings.HasSuffix(pathname, ".m3u8"):
+		return TypeM3U8
+	default:
+		return TypeDirect
+	}
+}
+
+func isXStatusURL(hostname, pathname string) bool {
+	isXHost := hostname == "x.com" || strings.HasSuffix(hostname, ".x.com") ||
+		hostname == "twitter.com" || strings.HasSuffix(hostname, ".twitter.com")
+	if !isXHost {
+		return false
+	}
+
+	parts := strings.Split(strings.Trim(pathname, "/"), "/")
+	if len(parts) < 3 || parts[0] == "" || parts[1] != "status" || parts[2] == "" {
+		return false
+	}
+	for _, char := range parts[2] {
+		if char < '0' || char > '9' {
+			return false
+		}
+	}
+	return true
+}
 
 // BinaryNames maps each DownloadType to its executable filename (without extension).
 var BinaryNames = map[DownloadType]string{

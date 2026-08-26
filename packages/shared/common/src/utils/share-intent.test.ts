@@ -16,6 +16,12 @@ test("infers download types from parsed hostnames and paths", () => {
   expect(inferDownloadType("https://youtu.be/example")).toBe(
     DownloadType.youtube,
   );
+  expect(inferDownloadType("https://x.com/openai/status/1234567890")).toBe(
+    DownloadType.youtube,
+  );
+  expect(
+    inferDownloadType("https://twitter.com/openai/status/1234567890"),
+  ).toBe(DownloadType.youtube);
   expect(
     inferDownloadType("https://media.example/live/index.m3u8?token=abc"),
   ).toBe(DownloadType.m3u8);

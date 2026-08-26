@@ -36,9 +36,11 @@ vi.mock("@mediago/shared-common", async (importOriginal) => {
   return {
     ...actual,
     matchPageUrl: vi.fn(() => undefined),
-    matchRequestUrl: vi.fn((url: string) =>
-      url.endsWith(".m3u8") ? { type: actual.DownloadType.m3u8 } : undefined,
-    ),
+    matchRequestUrl: vi.fn((url: string) => {
+      if (url.endsWith(".m3u8")) return { type: actual.DownloadType.m3u8 };
+      if (url.endsWith(".mp4")) return { type: actual.DownloadType.direct };
+      return undefined;
+    }),
   };
 });
 
@@ -58,7 +60,7 @@ vi.mock("./downloader.server", () => ({
 }));
 
 const { DownloadType } = await import("@mediago/shared-common");
-const { AgentCollectionError, SniffingHelper } =
+const { AgentCollectionError, getCookieBackedType, SniffingHelper } =
   await import("./sniffing-helper.service");
 
 afterEach(() => {
@@ -212,6 +214,46 @@ describe("SniffingHelper tab isolation", () => {
     await Promise.resolve();
     await Promise.resolve();
     expect(events).toHaveLength(1);
+  });
+
+  it("ignores generic media requests on X pages in favor of tweet candidates", async () => {
+    const { helper, inspectSources } = createHelper();
+    const events: unknown[] = [];
+    helper.on("source", (event) => events.push(event));
+    register(helper, "tab-x", 303);
+    helper.update("tab-x", { title: "Home / X", url: "https://x.com/home" });
+
+    const listener = electronMocks.listeners.get("persist:webview");
+    listener?.({
+      requestHeaders: { Referer: "https://x.com/home" },
+      url: "https://video.twimg.com/ext_tw_video/example/video.mp4",
+      webContentsId: 303,
+    });
+    listener?.({
+      requestHeaders: { Referer: "https://x.com/home" },
+      url: "https://video.twimg.com/amplify_video/example/playlist.m3u8",
+      webContentsId: 303,
+    });
+
+    await vi.advanceTimersByTimeAsync(150);
+
+    expect(events).toHaveLength(0);
+    expect(inspectSources).not.toHaveBeenCalled();
+  });
+});
+
+describe("cookie-backed page types", () => {
+  it.each([
+    ["https://www.bilibili.com/video/BV1", DownloadType.bilibili],
+    ["https://www.youtube.com/watch?v=video", DownloadType.youtube],
+    ["https://x.com/openai/status/123", DownloadType.youtube],
+    ["https://twitter.com/openai/status/123", DownloadType.youtube],
+  ])("maps %s to %s", (url, type) => {
+    expect(getCookieBackedType(url)).toBe(type);
+  });
+
+  it("does not classify an unrelated site", () => {
+    expect(getCookieBackedType("https://example.com/video")).toBeUndefined();
   });
 });
 

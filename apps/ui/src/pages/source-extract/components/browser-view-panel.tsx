@@ -23,8 +23,9 @@ import {
 } from "@/store/browser";
 import { usePlatform } from "@/hooks/use-platform";
 import { createDownloadTasks } from "@/api/download-task";
-import { DownloadType, type DownloadTask } from "@mediago/shared-common";
+import type { DownloadTask } from "@mediago/shared-common";
 import { filterSources } from "./source-filter";
+import { sourceTypeLabel } from "./source-type-label";
 
 interface SourceItemProps {
   item: SourceData;
@@ -53,9 +54,7 @@ const SourceItem = memo(function SourceItem({
         {item.name}
       </span>
       <div className="flex flex-wrap items-center gap-1.5">
-        <Badge variant="outline">
-          {item.type === DownloadType.m3u8 ? "HLS" : item.type}
-        </Badge>
+        <Badge variant="outline">{sourceTypeLabel(item)}</Badge>
         {item.mediaInfo?.status === "inspecting" ? (
           <Badge variant="secondary">
             <LoaderCircle className="animate-spin" />

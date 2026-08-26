@@ -1,10 +1,12 @@
 import { bilibiliPageAdapter } from "./bilibili";
 import type { PageAdapter, PageAdapterLocation } from "./types";
+import { twitterPageAdapter } from "./twitter";
 import { youtubePageAdapter } from "./youtube";
 
 export const PAGE_ADAPTERS: readonly PageAdapter[] = [
   bilibiliPageAdapter,
   youtubePageAdapter,
+  twitterPageAdapter,
 ];
 
 export function findPageAdapter(

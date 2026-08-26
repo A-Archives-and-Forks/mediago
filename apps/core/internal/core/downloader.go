@@ -165,7 +165,7 @@ func (d *DownloaderSvc) buildArgs(p DownloadParams, s schema.Schema) []string {
 	}
 
 	if p.Type == TypeYoutube {
-		if denoPath := d.youtubeDenoPath(); denoPath != "" {
+		if denoPath := d.ytDLPDenoPath(); denoPath != "" {
 			out = append(out, "--js-runtimes", "deno:"+denoPath)
 		}
 	}
@@ -173,7 +173,7 @@ func (d *DownloaderSvc) buildArgs(p DownloadParams, s schema.Schema) []string {
 	return out
 }
 
-func (d *DownloaderSvc) youtubeDenoPath() string {
+func (d *DownloaderSvc) ytDLPDenoPath() string {
 	ytDLPPath := d.binMap[TypeYoutube]
 	if ytDLPPath == "" {
 		return ""

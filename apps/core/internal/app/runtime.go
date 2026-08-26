@@ -82,11 +82,11 @@ func NewRuntime(cfg *AppConfig) (*Runtime, error) {
 		}
 	}
 	denoPath := filepath.Join(cfg.DepsDir, core.DenoBinaryName+exeExt())
-	logger.Infof("youtube JavaScript runtime: %s", denoPath)
+	logger.Infof("yt-dlp JavaScript runtime: %s", denoPath)
 	if info, err := os.Stat(denoPath); err != nil {
-		logger.Warnf("youtube JavaScript runtime not found: %v", err)
+		logger.Warnf("yt-dlp JavaScript runtime not found: %v", err)
 	} else if info.Mode()&0o111 == 0 {
-		logger.Warnf("youtube JavaScript runtime is not executable: %s", denoPath)
+		logger.Warnf("yt-dlp JavaScript runtime is not executable: %s", denoPath)
 	}
 
 	r := runner.NewPTYRunner()

@@ -21,19 +21,18 @@ import {
 } from "@mediago/shared-common";
 import {
   app,
-  type Event,
   type HandlerDetails,
+  type RenderProcessGoneDetails,
   session,
+  shell,
   WebContentsView,
 } from "electron";
 import isDev from "electron-is-dev";
 import { inject, injectable } from "inversify";
 import {
-  isDeeplink,
   mobileUA,
   PERSIST_WEBVIEW,
   PRIVACY_WEBVIEW,
-  pcUA,
   pluginUrl,
 } from "../utils";
 import ElectronLogger from "../vendor/ElectronLogger";
@@ -64,10 +63,77 @@ const preload = require.resolve("@mediago/electron-preload");
 interface TabRuntime {
   attachedWindow: Electron.BrowserWindow | null;
   bounds: Electron.Rectangle | null;
+  desktopUserAgent: string;
   kind: "user" | "agent";
   partition: string;
   tabId: string;
   view: WebContentsView;
+}
+
+const HTTPS_ONLY_HOSTS = ["x.com", "twitter.com", "google.com"] as const;
+const INTERNAL_BROWSER_PROTOCOLS = new Set(["http:", "https:"]);
+const EXTERNAL_BROWSER_PROTOCOLS = new Set(["mailto:", "sms:", "tel:"]);
+const ERR_ABORTED = -3;
+const RENDER_PROCESS_GONE_ERROR_CODE = -1000;
+const WEB_CONTENTS_DESTROYED_ERROR_CODE = -1001;
+const UNSUPPORTED_PROTOCOL_ERROR_CODE = -1002;
+
+export function normalizeBrowserURL(value: string): string {
+  const trimmed = value.trim();
+  const normalized = /^[a-z][a-z\d+.-]*:/i.test(trimmed)
+    ? trimmed
+    : trimmed.startsWith("//")
+      ? `https:${trimmed}`
+      : `https://${trimmed}`;
+
+  try {
+    const url = new URL(normalized);
+    if (
+      url.protocol === "http:" &&
+      HTTPS_ONLY_HOSTS.some(
+        (host) => url.hostname === host || url.hostname.endsWith(`.${host}`),
+      )
+    ) {
+      url.protocol = "https:";
+      return url.href;
+    }
+  } catch {
+    return normalized;
+  }
+
+  return normalized;
+}
+
+function isGoogleAuthenticationURL(value: string): boolean {
+  try {
+    return new URL(value).hostname === "accounts.google.com";
+  } catch {
+    return false;
+  }
+}
+
+function getURLProtocol(value: string): string | undefined {
+  try {
+    return new URL(value).protocol;
+  } catch {
+    return undefined;
+  }
+}
+
+function isInternalBrowserURL(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return (
+      INTERNAL_BROWSER_PROTOCOLS.has(url.protocol) ||
+      (url.protocol === "about:" && url.pathname === "blank")
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isExternalBrowserURL(value: string): boolean {
+  return EXTERNAL_BROWSER_PROTOCOLS.has(getURLProtocol(value) ?? "");
 }
 
 export interface CreateTabOptions {
@@ -210,10 +276,30 @@ export default class BrowserTabManagerService implements DiscoveryBrowserExecuto
   }
 
   async loadURL(tabId: string, url: string): Promise<void> {
+    const navigationURL = normalizeBrowserURL(url);
     const tab = this.requireTab(tabId);
+    if (isExternalBrowserURL(navigationURL)) {
+      this.openExternalURL(navigationURL, "external protocol");
+      this.emitSnapshot();
+      return;
+    }
+    if (!isInternalBrowserURL(navigationURL)) {
+      Object.assign(tab, {
+        mode: "browser" as const,
+        status: "failed" as const,
+        url: navigationURL,
+        title: navigationURL,
+        favicon: undefined,
+        errorCode: UNSUPPORTED_PROTOCOL_ERROR_CODE,
+        errorMessage: "Unsupported browser URL protocol",
+        sources: [],
+      });
+      this.emitSnapshot();
+      throw new Error("Unsupported browser URL protocol");
+    }
     tab.mode = "browser";
     tab.status = "loading";
-    tab.url = url;
+    tab.url = navigationURL;
     tab.errorCode = undefined;
     tab.errorMessage = undefined;
     tab.sources = [];
@@ -228,11 +314,14 @@ export default class BrowserTabManagerService implements DiscoveryBrowserExecuto
       this.emitSnapshot();
       throw new Error("Unable to allocate a browser tab");
     }
-    this.sniffingHelper.update(tabId, { title: tab.title, url });
+    this.sniffingHelper.update(tabId, {
+      title: tab.title,
+      url: navigationURL,
+    });
     this.blockingRequested = Boolean(this.configCache.get("blockAds"));
     if (this.blockingRequested) this.startBlocking(runtime.partition);
     runtime.view.webContents.stop();
-    await runtime.view.webContents.loadURL(url);
+    await runtime.view.webContents.loadURL(navigationURL);
   }
 
   async goBack(tabId: string): Promise<boolean> {
@@ -304,9 +393,10 @@ export default class BrowserTabManagerService implements DiscoveryBrowserExecuto
   }
 
   setUserAgent(isMobile?: boolean): void {
-    const userAgent = isMobile ? mobileUA : pcUA;
     for (const runtime of this.runtimes.values()) {
-      runtime.view.webContents.setUserAgent(userAgent);
+      runtime.view.webContents.setUserAgent(
+        isMobile ? mobileUA : runtime.desktopUserAgent,
+      );
     }
   }
 
@@ -316,7 +406,7 @@ export default class BrowserTabManagerService implements DiscoveryBrowserExecuto
       if (useProxy) {
         enableSessionProxy(targetSession, this.logger, proxy);
       } else {
-        void targetSession.setProxy({ proxyRules: "" });
+        void targetSession.setProxy({ mode: "system" });
       }
     }
   }
@@ -364,16 +454,16 @@ export default class BrowserTabManagerService implements DiscoveryBrowserExecuto
     if (!init) this.sendToCurrentWindow(IpcEvent.browser.privacyChanged);
   }
 
-  async withBilibiliSessionCookies<
-    T extends Pick<SourceParams, "type" | "headers">,
+  async withSessionCookies<
+    T extends Pick<SourceParams, "type" | "headers" | "url">,
   >(tabId: string, item: T): Promise<T> {
-    if (item.type !== DownloadType.bilibili || hasCookieHeader(item.headers)) {
-      return item;
-    }
+    if (hasCookieHeader(item.headers)) return item;
+    const cookieURL = getSessionCookieURL(item);
+    if (!cookieURL) return item;
     const partition =
       this.runtimes.get(tabId)?.partition ?? this.defaultPartition;
     const cookies = await session.fromPartition(partition).cookies.get({
-      url: "https://www.bilibili.com",
+      url: cookieURL,
     });
     if (cookies.length === 0) return item;
     const cookieHeader = cookies
@@ -535,6 +625,7 @@ export default class BrowserTabManagerService implements DiscoveryBrowserExecuto
     const runtime: TabRuntime = {
       attachedWindow: null,
       bounds: null,
+      desktopUserAgent: view.webContents.getUserAgent(),
       kind,
       partition,
       tabId,
@@ -552,9 +643,9 @@ export default class BrowserTabManagerService implements DiscoveryBrowserExecuto
     this.bindRuntime(runtime);
     view.setBackgroundColor("#fff");
     view.webContents.setAudioMuted(this.configCache.get("audioMuted") === true);
-    view.webContents.setUserAgent(
-      this.configCache.get("isMobile") ? mobileUA : pcUA,
-    );
+    if (this.configCache.get("isMobile")) {
+      view.webContents.setUserAgent(mobileUA);
+    }
     this.applyProxyToPartition(partition);
     if (this.blockingRequested) this.startBlocking(partition);
     if (isDev && process.env.OPEN_DEVTOOLS === "true" && kind === "user") {
@@ -568,12 +659,24 @@ export default class BrowserTabManagerService implements DiscoveryBrowserExecuto
   private bindRuntime(runtime: TabRuntime): void {
     const { webContents } = runtime.view;
     webContents.on("dom-ready", () => this.onDomReady(runtime));
-    webContents.on("did-navigate", () => void this.onDidNavigate(runtime));
-    webContents.on("did-navigate-in-page", () =>
-      this.onDidNavigateInPage(runtime),
+    webContents.on("did-start-navigation", (details) =>
+      this.onDidStartNavigation(runtime, details),
     );
-    webContents.on("did-fail-load", (_event, code, description) =>
-      this.onDidFailLoad(runtime, code, description),
+    webContents.on("did-stop-loading", () => this.onDidStopLoading(runtime));
+    webContents.on("did-navigate", () => void this.onDidNavigate(runtime));
+    webContents.on("did-navigate-in-page", (_event, url, isMainFrame) =>
+      this.onDidNavigateInPage(runtime, url, isMainFrame),
+    );
+    webContents.on(
+      "did-fail-load",
+      (_event, code, description, validatedURL, isMainFrame) =>
+        this.onDidFailLoad(
+          runtime,
+          code,
+          description,
+          validatedURL,
+          isMainFrame,
+        ),
     );
     webContents.on("page-title-updated", () =>
       this.onPageTitleUpdated(runtime),
@@ -581,16 +684,88 @@ export default class BrowserTabManagerService implements DiscoveryBrowserExecuto
     webContents.on("page-favicon-updated", (_event, favicons: string[]) =>
       this.onFaviconUpdated(runtime, favicons),
     );
-    webContents.on("will-navigate", (event: Event, url: string) => {
-      if (isDeeplink(url)) event.preventDefault();
+    webContents.on("render-process-gone", (_event, details) => {
+      this.onRenderProcessGone(runtime, details);
     });
-    webContents.setWindowOpenHandler(({ url }: HandlerDetails) => {
-      if (runtime.kind === "user") {
-        const tab = this.createTab({ url });
-        void this.loadURL(tab.id, url);
+    webContents.on("destroyed", () => this.onWebContentsDestroyed(runtime));
+    webContents.on("will-navigate", (event) => {
+      if (isInternalBrowserURL(event.url)) return;
+      event.preventDefault();
+      if (runtime.kind === "user" && isExternalBrowserURL(event.url)) {
+        this.openExternalURL(event.url, "external protocol");
       }
-      return { action: "deny" };
     });
+    webContents.setWindowOpenHandler((details: HandlerDetails) => {
+      const { disposition, url } = details;
+      if (runtime.kind !== "user") return { action: "deny" };
+      if (isGoogleAuthenticationURL(url)) {
+        this.openExternalURL(url, "external authentication");
+        return { action: "deny" };
+      }
+      if (!isInternalBrowserURL(url)) {
+        if (isExternalBrowserURL(url)) {
+          this.openExternalURL(url, "external protocol");
+        }
+        return { action: "deny" };
+      }
+
+      const tab = this.createTab({
+        activate: disposition !== "background-tab",
+        url,
+      });
+      try {
+        const childRuntime = this.ensureUserRuntime(tab.id);
+        return {
+          action: "allow",
+          createWindow: () => childRuntime.view.webContents,
+          outlivesOpener: true,
+        };
+      } catch {
+        this.closeTab(tab.id);
+        this.logger.error("[BrowserTab] popup view allocation failed");
+        return { action: "deny" };
+      }
+    });
+  }
+
+  private onDidStartNavigation(
+    runtime: TabRuntime,
+    details: {
+      isMainFrame: boolean;
+      isSameDocument: boolean;
+      url: string;
+    },
+  ): void {
+    if (!details.isMainFrame || !this.isCurrentRuntime(runtime)) return;
+    const title = runtime.view.webContents.getTitle();
+    this.sniffingHelper.update(runtime.tabId, { title, url: details.url });
+    if (runtime.kind !== "user") return;
+
+    const tab = this.requireTab(runtime.tabId);
+    const resetPageResources =
+      !details.isSameDocument || tab.url !== details.url;
+    Object.assign(tab, {
+      mode: "browser" as const,
+      status: "loading" as const,
+      url: details.url,
+      errorCode: undefined,
+      errorMessage: undefined,
+      ...(resetPageResources ? { favicon: undefined, sources: [] } : {}),
+    });
+    this.emitSnapshot();
+  }
+
+  private onDidStopLoading(runtime: TabRuntime): void {
+    if (!this.isCurrentRuntime(runtime) || runtime.kind !== "user") return;
+    const tab = this.requireTab(runtime.tabId);
+    if (tab.status === "failed") return;
+    Object.assign(tab, {
+      ...this.pageInfo(runtime),
+      status: "loaded" as const,
+      errorCode: undefined,
+      errorMessage: undefined,
+    });
+    this.emitSnapshot();
   }
 
   private onDomReady(runtime: TabRuntime): void {
@@ -612,7 +787,7 @@ export default class BrowserTabManagerService implements DiscoveryBrowserExecuto
     const pageInfo = this.pageInfo(runtime);
     this.sniffingHelper.update(runtime.tabId, pageInfo);
     if (runtime.kind === "user") {
-      this.updateTabPage(runtime.tabId, pageInfo, "loaded");
+      this.updateTabPage(runtime.tabId, pageInfo);
       this.sendRuntime(runtime, IpcEvent.browser.didNavigate, {
         tabId: runtime.tabId,
         ...pageInfo,
@@ -631,9 +806,16 @@ export default class BrowserTabManagerService implements DiscoveryBrowserExecuto
     }
   }
 
-  private onDidNavigateInPage(runtime: TabRuntime): void {
-    if (!this.isCurrentRuntime(runtime)) return;
-    const pageInfo = this.pageInfo(runtime);
+  private onDidNavigateInPage(
+    runtime: TabRuntime,
+    url?: string,
+    isMainFrame?: boolean,
+  ): void {
+    if (isMainFrame === false || !this.isCurrentRuntime(runtime)) return;
+    const pageInfo = {
+      title: runtime.view.webContents.getTitle(),
+      url: url || runtime.view.webContents.getURL(),
+    };
     this.sniffingHelper.update(runtime.tabId, pageInfo);
     this.sniffingHelper.checkPageInfo(runtime.tabId);
     if (runtime.kind === "user") {
@@ -649,8 +831,15 @@ export default class BrowserTabManagerService implements DiscoveryBrowserExecuto
     runtime: TabRuntime,
     errorCode: number,
     errorMessage: string,
+    validatedURL?: string,
+    isMainFrame?: boolean,
   ): void {
-    if (!this.isCurrentRuntime(runtime)) return;
+    if (
+      isMainFrame === false ||
+      errorCode === ERR_ABORTED ||
+      !this.isCurrentRuntime(runtime)
+    )
+      return;
     if (runtime.kind === "agent") {
       this.sniffingHelper.failAgent(
         runtime.tabId,
@@ -658,7 +847,64 @@ export default class BrowserTabManagerService implements DiscoveryBrowserExecuto
       );
       return;
     }
+    const currentPageInfo = this.pageInfo(runtime);
+    const pageInfo = {
+      title: currentPageInfo.title,
+      url: validatedURL || currentPageInfo.url,
+    };
+    this.failUserRuntime(runtime, pageInfo, errorCode, errorMessage);
+    this.logger.error(`[BrowserTab] load failed (${errorCode})`);
+  }
+
+  private onRenderProcessGone(
+    runtime: TabRuntime,
+    details: RenderProcessGoneDetails,
+  ): void {
+    if (!this.isCurrentRuntime(runtime)) return;
+    if (runtime.kind === "agent") {
+      this.sniffingHelper.failAgent(
+        runtime.tabId,
+        "discovery_navigation_failed",
+      );
+      this.destroyRuntime(runtime.tabId);
+      return;
+    }
+
     const pageInfo = this.pageInfo(runtime);
+    this.destroyRuntime(runtime.tabId);
+    this.failUserRuntime(
+      runtime,
+      pageInfo,
+      RENDER_PROCESS_GONE_ERROR_CODE,
+      `Renderer process exited: ${details.reason}`,
+    );
+  }
+
+  private onWebContentsDestroyed(runtime: TabRuntime): void {
+    if (runtime.kind === "agent") {
+      this.sniffingHelper.failAgent(
+        runtime.tabId,
+        "discovery_navigation_failed",
+      );
+      this.releaseRuntime(runtime);
+      return;
+    }
+    if (!this.releaseRuntime(runtime)) return;
+    const tab = this.requireTab(runtime.tabId);
+    this.failUserRuntime(
+      runtime,
+      { title: tab.title, url: tab.url },
+      WEB_CONTENTS_DESTROYED_ERROR_CODE,
+      "Browser contents were destroyed unexpectedly",
+    );
+  }
+
+  private failUserRuntime(
+    runtime: TabRuntime,
+    pageInfo: { title: string; url: string },
+    errorCode: number,
+    errorMessage: string,
+  ): void {
     const tab = this.requireTab(runtime.tabId);
     Object.assign(tab, {
       status: "failed" as const,
@@ -673,7 +919,12 @@ export default class BrowserTabManagerService implements DiscoveryBrowserExecuto
       errorCode,
       errorMessage,
     } satisfies BrowserNavigationFailurePayload);
-    this.logger.error(`[BrowserTab] load failed (${errorCode})`);
+  }
+
+  private openExternalURL(url: string, purpose: string): void {
+    void shell.openExternal(url).catch(() => {
+      this.logger.error(`[BrowserTab] ${purpose} open failed`);
+    });
   }
 
   private onPageTitleUpdated(runtime: TabRuntime): void {
@@ -696,7 +947,7 @@ export default class BrowserTabManagerService implements DiscoveryBrowserExecuto
   }: SniffingSourceEvent): Promise<void> => {
     const runtime = this.runtimes.get(tabId);
     if (!runtime || runtime.kind !== "user") return;
-    const enriched = await this.withBilibiliSessionCookies(tabId, source);
+    const enriched = await this.withSessionCookies(tabId, source);
     if (!this.isCurrentRuntime(runtime)) return;
     const tab = this.requireTab(tabId);
     const existing = tab.sources.find((item) => item.url === enriched.url);
@@ -765,10 +1016,16 @@ export default class BrowserTabManagerService implements DiscoveryBrowserExecuto
   private destroyRuntime(tabId: string): void {
     const runtime = this.runtimes.get(tabId);
     if (!runtime) return;
-    this.runtimes.delete(tabId);
-    this.detachRuntime(runtime);
-    this.sniffingHelper.unregister(tabId);
+    if (!this.releaseRuntime(runtime)) return;
     runtime.view.webContents.close();
+  }
+
+  private releaseRuntime(runtime: TabRuntime): boolean {
+    if (!this.isCurrentRuntime(runtime)) return false;
+    this.runtimes.delete(runtime.tabId);
+    this.detachRuntime(runtime);
+    this.sniffingHelper.unregister(runtime.tabId);
+    return true;
   }
 
   private isCurrentRuntime(runtime: TabRuntime): boolean {
@@ -812,7 +1069,7 @@ export default class BrowserTabManagerService implements DiscoveryBrowserExecuto
     const { useProxy, proxy } = this.configCache.store;
     const targetSession = session.fromPartition(partition);
     if (useProxy) enableSessionProxy(targetSession, this.logger, proxy);
-    else void targetSession.setProxy({ proxyRules: "" });
+    else void targetSession.setProxy({ mode: "system" });
   }
 
   private startBlocking(partition: string): void {
@@ -882,4 +1139,34 @@ function hasCookieHeader(headers?: string): boolean {
     .replace(/\r\n/g, "\n")
     .split("\n")
     .some((line) => line.split(":", 1)[0]?.trim().toLowerCase() === "cookie");
+}
+
+function getSessionCookieURL(
+  item: Pick<SourceParams, "type" | "url">,
+): string | undefined {
+  if (item.type === DownloadType.bilibili) {
+    return "https://www.bilibili.com";
+  }
+  if (item.type !== DownloadType.youtube) return undefined;
+
+  try {
+    const hostname = new URL(item.url).hostname.toLowerCase();
+    if (hostname === "x.com" || hostname.endsWith(".x.com")) {
+      return "https://x.com";
+    }
+    if (hostname === "twitter.com" || hostname.endsWith(".twitter.com")) {
+      return "https://twitter.com";
+    }
+    if (
+      hostname === "youtu.be" ||
+      hostname === "youtube.com" ||
+      hostname.endsWith(".youtube.com")
+    ) {
+      return "https://www.youtube.com";
+    }
+  } catch {
+    return undefined;
+  }
+
+  return undefined;
 }

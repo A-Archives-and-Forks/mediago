@@ -28,6 +28,11 @@ const PAGE_ACTION_MATCHES = [
   "*://m.youtube.com/*",
   "*://music.youtube.com/*",
   "*://youtu.be/*",
+  "*://x.com/*",
+  "*://www.x.com/*",
+  "*://twitter.com/*",
+  "*://www.twitter.com/*",
+  "*://mobile.twitter.com/*",
 ];
 
 export default defineManifest({

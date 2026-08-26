@@ -63,6 +63,15 @@ export function inferDownloadType(value: string): DownloadType {
     ) {
       return DownloadType.youtube;
     }
+    if (
+      (hostname === "x.com" ||
+        hostname.endsWith(".x.com") ||
+        hostname === "twitter.com" ||
+        hostname.endsWith(".twitter.com")) &&
+      /^\/[^/]+\/status\/\d+(?:\/|$)/.test(pathname)
+    ) {
+      return DownloadType.youtube;
+    }
     if (pathname.endsWith(".m3u8")) return DownloadType.m3u8;
   } catch {
     // Invalid values are rejected by normalizeShareIntent.
