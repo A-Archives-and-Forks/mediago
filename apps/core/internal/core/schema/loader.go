@@ -121,10 +121,10 @@ func DefaultSchemas() SchemaList {
 				Args: map[string]ArgSpec{
 					"url":        {ArgsName: []string{}},
 					"localDir":   {ArgsName: []string{"-P"}},
-					"name":       {ArgsName: []string{"-o"}},
+					"name":       {ArgsName: []string{"-o"}, Postfix: ".%(ext)s"},
 					"headers":    {ArgsName: []string{"--add-header"}},
 					"proxy":      {ArgsName: []string{"--proxy"}},
-					"__common__": {ArgsName: []string{"--no-mtime", "--progress", "--newline", "--no-colors"}},
+					"__common__": {ArgsName: []string{"--no-mtime", "--progress", "--newline", "--no-colors", "--no-simulate", "--print", "after_move:__MEDIAGO_OUTPUT__:%(filepath)s"}},
 				},
 				ConsoleReg: ConsoleReg{
 					Percent: `([\d.]+)%`,

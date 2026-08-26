@@ -27,7 +27,7 @@ type TaskQueue struct {
 
 	// event callback functions
 	onStart    func(TaskID)
-	onSuccess  func(TaskID)
+	onSuccess  func(TaskID, DownloadResult)
 	onFailed   func(TaskID, error)
 	onStopped  func(TaskID)
 	onProgress func(ProgressEvent)
@@ -223,7 +223,7 @@ func (q *TaskQueue) execute(p DownloadParams, ctx context.Context) {
 		q.onStart(p.ID)
 	}
 
-	err := q.downloader.Download(ctx, p, Callbacks{
+	result, err := q.downloader.Download(ctx, p, Callbacks{
 		OnProgress: func(e ProgressEvent) {
 			q.mu.Lock()
 			task, exists := q.tasks[p.ID]
@@ -264,6 +264,7 @@ func (q *TaskQueue) execute(p DownloadParams, ctx context.Context) {
 		if task != nil {
 			task.Status = StatusSuccess
 			task.Percent = 100
+			task.OutputPath = result.PrimaryPath
 		}
 	case errors.Is(err, context.Canceled):
 		if task != nil {
@@ -281,7 +282,7 @@ func (q *TaskQueue) execute(p DownloadParams, ctx context.Context) {
 	case err == nil:
 		logger.Info("Task completed successfully", zap.String("id", string(p.ID)))
 		if q.onSuccess != nil {
-			q.onSuccess(p.ID)
+			q.onSuccess(p.ID, result)
 		}
 	case errors.Is(err, context.Canceled):
 		logger.Info("Task was stopped", zap.String("id", string(p.ID)))
@@ -314,7 +315,7 @@ func (q *TaskQueue) OnStart(fn func(TaskID)) {
 	q.onStart = fn
 }
 
-func (q *TaskQueue) OnSuccess(fn func(TaskID)) {
+func (q *TaskQueue) OnSuccess(fn func(TaskID, DownloadResult)) {
 	q.onSuccess = fn
 }
 

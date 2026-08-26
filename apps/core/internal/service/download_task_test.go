@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -14,6 +15,7 @@ import (
 	"caorushizi.cn/mediago/internal/db"
 	"caorushizi.cn/mediago/internal/db/repo"
 	"caorushizi.cn/mediago/internal/logger"
+	"caorushizi.cn/mediago/internal/tasklog"
 	"go.uber.org/zap"
 )
 
@@ -21,9 +23,9 @@ type headerCaptureDownloader struct {
 	params chan core.DownloadParams
 }
 
-func (d *headerCaptureDownloader) Download(_ context.Context, params core.DownloadParams, _ core.Callbacks) error {
+func (d *headerCaptureDownloader) Download(_ context.Context, params core.DownloadParams, _ core.Callbacks) (core.DownloadResult, error) {
 	d.params <- params
-	return nil
+	return core.DownloadResult{PrimaryPath: "/downloads/runtime-credentials.mp4"}, nil
 }
 
 func (*headerCaptureDownloader) Config() interface{} { return nil }
@@ -296,6 +298,74 @@ func TestStartDownloadWithRuntimeHeadersDoesNotPersistCredentials(t *testing.T) 
 		t.Fatal("timed out waiting for download params")
 	}
 	waitForRuntimeHeaderQueue(t, queue)
+}
+
+func TestGetDownloadTaskUsesPersistedOutputOutsideCurrentDirectory(t *testing.T) {
+	svc, videoRepo := newTestDownloadTaskService(t)
+	actualOutput := filepath.Join(t.TempDir(), "persisted-video.mp4")
+	writeTestOutput(t, actualOutput, "media")
+	video, err := videoRepo.Create(&db.Video{
+		Name:       "display title does not match file",
+		Type:       string(core.TypeYoutube),
+		URL:        "https://example.com/persisted",
+		Status:     "success",
+		OutputPath: actualOutput,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := svc.GetDownloadTask(video.ID, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Exists || result.File != actualOutput {
+		t.Fatalf("GetDownloadTask() = exists %v, file %q", result.Exists, result.File)
+	}
+}
+
+func TestGetDownloadTaskBackfillsLegacyOutputFromLog(t *testing.T) {
+	database, err := db.New(filepath.Join(t.TempDir(), "mediago.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+	videoRepo := repo.NewVideoRepository(database)
+	logs := tasklog.NewManager(filepath.Join(t.TempDir(), "logs"))
+	svc := NewDownloadTaskService(videoRepo, nil, logs)
+
+	name := "@creator · legacy.clip"
+	actualOutput := filepath.Join(t.TempDir(), name)
+	if err := os.WriteFile(actualOutput, []byte("legacy media"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	video, err := videoRepo.Create(&db.Video{
+		Name:   name,
+		Type:   string(core.TypeYoutube),
+		URL:    "https://example.com/legacy",
+		Status: "success",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := logs.Append(string(queueTaskIDForDownload(video.ID)), "[download] Destination: "+actualOutput); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := svc.GetDownloadTask(video.ID, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Exists || result.File != actualOutput {
+		t.Fatalf("GetDownloadTask() = exists %v, file %q", result.Exists, result.File)
+	}
+	stored, err := videoRepo.FindByIDOrFail(video.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stored.OutputPath != actualOutput {
+		t.Fatalf("backfilled outputPath = %q, want %q", stored.OutputPath, actualOutput)
+	}
 }
 
 func waitForRuntimeHeaderQueue(t *testing.T, queue *core.TaskQueue) {

@@ -162,7 +162,7 @@ func TestExternalRunnerBoundary(t *testing.T) {
 				testDownloaderConfig{localDir: depsDir},
 			)
 
-			err := d.Download(context.Background(), DownloadParams{
+			_, err := d.Download(context.Background(), DownloadParams{
 				ID:     TaskID("runner-boundary"),
 				Type:   tt.downloadType,
 				URL:    downloadURL,
@@ -182,7 +182,11 @@ func TestExternalRunnerBoundary(t *testing.T) {
 			}
 			assertStandaloneArgCount(t, tt.name, "URL", gotArgs, 1, downloadURL)
 			assertAdjacentArgCount(t, tt.name, "output directory", gotArgs, 1, tt.outputDirFlag, filepath.Join(depsDir, downloadFolder))
-			assertAdjacentArgCount(t, tt.name, "output name", gotArgs, 1, tt.outputNameFlag, downloadName)
+			expectedOutputName := downloadName
+			if tt.downloadType == TypeYoutube {
+				expectedOutputName += ".%(ext)s"
+			}
+			assertAdjacentArgCount(t, tt.name, "output name", gotArgs, 1, tt.outputNameFlag, expectedOutputName)
 
 			if len(gotMessages) != len(chunks) {
 				t.Fatalf("%s OnMessage count: expected %d, actual %d", tt.name, len(chunks), len(gotMessages))
@@ -225,7 +229,7 @@ func TestDownloaderMissingBBDownContract(t *testing.T) {
 				testDownloaderConfig{localDir: t.TempDir()},
 			)
 
-			err := d.Download(context.Background(), DownloadParams{
+			_, err := d.Download(context.Background(), DownloadParams{
 				ID:   TaskID("missing-bbdown"),
 				Type: TypeBilibili,
 				URL:  "https://www.bilibili.com/video/BV-contract",
@@ -266,7 +270,7 @@ func TestDownloaderUnconfiguredBinaryContract(t *testing.T) {
 		testDownloaderConfig{localDir: t.TempDir()},
 	)
 
-	err := d.Download(context.Background(), DownloadParams{
+	_, err := d.Download(context.Background(), DownloadParams{
 		ID:   TaskID("unconfigured-binary"),
 		Type: TypeBilibili,
 		URL:  "https://www.bilibili.com/video/BV-contract",
@@ -363,15 +367,16 @@ func TestExternalInputContracts(t *testing.T) {
 		assertStandaloneArgCount(t, tool, "header flags", args, len(headers), "--add-header")
 		assertStandaloneArgCount(t, tool, "proxy flag", args, 1, "--proxy")
 		assertAdjacentArgCount(t, tool, "output directory", args, 1, "-P", filepath.Join(localDir, folder))
-		assertAdjacentArgCount(t, tool, "output template", args, 1, "-o", safeName)
+		assertAdjacentArgCount(t, tool, "output template", args, 1, "-o", safeName+".%(ext)s")
 		for i, header := range headers {
 			assertAdjacentArgCount(t, tool, fmt.Sprintf("header %d", i+1), args, 1, "--add-header", header)
 		}
 		assertAdjacentArgCount(t, tool, "proxy", args, 1, "--proxy", proxy)
 		assertAdjacentArgCount(t, tool, "Deno runtime", args, 1, "--js-runtimes", "deno:"+filepath.Join("/runtime", "deno"))
-		for _, flag := range []string{"--no-mtime", "--progress", "--newline", "--no-colors"} {
+		for _, flag := range []string{"--no-mtime", "--progress", "--newline", "--no-colors", "--no-simulate"} {
 			assertStandaloneArgCount(t, tool, flag, args, 1, flag)
 		}
+		assertAdjacentArgCount(t, tool, "final output marker", args, 1, "--print", "after_move:__MEDIAGO_OUTPUT__:%(filepath)s")
 
 		t.Run("X status URL uses the same executor", func(t *testing.T) {
 			const xURL = "https://x.com/openai/status/1234567890"

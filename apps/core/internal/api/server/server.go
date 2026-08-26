@@ -142,7 +142,7 @@ func New(queue *core.TaskQueue, logs *tasklog.Manager, database *db.Database, co
 
 		// Video player service (requires video root directory)
 		if opt.VideoRoot != "" {
-			videoSvc := video.NewService(videoRepo, opt.VideoRoot)
+			videoSvc := video.NewService(videoRepo, opt.VideoRoot, logs)
 			srv.videoHandler = video.NewHandler(videoSvc)
 		}
 	}

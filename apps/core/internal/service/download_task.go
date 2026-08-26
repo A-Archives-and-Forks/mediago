@@ -229,12 +229,11 @@ func (s *DownloadTaskService) GetDownloadTasks(current, pageSize int, filter, lo
 			Video:  item,
 			Exists: false,
 		}
-		if item.Status == "success" && localPath != "" {
-			searchDir := localPath
-			if item.Folder != nil && *item.Folder != "" {
-				searchDir = filepath.Join(localPath, *item.Folder)
+		if item.Status == "success" {
+			exists, file, resolveErr := s.resolveTaskFile(item, localPath)
+			if resolveErr != nil {
+				return nil, resolveErr
 			}
-			exists, file := CheckFileExists(item.Name, searchDir)
 			taskWithFile.Exists = exists
 			taskWithFile.File = file
 		}
@@ -252,14 +251,52 @@ func (s *DownloadTaskService) GetDownloadTask(id int64, localPath string) (*Down
 	}
 
 	result := &DownloadTaskWithFile{Video: item}
-	if item.Status == "success" && localPath != "" {
-		searchDir := localPath
-		if item.Folder != nil && *item.Folder != "" {
-			searchDir = filepath.Join(localPath, *item.Folder)
+	if item.Status == "success" {
+		result.Exists, result.File, err = s.resolveTaskFile(item, localPath)
+		if err != nil {
+			return nil, err
 		}
-		result.Exists, result.File = CheckFileExists(item.Name, searchDir)
 	}
 	return result, nil
+}
+
+func (s *DownloadTaskService) resolveTaskFile(item *db.Video, localPath string) (bool, string, error) {
+	if exists, file := ResolveOutputPath(item.OutputPath); exists {
+		if file != item.OutputPath {
+			if err := s.repo.UpdateOutputPath(item.ID, file); err != nil {
+				return false, "", err
+			}
+			item.OutputPath = file
+		}
+		return true, file, nil
+	}
+
+	searchDir := localPath
+	if searchDir != "" && item.Folder != nil && *item.Folder != "" {
+		searchDir = filepath.Join(localPath, *item.Folder)
+	}
+	if s.logs != nil {
+		if content, readErr := s.logs.Read(string(queueTaskIDForDownload(item.ID))); readErr == nil {
+			if exists, file := ResolveOutputPathFromLog(content, item.Name, searchDir); exists {
+				if err := s.repo.UpdateOutputPath(item.ID, file); err != nil {
+					return false, "", err
+				}
+				item.OutputPath = file
+				return true, file, nil
+			}
+		}
+	}
+
+	if searchDir != "" {
+		if exists, file := CheckFileExists(item.Name, searchDir); exists {
+			if err := s.repo.UpdateOutputPath(item.ID, file); err != nil {
+				return false, "", err
+			}
+			item.OutputPath = file
+			return true, file, nil
+		}
+	}
+	return false, "", nil
 }
 
 // StartDownload starts a download task.
@@ -280,8 +317,8 @@ func (s *DownloadTaskService) startDownload(taskID int64, localPath string, dele
 		return err
 	}
 
-	// Update status to pending
-	if err := s.repo.UpdateStatus([]int64{taskID}, "pending"); err != nil {
+	// Clear any stale artifact identity before re-running the task.
+	if err := s.repo.PrepareDownload(taskID); err != nil {
 		return err
 	}
 
@@ -370,6 +407,12 @@ func (s *DownloadTaskService) ExportDownloadList() (string, error) {
 // SetStatus updates the download status for multiple tasks in bulk.
 func (s *DownloadTaskService) SetStatus(ids []int64, status string) error {
 	return s.repo.UpdateStatus(ids, status)
+}
+
+// CompleteDownload persists the verified primary output and success status in
+// one database update.
+func (s *DownloadTaskService) CompleteDownload(id int64, outputPath string) error {
+	return s.repo.CompleteDownload(id, outputPath)
 }
 
 // SetIsLive updates the live-stream flag.

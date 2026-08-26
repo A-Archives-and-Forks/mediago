@@ -278,6 +278,7 @@ export interface DownloadTask {
   url: string;
   folder?: string | null;
   headers?: string | null;
+  outputPath?: string;
   isLive: boolean;
   status: string;
   createdDate: string;

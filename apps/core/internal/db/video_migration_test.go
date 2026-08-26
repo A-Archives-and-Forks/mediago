@@ -1,0 +1,63 @@
+package db
+
+import (
+	"path/filepath"
+	"testing"
+
+	"github.com/glebarez/sqlite"
+	"gorm.io/gorm"
+)
+
+func TestVideoOutputPathMigrationPreservesLegacyRows(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "downloads.db")
+	legacy, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := legacy.Exec(`
+		CREATE TABLE video (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			name TEXT NOT NULL,
+			type TEXT NOT NULL DEFAULT 'm3u8',
+			url TEXT NOT NULL,
+			folder TEXT,
+			headers TEXT,
+			isLive NUMERIC NOT NULL DEFAULT 0,
+			status TEXT NOT NULL DEFAULT 'ready',
+			createdDate DATETIME,
+			updatedDate DATETIME
+		)
+	`).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := legacy.Exec(`CREATE UNIQUE INDEX idx_video_name ON video(name)`).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := legacy.Exec(`INSERT INTO video (name, type, url, status) VALUES (?, ?, ?, ?)`,
+		"legacy", "youtube", "https://example.com/legacy", "success").Error; err != nil {
+		t.Fatal(err)
+	}
+	legacySQL, err := legacy.DB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := legacySQL.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	database, err := New(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+	if !database.DB.Migrator().HasColumn(&Video{}, "outputPath") {
+		t.Fatal("video.outputPath column was not added")
+	}
+	var video Video
+	if err := database.DB.First(&video).Error; err != nil {
+		t.Fatal(err)
+	}
+	if video.Name != "legacy" || video.Status != "success" || video.OutputPath != "" {
+		t.Fatalf("migrated legacy row = %#v", video)
+	}
+}

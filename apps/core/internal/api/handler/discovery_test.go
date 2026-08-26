@@ -123,9 +123,9 @@ type discoveryDownloadCapture struct {
 	params chan core.DownloadParams
 }
 
-func (d *discoveryDownloadCapture) Download(_ context.Context, params core.DownloadParams, _ core.Callbacks) error {
+func (d *discoveryDownloadCapture) Download(_ context.Context, params core.DownloadParams, _ core.Callbacks) (core.DownloadResult, error) {
 	d.params <- params
-	return nil
+	return core.DownloadResult{PrimaryPath: "/downloads/discovery.mp4"}, nil
 }
 func (*discoveryDownloadCapture) Config() interface{} { return nil }
 

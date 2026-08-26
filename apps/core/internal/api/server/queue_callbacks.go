@@ -36,7 +36,7 @@ func (s *Server) setupQueueCallbacks() {
 		s.hub.Broadcast("download-start", map[string]interface{}{"id": id})
 	})
 
-	s.queue.OnSuccess(func(id core.TaskID) {
+	s.queue.OnSuccess(func(id core.TaskID, result core.DownloadResult) {
 		if s.logs != nil {
 			if err := s.logs.Append(string(id), "Task completed successfully"); err != nil {
 				logger.Warn("Failed to append success log",
@@ -45,13 +45,14 @@ func (s *Server) setupQueueCallbacks() {
 			}
 		}
 
-		// Update database status
+		// Persist the actual output path together with the success status.
 		if s.downloadService != nil {
 			if dbID, err := strconv.ParseInt(string(id), 10, 64); err == nil {
-				if err := s.downloadService.SetStatus([]int64{dbID}, "success"); err != nil {
+				if err := s.downloadService.CompleteDownload(dbID, result.PrimaryPath); err != nil {
 					logger.Warn("Failed to update DB status on success",
 						zap.String("id", string(id)),
 						zap.Error(err))
+					return
 				}
 			}
 		}

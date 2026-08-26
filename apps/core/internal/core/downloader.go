@@ -9,7 +9,9 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strings"
+	"sync"
 
 	"caorushizi.cn/mediago/internal/core/parser"
 	"caorushizi.cn/mediago/internal/core/schema"
@@ -18,9 +20,12 @@ import (
 )
 
 var (
-	ErrUnsupportedType   = errors.New("unsupported download type")
-	ErrM3U8OutputMissing = errors.New("m3u8 download finished without a merged media file")
+	ErrUnsupportedType       = errors.New("unsupported download type")
+	ErrDownloadOutputMissing = errors.New("download finished without a media output")
+	ErrM3U8OutputMissing     = errors.New("m3u8 download finished without a merged media file")
 )
+
+const ytDLPOutputMarker = "__MEDIAGO_OUTPUT__:"
 
 var completedMediaExtensions = map[string]struct{}{
 	".3g2":  {},
@@ -49,6 +54,12 @@ var completedMediaExtensions = map[string]struct{}{
 type outputFileState struct {
 	size    int64
 	modTime int64
+}
+
+type outputCandidate struct {
+	path  string
+	state outputFileState
+	score int
 }
 
 // DownloaderSvc is the downloader service
@@ -110,7 +121,12 @@ func (d *DownloaderSvc) buildArgs(p DownloadParams, s schema.Schema) []string {
 			// this path sees a filesystem-safe value. We sanitize
 			// again defensively — cheap, and guards against any future
 			// code path that bypasses the service layer.
-			name := SanitizeFilename(p.Name)
+			name := outputBaseName(p.Name)
+			if strings.Contains(spec.Postfix, "%(") {
+				// yt-dlp treats percent signs as output-template syntax. Escape
+				// literal title percentages before appending our extension field.
+				name = strings.ReplaceAll(name, "%", "%%")
+			}
 			if spec.Postfix == "@@AUTO@@" {
 				// automatically infer the file extension
 				name = name + "." + guessExtFromURL(p.URL)
@@ -262,6 +278,15 @@ func (d *DownloaderSvc) outputDirectory(p DownloadParams) string {
 	return dir
 }
 
+func outputBaseName(name string) string {
+	safeName := SanitizeFilename(name)
+	ext := filepath.Ext(safeName)
+	if _, ok := completedMediaExtensions[strings.ToLower(ext)]; ok {
+		return strings.TrimSuffix(safeName, ext)
+	}
+	return safeName
+}
+
 func captureOutputFiles(dir, downloadName string) (map[string]outputFileState, error) {
 	result := make(map[string]outputFileState)
 	entries, err := os.ReadDir(dir)
@@ -272,9 +297,40 @@ func captureOutputFiles(dir, downloadName string) (map[string]outputFileState, e
 		return nil, err
 	}
 
-	name := SanitizeFilename(downloadName)
+	name := outputBaseName(downloadName)
 	for _, entry := range entries {
-		if entry.IsDir() || !isOutputFilename(entry.Name(), name) {
+		if entry.IsDir() {
+			if entry.Name() != name {
+				continue
+			}
+			root := filepath.Join(dir, entry.Name())
+			walkErr := filepath.WalkDir(root, func(path string, nested os.DirEntry, walkErr error) error {
+				if walkErr != nil {
+					return walkErr
+				}
+				if nested.IsDir() {
+					return nil
+				}
+				info, infoErr := nested.Info()
+				if infoErr != nil {
+					return infoErr
+				}
+				if !info.Mode().IsRegular() || info.Size() == 0 || !hasCompletedMediaExtension(path) {
+					return nil
+				}
+				relative, relativeErr := filepath.Rel(dir, path)
+				if relativeErr != nil {
+					return relativeErr
+				}
+				result[relative] = outputFileState{size: info.Size(), modTime: info.ModTime().UnixNano()}
+				return nil
+			})
+			if walkErr != nil {
+				return nil, walkErr
+			}
+			continue
+		}
+		if !isOutputFilename(entry.Name(), name) {
 			continue
 		}
 		info, err := entry.Info()
@@ -293,6 +349,9 @@ func captureOutputFiles(dir, downloadName string) (map[string]outputFileState, e
 }
 
 func isOutputFilename(filename, downloadName string) bool {
+	if filename == downloadName {
+		return true
+	}
 	ext := strings.ToLower(filepath.Ext(filename))
 	if _, ok := completedMediaExtensions[ext]; !ok {
 		return false
@@ -301,13 +360,116 @@ func isOutputFilename(filename, downloadName string) bool {
 	return base == downloadName || strings.HasPrefix(base, downloadName+".")
 }
 
-func hasNewOutput(before, after map[string]outputFileState) bool {
-	for name, state := range after {
-		if previous, ok := before[name]; !ok || previous != state {
-			return true
+func hasCompletedMediaExtension(path string) bool {
+	_, ok := completedMediaExtensions[strings.ToLower(filepath.Ext(path))]
+	return ok
+}
+
+func outputCandidateScore(path, downloadName string) int {
+	filename := filepath.Base(path)
+	if filename == outputBaseName(downloadName) {
+		return 350
+	}
+
+	switch strings.ToLower(filepath.Ext(filename)) {
+	case ".mp4", ".mkv", ".webm", ".mov", ".avi", ".flv", ".m4v", ".mpeg", ".mpg", ".wmv", ".rmvb", ".f4v", ".3gp", ".3g2":
+		return 300
+	case ".m4a", ".mp3", ".aac", ".f4a", ".f4b":
+		return 200
+	case ".ts":
+		return 100
+	default:
+		return 0
+	}
+}
+
+func changedOutputCandidates(dir, downloadName string, before, after map[string]outputFileState) []outputCandidate {
+	candidates := make([]outputCandidate, 0, len(after))
+	for relative, state := range after {
+		if previous, ok := before[relative]; ok && previous == state {
+			continue
+		}
+		candidates = append(candidates, outputCandidate{
+			path:  filepath.Join(dir, relative),
+			state: state,
+			score: outputCandidateScore(relative, downloadName),
+		})
+	}
+	sort.Slice(candidates, func(i, j int) bool {
+		if candidates[i].score != candidates[j].score {
+			return candidates[i].score > candidates[j].score
+		}
+		if candidates[i].state.size != candidates[j].state.size {
+			return candidates[i].state.size > candidates[j].state.size
+		}
+		return candidates[i].path < candidates[j].path
+	})
+	return candidates
+}
+
+func normalizeReportedOutputPath(outputDir, reported string) string {
+	reported = trimMatchingQuotes(reported)
+	if reported == "" {
+		return ""
+	}
+	if !filepath.IsAbs(reported) {
+		reported = filepath.Join(outputDir, reported)
+	}
+	absolute, err := filepath.Abs(reported)
+	if err != nil {
+		return ""
+	}
+	absoluteDir, err := filepath.Abs(outputDir)
+	if err != nil {
+		return ""
+	}
+	relative, err := filepath.Rel(absoluteDir, absolute)
+	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return ""
+	}
+	info, err := os.Stat(absolute)
+	if err != nil || !info.Mode().IsRegular() || info.Size() == 0 {
+		return ""
+	}
+	return filepath.Clean(absolute)
+}
+
+func trimMatchingQuotes(value string) string {
+	value = strings.TrimSpace(value)
+	if len(value) >= 2 {
+		first, last := value[0], value[len(value)-1]
+		if (first == '"' && last == '"') || (first == '\'' && last == '\'') {
+			return value[1 : len(value)-1]
 		}
 	}
-	return false
+	return value
+}
+
+func primaryOutputPath(outputDir, downloadName, reported string, before, after map[string]outputFileState) string {
+	if output := normalizeReportedOutputPath(outputDir, reported); output != "" {
+		return output
+	}
+	candidates := changedOutputCandidates(outputDir, downloadName, before, after)
+	if len(candidates) == 0 {
+		return ""
+	}
+	absolute, err := filepath.Abs(candidates[0].path)
+	if err != nil {
+		return ""
+	}
+	return filepath.Clean(absolute)
+}
+
+func outputPathFromLine(line string) string {
+	markerIndex := strings.LastIndex(line, ytDLPOutputMarker)
+	if markerIndex == -1 {
+		return ""
+	}
+	path := line[markerIndex+len(ytDLPOutputMarker):]
+	if end := strings.IndexAny(path, "\r\n"); end >= 0 {
+		path = path[:end]
+	}
+	return strings.TrimSpace(path)
 }
 
 // SanitizeFilename strips or replaces characters that filesystems — chiefly
@@ -371,7 +533,7 @@ func guessExtFromURL(u string) string {
 }
 
 // Download executes a download task
-func (d *DownloaderSvc) Download(ctx context.Context, p DownloadParams, cb Callbacks) error {
+func (d *DownloaderSvc) Download(ctx context.Context, p DownloadParams, cb Callbacks) (DownloadResult, error) {
 	logger.Info("Starting download task",
 		zap.String("id", string(p.ID)),
 		zap.String("type", string(p.Type)),
@@ -383,7 +545,7 @@ func (d *DownloaderSvc) Download(ctx context.Context, p DownloadParams, cb Callb
 		logger.Error("Unsupported download type",
 			zap.String("id", string(p.ID)),
 			zap.String("type", string(p.Type)))
-		return fmt.Errorf("%w: %q", ErrUnsupportedType, p.Type)
+		return DownloadResult{}, fmt.Errorf("%w: %q", ErrUnsupportedType, p.Type)
 	}
 
 	// get the executable path for the corresponding download type
@@ -392,7 +554,7 @@ func (d *DownloaderSvc) Download(ctx context.Context, p DownloadParams, cb Callb
 		logger.Error("Binary not configured for download type",
 			zap.String("id", string(p.ID)),
 			zap.String("type", string(p.Type)))
-		return fmt.Errorf("binary not configured for type %q", p.Type)
+		return DownloadResult{}, fmt.Errorf("binary not configured for type %q", p.Type)
 	}
 
 	// check if the binary file actually exists on disk
@@ -406,7 +568,7 @@ func (d *DownloaderSvc) Download(ctx context.Context, p DownloadParams, cb Callb
 		if extension := filepath.Ext(tool); strings.EqualFold(extension, ".exe") {
 			tool = strings.TrimSuffix(tool, extension)
 		}
-		return &DependencyError{
+		return DownloadResult{}, &DependencyError{
 			Tool:         tool,
 			ExpectedPath: bin,
 			Err:          statErr,
@@ -417,15 +579,10 @@ func (d *DownloaderSvc) Download(ctx context.Context, p DownloadParams, cb Callb
 		zap.String("id", string(p.ID)),
 		zap.String("binary", bin))
 
-	var outputBefore map[string]outputFileState
-	var outputDir string
-	if p.Type == TypeM3U8 {
-		outputDir = d.outputDirectory(p)
-		var inspectErr error
-		outputBefore, inspectErr = captureOutputFiles(outputDir, p.Name)
-		if inspectErr != nil {
-			return fmt.Errorf("inspect m3u8 output directory before download: %w", inspectErr)
-		}
+	outputDir := d.outputDirectory(p)
+	outputBefore, inspectErr := captureOutputFiles(outputDir, p.Name)
+	if inspectErr != nil {
+		return DownloadResult{}, fmt.Errorf("inspect output directory before download: %w", inspectErr)
 	}
 
 	// create a console line parser
@@ -434,7 +591,7 @@ func (d *DownloaderSvc) Download(ctx context.Context, p DownloadParams, cb Callb
 		logger.Error("Failed to create line parser",
 			zap.String("id", string(p.ID)),
 			zap.Error(err))
-		return err
+		return DownloadResult{}, err
 	}
 
 	// build command-line arguments
@@ -448,9 +605,16 @@ func (d *DownloaderSvc) Download(ctx context.Context, p DownloadParams, cb Callb
 
 	// initialize parse state
 	st := &parser.ParseState{}
+	var reportedOutput string
+	var reportedOutputMu sync.Mutex
 
 	// process console output line by line
 	onLine := func(line string) {
+		if output := outputPathFromLine(line); output != "" {
+			reportedOutputMu.Lock()
+			reportedOutput = output
+			reportedOutputMu.Unlock()
+		}
 		line = strings.TrimSpace(line)
 
 		// emit message event
@@ -513,22 +677,30 @@ func (d *DownloaderSvc) Download(ctx context.Context, p DownloadParams, cb Callb
 		logger.Error("Download failed",
 			zap.String("id", string(p.ID)),
 			zap.Error(err))
-		return err
+		return DownloadResult{}, err
 	}
 
-	if p.Type == TypeM3U8 {
-		outputAfter, inspectErr := captureOutputFiles(outputDir, p.Name)
-		if inspectErr != nil {
-			return fmt.Errorf("inspect m3u8 output directory after download: %w", inspectErr)
-		}
-		if !hasNewOutput(outputBefore, outputAfter) {
+	outputAfter, inspectErr := captureOutputFiles(outputDir, p.Name)
+	if inspectErr != nil {
+		return DownloadResult{}, fmt.Errorf("inspect output directory after download: %w", inspectErr)
+	}
+	reportedOutputMu.Lock()
+	reported := reportedOutput
+	reportedOutputMu.Unlock()
+	outputPath := primaryOutputPath(outputDir, p.Name, reported, outputBefore, outputAfter)
+	if outputPath == "" {
+		if p.Type == TypeM3U8 {
 			logger.Error("M3U8 downloader exited without creating a merged media file",
 				zap.String("id", string(p.ID)))
-			return ErrM3U8OutputMissing
+			return DownloadResult{}, ErrM3U8OutputMissing
 		}
+		logger.Error("Downloader exited without creating a media file",
+			zap.String("id", string(p.ID)),
+			zap.String("type", string(p.Type)))
+		return DownloadResult{}, ErrDownloadOutputMissing
 	}
 
 	logger.Info("Download completed successfully",
 		zap.String("id", string(p.ID)))
-	return nil
+	return DownloadResult{PrimaryPath: outputPath}, nil
 }

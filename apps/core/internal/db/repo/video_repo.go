@@ -174,6 +174,29 @@ func (r *VideoRepository) UpdateStatus(ids []int64, status string) error {
 	return r.db.Model(&db.Video{}).Where("id IN ?", ids).Update("status", status).Error
 }
 
+// PrepareDownload clears stale output identity before a task is queued again.
+func (r *VideoRepository) PrepareDownload(id int64) error {
+	return r.db.Model(&db.Video{}).Where("id = ?", id).Updates(map[string]any{
+		"outputPath": "",
+		"status":     "pending",
+	}).Error
+}
+
+// CompleteDownload atomically persists the verified primary artifact and the
+// terminal success status.
+func (r *VideoRepository) CompleteDownload(id int64, outputPath string) error {
+	return r.db.Model(&db.Video{}).Where("id = ?", id).Updates(map[string]any{
+		"outputPath": outputPath,
+		"status":     "success",
+	}).Error
+}
+
+// UpdateOutputPath backfills output identity for a historical task without
+// changing its status or display name.
+func (r *VideoRepository) UpdateOutputPath(id int64, outputPath string) error {
+	return r.db.Model(&db.Video{}).Where("id = ?", id).Update("outputPath", outputPath).Error
+}
+
 // UpdateIsLive updates the live-stream flag.
 func (r *VideoRepository) UpdateIsLive(id int64, isLive bool) (*db.Video, error) {
 	video, err := r.FindByIDOrFail(id)

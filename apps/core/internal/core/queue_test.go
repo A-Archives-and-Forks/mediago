@@ -14,9 +14,9 @@ type blockingDownloader struct {
 	counts   map[TaskID]int
 }
 
-type downloaderFunc func(context.Context, DownloadParams, Callbacks) error
+type downloaderFunc func(context.Context, DownloadParams, Callbacks) (DownloadResult, error)
 
-func (f downloaderFunc) Download(ctx context.Context, params DownloadParams, callbacks Callbacks) error {
+func (f downloaderFunc) Download(ctx context.Context, params DownloadParams, callbacks Callbacks) (DownloadResult, error) {
 	return f(ctx, params, callbacks)
 }
 
@@ -32,14 +32,14 @@ func newBlockingDownloader() *blockingDownloader {
 	}
 }
 
-func (d *blockingDownloader) Download(ctx context.Context, p DownloadParams, _ Callbacks) error {
+func (d *blockingDownloader) Download(ctx context.Context, p DownloadParams, _ Callbacks) (DownloadResult, error) {
 	d.mu.Lock()
 	d.counts[p.ID]++
 	d.mu.Unlock()
 	d.started <- p.ID
 	<-ctx.Done()
 	d.finished <- p.ID
-	return ctx.Err()
+	return DownloadResult{}, ctx.Err()
 }
 
 func (d *blockingDownloader) Config() interface{} {
@@ -103,11 +103,14 @@ func TestTaskQueueKeepsTaskActiveUntilTerminalCallbackFinishes(t *testing.T) {
 	downloadCalls := make(chan TaskID, 2)
 	callbackStarted := make(chan struct{})
 	releaseCallback := make(chan struct{})
-	queue := NewTaskQueue(downloaderFunc(func(_ context.Context, params DownloadParams, _ Callbacks) error {
+	queue := NewTaskQueue(downloaderFunc(func(_ context.Context, params DownloadParams, _ Callbacks) (DownloadResult, error) {
 		downloadCalls <- params.ID
-		return nil
+		return DownloadResult{PrimaryPath: "/downloads/first.mp4"}, nil
 	}), 1)
-	queue.OnSuccess(func(TaskID) {
+	queue.OnSuccess(func(_ TaskID, result DownloadResult) {
+		if result.PrimaryPath != "/downloads/first.mp4" {
+			t.Errorf("success output path = %q", result.PrimaryPath)
+		}
 		close(callbackStarted)
 		<-releaseCallback
 	})

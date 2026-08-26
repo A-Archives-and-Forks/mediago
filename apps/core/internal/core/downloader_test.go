@@ -171,6 +171,19 @@ func TestBuildArgsPassesSniffedM3U8Headers(t *testing.T) {
 	}
 }
 
+func TestBuildArgsEscapesLiteralPercentInYTDLPOutputTemplate(t *testing.T) {
+	d := &DownloaderSvc{
+		binMap: map[DownloadType]string{TypeYoutube: "/runtime/yt-dlp"},
+		cfg:    testDownloaderConfig{localDir: "/downloads"},
+	}
+	args := d.buildArgs(DownloadParams{
+		Type: TypeYoutube,
+		URL:  "https://example.com/video",
+		Name: "100% real.mp4",
+	}, defaultContractSchema(t, string(TypeYoutube)))
+	assertAdjacentArgCount(t, "yt-dlp", "escaped output template", args, 1, "-o", "100%% real.%(ext)s")
+}
+
 func TestBuildArgsUsesBundledFFmpeg(t *testing.T) {
 	d := &DownloaderSvc{binMap: map[DownloadType]string{
 		TypeM3U8: "/opt/mediago/deps/N_m3u8DL-RE",
@@ -219,7 +232,10 @@ func TestDownloadLogsStructuredDiagnosticsWithoutParameterValues(t *testing.T) {
 		map[DownloadType]string{TypeYoutube: bin},
 		runnerFunc(func(_ context.Context, _ string, args []string, _ func(string)) error {
 			runnerArgs = slices.Clone(args)
-			return nil
+			if err := os.MkdirAll(localDir, 0o700); err != nil {
+				return err
+			}
+			return os.WriteFile(filepath.Join(localDir, downloadName), []byte("media"), 0o600)
 		}),
 		schema.SchemaList{Schemas: []schema.Schema{{
 			Type: string(TypeYoutube),
@@ -235,7 +251,7 @@ func TestDownloadLogsStructuredDiagnosticsWithoutParameterValues(t *testing.T) {
 		testDownloaderConfig{localDir: localDir, useProxy: true, proxy: proxyValue},
 	)
 
-	err := d.Download(context.Background(), DownloadParams{
+	_, err := d.Download(context.Background(), DownloadParams{
 		ID:      "log-test",
 		Type:    TypeYoutube,
 		URL:     downloadURL,
@@ -341,7 +357,7 @@ func TestDownloadRejectsM3U8WithoutMergedOutput(t *testing.T) {
 		schema.DefaultSchemas(),
 		testDownloaderConfig{localDir: tempDir},
 	)
-	err := d.Download(context.Background(), DownloadParams{
+	_, err := d.Download(context.Background(), DownloadParams{
 		ID: "1", Type: TypeM3U8, URL: "https://example.com/video.m3u8", Name: "video",
 	}, Callbacks{})
 
@@ -375,7 +391,7 @@ func TestM3U8MissingOutputLogOmitsParameterValues(t *testing.T) {
 		schema.DefaultSchemas(),
 		testDownloaderConfig{localDir: localDir},
 	)
-	err := d.Download(context.Background(), DownloadParams{
+	_, err := d.Download(context.Background(), DownloadParams{
 		ID: "m3u8-log-test", Type: TypeM3U8, URL: "https://media.example/video.m3u8", Name: "m3u8-name-secret",
 	}, Callbacks{})
 	if !errors.Is(err, ErrM3U8OutputMissing) {
@@ -426,11 +442,91 @@ func TestDownloadAcceptsNewMergedM3U8Output(t *testing.T) {
 		schema.DefaultSchemas(),
 		testDownloaderConfig{localDir: tempDir},
 	)
-	err := d.Download(context.Background(), DownloadParams{
+	result, err := d.Download(context.Background(), DownloadParams{
 		ID: "1", Type: TypeM3U8, URL: "https://example.com/video.m3u8", Name: "video",
 	}, Callbacks{})
 
 	if err != nil {
 		t.Fatalf("Download() error = %v", err)
+	}
+	if result.PrimaryPath != filepath.Join(tempDir, "video.mp4") {
+		t.Fatalf("Download() primary path = %q", result.PrimaryPath)
+	}
+}
+
+func TestDownloadReturnsPrimaryOutputForEveryDownloaderType(t *testing.T) {
+	ensureTestLogger()
+	tests := []struct {
+		name         string
+		downloadType DownloadType
+		taskName     string
+		outputName   string
+		reportOutput bool
+	}{
+		{name: "m3u8", downloadType: TypeM3U8, taskName: "stream", outputName: "stream.mp4"},
+		{name: "bilibili", downloadType: TypeBilibili, taskName: "bilibili", outputName: "bilibili.mp4"},
+		{name: "direct avoids duplicate extension", downloadType: TypeDirect, taskName: "direct.mp4", outputName: "direct.mp4"},
+		{name: "mediago", downloadType: TypeMediago, taskName: "mediago", outputName: "mediago.mkv"},
+		{name: "yt-dlp final marker", downloadType: TypeYoutube, taskName: "social.video", outputName: "social.video.mp4", reportOutput: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tempDir := t.TempDir()
+			bin := filepath.Join(tempDir, BinaryNames[test.downloadType])
+			if err := os.WriteFile(bin, []byte("test"), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			want := filepath.Join(tempDir, test.outputName)
+			d := NewDownloader(
+				map[DownloadType]string{test.downloadType: bin},
+				runnerFunc(func(_ context.Context, _ string, _ []string, onLine func(string)) error {
+					if err := os.WriteFile(want, []byte("media"), 0o600); err != nil {
+						return err
+					}
+					if test.reportOutput {
+						onLine(ytDLPOutputMarker + want)
+					}
+					return nil
+				}),
+				schema.DefaultSchemas(),
+				testDownloaderConfig{localDir: tempDir},
+			)
+
+			result, err := d.Download(context.Background(), DownloadParams{
+				ID:   "all-downloaders",
+				Type: test.downloadType,
+				URL:  "https://example.com/video.mp4",
+				Name: test.taskName,
+			}, Callbacks{})
+			if err != nil {
+				t.Fatalf("Download() error = %v", err)
+			}
+			if result.PrimaryPath != want {
+				t.Fatalf("Download() primary path = %q, want %q", result.PrimaryPath, want)
+			}
+		})
+	}
+}
+
+func TestDownloadRejectsSuccessfulExitWithoutOutputForEveryDownloader(t *testing.T) {
+	ensureTestLogger()
+	tempDir := t.TempDir()
+	bin := filepath.Join(tempDir, "BBDown")
+	if err := os.WriteFile(bin, []byte("test"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	d := NewDownloader(
+		map[DownloadType]string{TypeBilibili: bin},
+		runnerFunc(func(context.Context, string, []string, func(string)) error { return nil }),
+		schema.DefaultSchemas(),
+		testDownloaderConfig{localDir: tempDir},
+	)
+
+	_, err := d.Download(context.Background(), DownloadParams{
+		ID: "missing-output", Type: TypeBilibili, URL: "https://example.com/video", Name: "video",
+	}, Callbacks{})
+	if !errors.Is(err, ErrDownloadOutputMissing) {
+		t.Fatalf("Download() error = %v, want ErrDownloadOutputMissing", err)
 	}
 }

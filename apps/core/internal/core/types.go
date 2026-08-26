@@ -148,15 +148,23 @@ type MessageEvent struct {
 
 // TaskInfo holds information about a task
 type TaskInfo struct {
-	ID      TaskID       `json:"id"`              // task ID
-	Type    DownloadType `json:"type"`            // download type
-	URL     string       `json:"url"`             // download URL
-	Name    string       `json:"name"`            // file name
-	Status  TaskStatus   `json:"status"`          // task status
-	Percent float64      `json:"percent"`         // completion percentage
-	Speed   string       `json:"speed"`           // download speed
-	IsLive  bool         `json:"isLive"`          // whether this is a live stream
-	Error   string       `json:"error,omitempty"` // error message (if any)
+	ID         TaskID       `json:"id"`                   // task ID
+	Type       DownloadType `json:"type"`                 // download type
+	URL        string       `json:"url"`                  // download URL
+	Name       string       `json:"name"`                 // file name
+	OutputPath string       `json:"outputPath,omitempty"` // verified primary output path
+	Status     TaskStatus   `json:"status"`               // task status
+	Percent    float64      `json:"percent"`              // completion percentage
+	Speed      string       `json:"speed"`                // download speed
+	IsLive     bool         `json:"isLive"`               // whether this is a live stream
+	Error      string       `json:"error,omitempty"`      // error message (if any)
+}
+
+// DownloadResult identifies the verified primary artifact produced by a
+// downloader. The path is absolute so changing the configured download
+// directory cannot detach a completed task from its file.
+type DownloadResult struct {
+	PrimaryPath string `json:"primaryPath"`
 }
 
 // Callbacks is a collection of download callback functions
@@ -173,6 +181,6 @@ type Runner interface {
 
 // Downloader is the interface for a downloader
 type Downloader interface {
-	Download(ctx context.Context, p DownloadParams, cb Callbacks) error
+	Download(ctx context.Context, p DownloadParams, cb Callbacks) (DownloadResult, error)
 	Config() interface{}
 }

@@ -37,6 +37,7 @@ export interface Video {
   url: string;
   folder?: string;
   headers?: string;
+  outputPath?: string;
   isLive: boolean;
   status: string;
   log: string;

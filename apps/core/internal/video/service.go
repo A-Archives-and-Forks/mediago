@@ -3,13 +3,13 @@ package video
 import (
 	"fmt"
 	"mime"
-	"os"
 	"path/filepath"
-	"strings"
+	"strconv"
 
 	"caorushizi.cn/mediago/internal/db"
 	"caorushizi.cn/mediago/internal/db/repo"
 	"caorushizi.cn/mediago/internal/service"
+	"caorushizi.cn/mediago/internal/tasklog"
 )
 
 // Service provides video-related operations backed by the download database
@@ -22,65 +22,50 @@ type Service interface {
 type dbService struct {
 	repo      *repo.VideoRepository
 	localPath string
+	logs      *tasklog.Manager
 }
 
 // NewService creates a video service backed by the download database
-func NewService(repo *repo.VideoRepository, localPath string) Service {
+func NewService(repo *repo.VideoRepository, localPath string, logs *tasklog.Manager) Service {
 	return &dbService{
 		repo:      repo,
 		localPath: localPath,
+		logs:      logs,
 	}
 }
 
 // resolveFilePath finds the actual file path for a download record.
-// If CheckFileExists returns a directory (multi-part downloads), it scans
-// inside for the first video file.
 func (s *dbService) resolveFilePath(rec *db.Video) (string, error) {
+	if exists, filePath := service.ResolveOutputPath(rec.OutputPath); exists {
+		if filePath != rec.OutputPath {
+			_ = s.repo.UpdateOutputPath(rec.ID, filePath)
+			rec.OutputPath = filePath
+		}
+		return filePath, nil
+	}
+
 	searchDir := s.localPath
 	if rec.Folder != nil && *rec.Folder != "" {
 		searchDir = filepath.Join(s.localPath, *rec.Folder)
+	}
+	if s.logs != nil {
+		if content, readErr := s.logs.Read(strconv.FormatInt(rec.ID, 10)); readErr == nil {
+			if exists, filePath := service.ResolveOutputPathFromLog(content, rec.Name, searchDir); exists {
+				_ = s.repo.UpdateOutputPath(rec.ID, filePath)
+				rec.OutputPath = filePath
+				return filePath, nil
+			}
+		}
 	}
 
 	exists, filePath := service.CheckFileExists(rec.Name, searchDir)
 	if !exists {
 		return "", fmt.Errorf("video file not found")
 	}
-
-	// If the path is a directory, find the first video file inside
-	info, err := os.Stat(filePath)
-	if err != nil {
-		return "", err
-	}
-	if info.IsDir() {
-		found, err := findFirstVideoInDir(filePath)
-		if err != nil {
-			return "", err
-		}
-		return found, nil
-	}
+	_ = s.repo.UpdateOutputPath(rec.ID, filePath)
+	rec.OutputPath = filePath
 
 	return filePath, nil
-}
-
-// findFirstVideoInDir scans a directory for the first video file
-func findFirstVideoInDir(dir string) (string, error) {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return "", err
-	}
-
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		ext := filepath.Ext(entry.Name())
-		mimeType := mime.TypeByExtension(ext)
-		if mimeType != "" && strings.HasPrefix(mimeType, "video") {
-			return filepath.Join(dir, entry.Name()), nil
-		}
-	}
-
-	return "", fmt.Errorf("no video file found in directory %s", dir)
 }
 
 // GetVideoFiles returns all successfully downloaded videos that exist on disk

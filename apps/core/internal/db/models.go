@@ -23,6 +23,7 @@ type Video struct {
 	URL         string    `gorm:"column:url;type:text;not null" json:"url"`
 	Folder      *string   `gorm:"column:folder;type:text" json:"folder"`
 	Headers     *string   `gorm:"column:headers;type:text" json:"headers"`
+	OutputPath  string    `gorm:"column:outputPath;type:text;not null;default:''" json:"outputPath,omitempty"`
 	IsLive      bool      `gorm:"column:isLive;not null;default:0" json:"isLive"`
 	Status      string    `gorm:"column:status;type:text;not null;default:'ready'" json:"status"`
 	CreatedDate time.Time `gorm:"column:createdDate;autoCreateTime" json:"createdDate"`

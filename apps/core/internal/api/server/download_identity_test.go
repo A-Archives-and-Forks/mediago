@@ -49,33 +49,35 @@ type controlledIdentityDownloader struct {
 	release     chan struct{}
 	finished    chan struct{}
 	result      error
+	outputPath  string
 	didStart    atomic.Bool
 	releaseOnce sync.Once
 }
 
 func newControlledIdentityDownloader(result error) *controlledIdentityDownloader {
 	return &controlledIdentityDownloader{
-		started:  make(chan core.DownloadParams, 1),
-		release:  make(chan struct{}),
-		finished: make(chan struct{}),
-		result:   result,
+		started:    make(chan core.DownloadParams, 1),
+		release:    make(chan struct{}),
+		finished:   make(chan struct{}),
+		result:     result,
+		outputPath: "/downloads/identity-contract.mp4",
 	}
 }
 
-func (d *controlledIdentityDownloader) Download(ctx context.Context, params core.DownloadParams, _ core.Callbacks) error {
+func (d *controlledIdentityDownloader) Download(ctx context.Context, params core.DownloadParams, _ core.Callbacks) (core.DownloadResult, error) {
 	d.didStart.Store(true)
 	defer close(d.finished)
 
 	select {
 	case d.started <- params:
 	case <-ctx.Done():
-		return ctx.Err()
+		return core.DownloadResult{}, ctx.Err()
 	}
 	select {
 	case <-d.release:
-		return d.result
+		return core.DownloadResult{PrimaryPath: d.outputPath}, d.result
 	case <-ctx.Done():
-		return ctx.Err()
+		return core.DownloadResult{}, ctx.Err()
 	}
 }
 
@@ -179,6 +181,17 @@ func TestCreateDownloadPreservesIdentityAcrossQueueAndSSE(t *testing.T) {
 			assertIdentityEventID(t, terminal, wantID)
 			if tt.terminalEvent == "download-failed" {
 				assertDependencyFailureEvent(t, terminal)
+			}
+			stored, err := srv.downloadService.FindByIDOrFail(responseID)
+			if err != nil {
+				t.Fatalf("FindByIDOrFail() error = %v", err)
+			}
+			if tt.terminalEvent == "download-success" {
+				if stored.Status != "success" || stored.OutputPath != downloader.outputPath {
+					t.Fatalf("stored successful download = status %q, outputPath %q", stored.Status, stored.OutputPath)
+				}
+			} else if stored.OutputPath != "" {
+				t.Fatalf("failed download outputPath = %q, want empty", stored.OutputPath)
 			}
 		})
 	}

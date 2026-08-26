@@ -20,8 +20,23 @@ func New(dbPath string) (*Database, error) {
 		return nil, err
 	}
 
-	// AutoMigrate: create tables if they don't exist
-	if err := db.AutoMigrate(&Video{}, &Favorite{}, &Conversion{}); err != nil {
+	// SQLite table rebuilds can fail when GORM adds a new NOT NULL column to
+	// the legacy video table. Migrate that existing table explicitly and avoid
+	// asking AutoMigrate to rebuild it. New databases still receive the full
+	// model schema.
+	videoTableExists := db.Migrator().HasTable(&Video{})
+	if videoTableExists && !db.Migrator().HasColumn(&Video{}, "outputPath") {
+		if err := db.Exec(`ALTER TABLE "video" ADD COLUMN "outputPath" TEXT NOT NULL DEFAULT ''`).Error; err != nil {
+			return nil, err
+		}
+	}
+
+	if !videoTableExists {
+		if err := db.AutoMigrate(&Video{}); err != nil {
+			return nil, err
+		}
+	}
+	if err := db.AutoMigrate(&Favorite{}, &Conversion{}); err != nil {
 		return nil, err
 	}
 
