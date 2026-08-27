@@ -159,6 +159,27 @@ function installDouyinJingxuanCard(
   return card;
 }
 
+function installXiaohongshuCard(
+  noteID = "66f00abc1234567890abcdef",
+  title = "小红书列表标题",
+): HTMLElement {
+  document.head.innerHTML = '<base href="https://www.xiaohongshu.com/explore">';
+  document.body.innerHTML = `
+    <main class="feeds-container">
+      <section class="note-item">
+        <a class="cover" href="/explore/${noteID}?xsec_token=feed-token&xsec_source=pc_feed">
+          <img alt="${title}" />
+          <span class="play-icon"></span>
+        </a>
+        <div class="footer"><a class="title">${title}</a></div>
+      </section>
+    </main>
+  `;
+  const card = document.querySelector<HTMLElement>("section.note-item");
+  if (!card) throw new Error("Expected a Xiaohongshu card fixture");
+  return card;
+}
+
 function cardButton(card: HTMLElement): HTMLElement | null {
   return (
     card
@@ -190,6 +211,9 @@ describe("supported page URL matching", () => {
     "https://vm.tiktok.com/ZTR45GpSF/",
     "https://www.douyin.com/video/7480123456789012345",
     "https://v.douyin.com/iF123AbC/",
+    "https://www.xiaohongshu.com/explore/66f00abc1234567890abcdef?xsec_token=token",
+    "https://www.xiaohongshu.com/discovery/item/66f00abc1234567890abcdef?xsec_token=token",
+    "https://xhslink.com/a1B2c3D4",
   ])("accepts canonical directly supported route %s", (url) => {
     expect(isSupportedPageUrl(url)).toBe(true);
   });
@@ -203,6 +227,8 @@ describe("supported page URL matching", () => {
     "https://twitter.com/search?q=video",
     "https://www.tiktok.com/@creator/live",
     "https://www.douyin.com/user/example",
+    "https://www.xiaohongshu.com/explore",
+    "https://www.xiaohongshu.com/search_result?keyword=video",
     "https://example.com/video/1",
   ])("rejects route without a canonical page rule %s", (url) => {
     expect(isSupportedPageUrl(url)).toBe(false);
@@ -528,6 +554,34 @@ describe("site card runtime controller", () => {
         name: "当前抖音精选标题",
         url: "https://www.douyin.com/video/7673896622496959771",
         type: "youtube",
+      },
+    });
+    controller.destroy();
+  });
+
+  test("shows and activates the same download button on Xiaohongshu cards", async () => {
+    const card = installXiaohongshuCard(
+      "66f00abc1234567890abcdef",
+      "当前小红书列表标题",
+    );
+    const fixture = createPorts({
+      url: "https://www.xiaohongshu.com/explore",
+    });
+    const controller = await createPageActionController(fixture.ports);
+
+    expect(pageActionButton()).toBeNull();
+    expect(cardButton(card)?.textContent).toBe("下载");
+    cardButton(card)?.click();
+
+    await vi.waitFor(() => {
+      expect(fixture.sendMessage).toHaveBeenCalledOnce();
+    });
+    expect(fixture.sendMessage).toHaveBeenCalledWith({
+      type: "ADD_PAGE_CANDIDATE_TO_POPUP",
+      candidate: {
+        name: "当前小红书列表标题",
+        url: "https://www.xiaohongshu.com/explore/66f00abc1234567890abcdef?xsec_token=feed-token&xsec_source=pc_feed",
+        type: "xiaohongshu",
       },
     });
     controller.destroy();

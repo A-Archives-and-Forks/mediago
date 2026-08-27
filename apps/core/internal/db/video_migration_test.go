@@ -53,6 +53,9 @@ func TestVideoOutputPathMigrationPreservesLegacyRows(t *testing.T) {
 	if !database.DB.Migrator().HasColumn(&Video{}, "outputPath") {
 		t.Fatal("video.outputPath column was not added")
 	}
+	if !database.DB.Migrator().HasTable(&DownloadArtifact{}) {
+		t.Fatal("download_artifact table was not created")
+	}
 	var video Video
 	if err := database.DB.First(&video).Error; err != nil {
 		t.Fatal(err)

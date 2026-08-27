@@ -77,6 +77,18 @@ export const SNIFF_FILTERS: SniffFilter[] = [
     },
   },
   {
+    // Xiaohongshu needs the stable note/share URL, including its xsec_token,
+    // rather than one of the many short-lived image/video CDN renditions.
+    hosts: [
+      /^https?:\/\/(?:www\.)?xiaohongshu\.com\/(?:explore\/[^/?#]+|discovery\/item\/[^/?#]+|user\/profile\/[^/?#]+\/[^/?#]+)(?:[/?#]|$)/i,
+      /^https?:\/\/(?:www\.)?xhslink\.com\/[^/?#]+(?:[/?#]|$)/i,
+    ],
+    type: DownloadType.xiaohongshu,
+    schema: {
+      name: "title",
+    },
+  },
+  {
     matches: [
       /\.(mp4|flv|mov|avi|mkv|wmv|m4a|ogg|m4b|m4p|m4r|m4b|m4p|m4r)(?![a-zA-Z])/,
     ],
@@ -149,7 +161,12 @@ export function shouldSuppressRequestSource(
       hostname === "m.tiktok.com" ||
       hostname === "douyin.com" ||
       hostname === "www.douyin.com";
-    return isX || isShortVideo;
+    const isXiaohongshu =
+      hostname === "xiaohongshu.com" ||
+      hostname.endsWith(".xiaohongshu.com") ||
+      hostname === "xhslink.com" ||
+      hostname.endsWith(".xhslink.com");
+    return isX || isShortVideo || isXiaohongshu;
   } catch {
     return false;
   }

@@ -66,6 +66,9 @@ export function inferDownloadType(value: string): DownloadType {
     if (isSupportedShortVideoURL(hostname, pathname)) {
       return DownloadType.youtube;
     }
+    if (isSupportedXiaohongshuURL(hostname, pathname)) {
+      return DownloadType.xiaohongshu;
+    }
     if (
       (hostname === "x.com" ||
         hostname.endsWith(".x.com") ||
@@ -80,6 +83,25 @@ export function inferDownloadType(value: string): DownloadType {
     // Invalid values are rejected by normalizeShareIntent.
   }
   return DownloadType.direct;
+}
+
+function isSupportedXiaohongshuURL(
+  hostname: string,
+  pathname: string,
+): boolean {
+  if (hostname === "xhslink.com" || hostname.endsWith(".xhslink.com")) {
+    return pathname !== "/";
+  }
+  if (
+    hostname !== "xiaohongshu.com" &&
+    !hostname.endsWith(".xiaohongshu.com")
+  ) {
+    return false;
+  }
+  return (
+    /^\/(?:explore|discovery\/item)\/[^/]+(?:\/|$)/.test(pathname) ||
+    /^\/user\/profile\/[^/]+\/[^/]+(?:\/|$)/.test(pathname)
+  );
 }
 
 function isSupportedShortVideoURL(hostname: string, pathname: string): boolean {

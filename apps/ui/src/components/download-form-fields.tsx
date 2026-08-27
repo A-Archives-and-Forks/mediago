@@ -24,6 +24,7 @@ const DOWNLOAD_TYPE_OPTIONS = [
   { value: DownloadType.m3u8, labelKey: "streamMedia" },
   { value: DownloadType.bilibili, labelKey: "bilibiliMedia" },
   { value: DownloadType.youtube, labelKey: "youtubeMedia" },
+  { value: DownloadType.xiaohongshu, labelKey: "xiaohongshuMedia" },
   { value: DownloadType.direct, labelKey: "direct" },
   { value: DownloadType.mediago, labelKey: "mediagoMedia" },
 ] as const;

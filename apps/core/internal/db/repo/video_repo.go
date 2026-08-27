@@ -2,6 +2,7 @@ package repo
 
 import (
 	"errors"
+	"strings"
 
 	"caorushizi.cn/mediago/internal/db"
 	"gorm.io/gorm"
@@ -176,25 +177,67 @@ func (r *VideoRepository) UpdateStatus(ids []int64, status string) error {
 
 // PrepareDownload clears stale output identity before a task is queued again.
 func (r *VideoRepository) PrepareDownload(id int64) error {
-	return r.db.Model(&db.Video{}).Where("id = ?", id).Updates(map[string]any{
-		"outputPath": "",
-		"status":     "pending",
-	}).Error
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("videoId = ?", id).Delete(&db.DownloadArtifact{}).Error; err != nil {
+			return err
+		}
+		return tx.Model(&db.Video{}).Where("id = ?", id).Updates(map[string]any{
+			"outputPath": "",
+			"status":     "pending",
+		}).Error
+	})
 }
 
-// CompleteDownload atomically persists the verified primary artifact and the
-// terminal success status.
-func (r *VideoRepository) CompleteDownload(id int64, outputPath string) error {
-	return r.db.Model(&db.Video{}).Where("id = ?", id).Updates(map[string]any{
-		"outputPath": outputPath,
-		"status":     "success",
-	}).Error
+// CompleteDownload atomically persists all verified artifacts together with
+// the backward-compatible primary output path and terminal success status.
+func (r *VideoRepository) CompleteDownload(id int64, primaryPath string, artifactPaths []string) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := replaceArtifacts(tx, id, primaryPath, artifactPaths); err != nil {
+			return err
+		}
+		return tx.Model(&db.Video{}).Where("id = ?", id).Updates(map[string]any{
+			"outputPath": primaryPath,
+			"status":     "success",
+		}).Error
+	})
 }
 
 // UpdateOutputPath backfills output identity for a historical task without
 // changing its status or display name.
 func (r *VideoRepository) UpdateOutputPath(id int64, outputPath string) error {
-	return r.db.Model(&db.Video{}).Where("id = ?", id).Update("outputPath", outputPath).Error
+	return r.UpdateResolvedArtifacts(id, outputPath, []string{outputPath})
+}
+
+// UpdateResolvedArtifacts backfills artifact identity for historical tasks
+// without changing their status or display name.
+func (r *VideoRepository) UpdateResolvedArtifacts(id int64, primaryPath string, artifactPaths []string) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := replaceArtifacts(tx, id, primaryPath, artifactPaths); err != nil {
+			return err
+		}
+		return tx.Model(&db.Video{}).Where("id = ?", id).Update("outputPath", primaryPath).Error
+	})
+}
+
+// FindArtifactPaths retrieves all persisted task artifacts in downloader order.
+func (r *VideoRepository) FindArtifactPaths(videoIDs []int64) (map[int64][]string, error) {
+	result := make(map[int64][]string, len(videoIDs))
+	if len(videoIDs) == 0 {
+		return result, nil
+	}
+
+	var artifacts []db.DownloadArtifact
+	if err := r.db.Where("videoId IN ?", videoIDs).
+		Order("videoId ASC").
+		Order("position ASC").
+		Order("id ASC").
+		Find(&artifacts).Error; err != nil {
+		return nil, err
+	}
+	for _, artifact := range artifacts {
+		result[artifact.VideoID] = append(result[artifact.VideoID], artifact.Path)
+	}
+	return result, nil
 }
 
 // UpdateIsLive updates the live-stream flag.
@@ -212,7 +255,12 @@ func (r *VideoRepository) UpdateIsLive(id int64, isLive bool) (*db.Video, error)
 
 // Delete removes a download task.
 func (r *VideoRepository) Delete(id int64) error {
-	return r.db.Delete(&db.Video{}, id).Error
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("videoId = ?", id).Delete(&db.DownloadArtifact{}).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&db.Video{}, id).Error
+	})
 }
 
 // DeleteMany removes multiple download tasks in bulk.
@@ -220,5 +268,48 @@ func (r *VideoRepository) DeleteMany(ids []int64) error {
 	if len(ids) == 0 {
 		return nil
 	}
-	return r.db.Delete(&db.Video{}, ids).Error
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("videoId IN ?", ids).Delete(&db.DownloadArtifact{}).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&db.Video{}, ids).Error
+	})
+}
+
+func replaceArtifacts(tx *gorm.DB, videoID int64, primaryPath string, artifactPaths []string) error {
+	if err := tx.Where("videoId = ?", videoID).Delete(&db.DownloadArtifact{}).Error; err != nil {
+		return err
+	}
+
+	paths := make([]string, 0, len(artifactPaths)+1)
+	seen := make(map[string]struct{}, len(artifactPaths)+1)
+	appendPath := func(candidate string) {
+		candidate = strings.TrimSpace(candidate)
+		if candidate == "" {
+			return
+		}
+		if _, ok := seen[candidate]; ok {
+			return
+		}
+		seen[candidate] = struct{}{}
+		paths = append(paths, candidate)
+	}
+	appendPath(primaryPath)
+	for _, artifactPath := range artifactPaths {
+		appendPath(artifactPath)
+	}
+	if len(paths) == 0 {
+		return nil
+	}
+
+	artifacts := make([]db.DownloadArtifact, 0, len(paths))
+	for position, artifactPath := range paths {
+		artifacts = append(artifacts, db.DownloadArtifact{
+			VideoID:   videoID,
+			Path:      artifactPath,
+			Position:  position,
+			IsPrimary: position == 0,
+		})
+	}
+	return tx.Create(&artifacts).Error
 }

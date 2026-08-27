@@ -256,6 +256,34 @@ func TestDownloaderMissingBBDownContract(t *testing.T) {
 	}
 }
 
+func TestDownloaderMissingYTDLPForXiaohongshuReportsSharedDependencyName(t *testing.T) {
+	ensureTestLogger()
+	missingPath := filepath.Join(t.TempDir(), "yt-dlp")
+	d := NewDownloader(
+		map[DownloadType]string{TypeXiaohongshu: missingPath},
+		runnerFunc(func(context.Context, string, []string, func(string)) error {
+			t.Fatal("runner was called for a missing dependency")
+			return nil
+		}),
+		schema.DefaultSchemas(),
+		testDownloaderConfig{localDir: t.TempDir()},
+	)
+
+	_, err := d.Download(context.Background(), DownloadParams{
+		ID:   "missing-ytdlp-xiaohongshu",
+		Type: TypeXiaohongshu,
+		URL:  "https://www.xiaohongshu.com/explore/abc123?xsec_token=signed-token",
+		Name: "xiaohongshu",
+	}, Callbacks{})
+	var dependencyErr *DependencyError
+	if !errors.As(err, &dependencyErr) {
+		t.Fatalf("Download() error = %v, want *DependencyError", err)
+	}
+	if dependencyErr.Tool != "yt-dlp" {
+		t.Fatalf("DependencyError.Tool = %q, want yt-dlp", dependencyErr.Tool)
+	}
+}
+
 func TestDownloaderUnconfiguredBinaryContract(t *testing.T) {
 	ensureTestLogger()
 
@@ -364,11 +392,15 @@ func TestExternalInputContracts(t *testing.T) {
 		assertStandaloneArgCount(t, tool, "URL", args, 1, url)
 		assertStandaloneArgCount(t, tool, "output directory flag", args, 1, "-P")
 		assertStandaloneArgCount(t, tool, "output template flag", args, 1, "-o")
-		assertStandaloneArgCount(t, tool, "header flags", args, len(headers), "--add-header")
+		assertStandaloneArgCount(t, tool, "header flags", args, len(headers)-1, "--add-header")
 		assertStandaloneArgCount(t, tool, "proxy flag", args, 1, "--proxy")
 		assertAdjacentArgCount(t, tool, "output directory", args, 1, "-P", filepath.Join(localDir, folder))
 		assertAdjacentArgCount(t, tool, "output template", args, 1, "-o", safeName+".%(ext)s")
 		for i, header := range headers {
+			if strings.EqualFold(headerNameForLog(header), "Cookie") {
+				assertAdjacentArgCount(t, tool, fmt.Sprintf("header %d", i+1), args, 0, "--add-header", header)
+				continue
+			}
 			assertAdjacentArgCount(t, tool, fmt.Sprintf("header %d", i+1), args, 1, "--add-header", header)
 		}
 		assertAdjacentArgCount(t, tool, "proxy", args, 1, "--proxy", proxy)
@@ -388,7 +420,7 @@ func TestExternalInputContracts(t *testing.T) {
 			}, defaultContractSchema(t, string(TypeYoutube)))
 
 			assertStandaloneArgCount(t, tool, "X URL", xArgs, 1, xURL)
-			assertAdjacentArgCount(t, tool, "X cookie header", xArgs, 1, "--add-header", "Cookie: auth_token=test-only; ct0=test-only")
+			assertAdjacentArgCount(t, tool, "X cookie header", xArgs, 0, "--add-header", "Cookie: auth_token=test-only; ct0=test-only")
 		})
 
 		t.Run("disabled proxy with value", func(t *testing.T) {
@@ -415,6 +447,47 @@ func TestExternalInputContracts(t *testing.T) {
 			defaultContractSchema(t, string(TypeYoutube)),
 		)
 		assertAdjacentArgCount(t, "yt-dlp", "exe-suffixed Deno runtime", args, 1, "--js-runtimes", "deno:"+filepath.Join("/runtime", "deno.exe"))
+	})
+
+	t.Run("Xiaohongshu uses yt-dlp", func(t *testing.T) {
+		const (
+			tool     = "yt-dlp"
+			pageURL  = "https://www.xiaohongshu.com/explore/abc123?xsec_token=signed-token&xsec_source=pc_feed"
+			localDir = "/downloads"
+			folder   = "saved"
+			cookie   = "web_session=test-only"
+			proxy    = "http://proxy.example:8080"
+		)
+		d := &DownloaderSvc{cfg: testDownloaderConfig{localDir: localDir, useProxy: true, proxy: proxy}}
+		args := d.buildArgs(DownloadParams{
+			Type:    TypeXiaohongshu,
+			URL:     pageURL,
+			Name:    unsafeName,
+			Folder:  folder,
+			Headers: []string{"Cookie: " + cookie},
+		}, defaultContractSchema(t, string(TypeXiaohongshu)))
+
+		assertStandaloneArgCount(t, tool, "full signed URL", args, 1, pageURL)
+		assertAdjacentArgCount(t, tool, "output directory", args, 1, "-P", filepath.Join(localDir, folder))
+		assertAdjacentArgCount(t, tool, "output template", args, 1, "-o", safeName+".%(ext)s")
+		assertAdjacentArgCount(t, tool, "cookie header", args, 0, "--add-header", "Cookie: "+cookie)
+		assertAdjacentArgCount(t, tool, "proxy", args, 1, "--proxy", proxy)
+		assertAdjacentArgCount(t, tool, "final output marker", args, 1, "--print", "after_move:__MEDIAGO_OUTPUT__:%(filepath)s")
+
+		profileURL := "https://www.xiaohongshu.com/user/profile/author-id/abc123?xsec_token=signed-token&xsec_source=pc_user"
+		profileArgs := d.buildArgs(DownloadParams{
+			Type: TypeXiaohongshu,
+			URL:  profileURL,
+			Name: unsafeName,
+		}, defaultContractSchema(t, string(TypeXiaohongshu)))
+		assertStandaloneArgCount(
+			t,
+			tool,
+			"normalized profile work URL",
+			profileArgs,
+			1,
+			"https://www.xiaohongshu.com/explore/abc123?xsec_token=signed-token&xsec_source=pc_user",
+		)
 	})
 }
 

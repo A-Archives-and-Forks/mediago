@@ -47,4 +47,12 @@ describe("urlDownloadType", () => {
   ])("does not classify unsupported short-video routes: %s", (url) => {
     expect(urlDownloadType(url)).toBe(DownloadType.direct);
   });
+
+  it.each([
+    "https://www.xiaohongshu.com/explore/66f00abc1234567890abcdef?xsec_token=token",
+    "https://www.xiaohongshu.com/discovery/item/66f00abc1234567890abcdef?xsec_token=token",
+    "https://xhslink.com/a1B2c3D4",
+  ])("routes Xiaohongshu note URLs through yt-dlp: %s", (url) => {
+    expect(urlDownloadType(url)).toBe(DownloadType.xiaohongshu);
+  });
 });

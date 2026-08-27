@@ -32,6 +32,20 @@ type Video struct {
 
 func (Video) TableName() string { return "video" }
 
+// DownloadArtifact records every file produced by one download task. Position
+// preserves the downloader's deterministic ordering and position zero is the
+// primary file mirrored by Video.OutputPath for backward compatibility.
+type DownloadArtifact struct {
+	ID          int64     `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	VideoID     int64     `gorm:"column:videoId;not null;index;uniqueIndex:idx_download_artifact_video_path" json:"videoId"`
+	Path        string    `gorm:"column:path;type:text;not null;uniqueIndex:idx_download_artifact_video_path" json:"path"`
+	Position    int       `gorm:"column:position;not null;default:0" json:"position"`
+	IsPrimary   bool      `gorm:"column:isPrimary;not null;default:0" json:"isPrimary"`
+	CreatedDate time.Time `gorm:"column:createdDate;autoCreateTime" json:"createdDate"`
+}
+
+func (DownloadArtifact) TableName() string { return "download_artifact" }
+
 // Favorite maps to the "favorite" table.
 type Favorite struct {
 	ID          int64              `gorm:"column:id;primaryKey;autoIncrement" json:"id"`

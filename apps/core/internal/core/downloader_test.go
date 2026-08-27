@@ -468,12 +468,16 @@ func TestDownloadReturnsPrimaryOutputForEveryDownloaderType(t *testing.T) {
 		{name: "direct avoids duplicate extension", downloadType: TypeDirect, taskName: "direct.mp4", outputName: "direct.mp4"},
 		{name: "mediago", downloadType: TypeMediago, taskName: "mediago", outputName: "mediago.mkv"},
 		{name: "yt-dlp final marker", downloadType: TypeYoutube, taskName: "social.video", outputName: "social.video.mp4", reportOutput: true},
+		{name: "xiaohongshu", downloadType: TypeXiaohongshu, taskName: "xiaohongshu", outputName: "xiaohongshu.mp4"},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			tempDir := t.TempDir()
 			bin := filepath.Join(tempDir, BinaryNames[test.downloadType])
+			if err := os.MkdirAll(filepath.Dir(bin), 0o700); err != nil {
+				t.Fatal(err)
+			}
 			if err := os.WriteFile(bin, []byte("test"), 0o700); err != nil {
 				t.Fatal(err)
 			}
@@ -505,7 +509,192 @@ func TestDownloadReturnsPrimaryOutputForEveryDownloaderType(t *testing.T) {
 			if result.PrimaryPath != want {
 				t.Fatalf("Download() primary path = %q, want %q", result.PrimaryPath, want)
 			}
+			if len(result.ArtifactPaths) != 1 || result.ArtifactPaths[0] != want {
+				t.Fatalf("Download() artifact paths = %q, want [%q]", result.ArtifactPaths, want)
+			}
 		})
+	}
+}
+
+func TestDownloadReturnsEveryArtifactFromTaskOutputDirectory(t *testing.T) {
+	ensureTestLogger()
+	tempDir := t.TempDir()
+	bin := filepath.Join(tempDir, BinaryNames[TypeXiaohongshu])
+	if err := os.MkdirAll(filepath.Dir(bin), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(bin, []byte("test"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	const taskName = "xiaohongshu-note"
+	videoPath := filepath.Join(tempDir, taskName+".mp4")
+	alternateVideoPath := filepath.Join(tempDir, taskName+".webm")
+	d := NewDownloader(
+		map[DownloadType]string{TypeXiaohongshu: bin},
+		runnerFunc(func(_ context.Context, _ string, _ []string, emit func(string)) error {
+			if err := os.WriteFile(videoPath, []byte("video"), 0o600); err != nil {
+				return err
+			}
+			if err := os.WriteFile(alternateVideoPath, []byte("alternate video"), 0o600); err != nil {
+				return err
+			}
+			emit(ytDLPOutputMarker + videoPath)
+			return nil
+		}),
+		schema.DefaultSchemas(),
+		testDownloaderConfig{localDir: tempDir},
+	)
+
+	result, err := d.Download(context.Background(), DownloadParams{
+		ID:   "xiaohongshu-artifacts",
+		Type: TypeXiaohongshu,
+		URL:  "https://www.xiaohongshu.com/explore/abc123?xsec_token=signed-token",
+		Name: taskName,
+	}, Callbacks{})
+	if err != nil {
+		t.Fatalf("Download() error = %v", err)
+	}
+	if result.PrimaryPath != videoPath {
+		t.Fatalf("Download() primary path = %q, want %q", result.PrimaryPath, videoPath)
+	}
+	wantArtifacts := []string{videoPath, alternateVideoPath}
+	if !slices.Equal(result.ArtifactPaths, wantArtifacts) {
+		t.Fatalf("Download() artifact paths = %q, want %q", result.ArtifactPaths, wantArtifacts)
+	}
+}
+
+func TestDownloadYTDLPUsesTemporaryCookieFile(t *testing.T) {
+	ensureTestLogger()
+	tempDir := t.TempDir()
+	bin := filepath.Join(tempDir, BinaryNames[TypeXiaohongshu])
+	if err := os.WriteFile(bin, []byte("test"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	const taskName = "xiaohongshu-cookie-file"
+	videoPath := filepath.Join(tempDir, taskName+".mp4")
+	var cookiePath string
+	d := NewDownloader(
+		map[DownloadType]string{TypeXiaohongshu: bin},
+		runnerFunc(func(_ context.Context, _ string, args []string, emit func(string)) error {
+			for index, arg := range args {
+				if arg == "--add-header" && index+1 < len(args) && strings.HasPrefix(strings.ToLower(args[index+1]), "cookie:") {
+					t.Fatal("Cookie must not be passed through --add-header")
+				}
+			}
+			cookieIndex := slices.Index(args, "--cookies")
+			if cookieIndex == -1 || cookieIndex+1 >= len(args) {
+				t.Fatal("expected --cookies argument")
+			}
+			cookiePath = args[cookieIndex+1]
+			contents, err := os.ReadFile(cookiePath)
+			if err != nil {
+				return err
+			}
+			if !strings.Contains(string(contents), "www.xiaohongshu.com\tFALSE\t/\tTRUE\t0\tweb_session\ttest-only") {
+				t.Fatalf("unexpected Netscape cookie file: %q", contents)
+			}
+			info, err := os.Stat(cookiePath)
+			if err != nil {
+				return err
+			}
+			if info.Mode().Perm() != 0o600 {
+				t.Fatalf("cookie file mode = %o, want 600", info.Mode().Perm())
+			}
+			if err := os.WriteFile(videoPath, []byte("video"), 0o600); err != nil {
+				return err
+			}
+			emit(ytDLPOutputMarker + videoPath)
+			return nil
+		}),
+		schema.DefaultSchemas(),
+		testDownloaderConfig{localDir: tempDir},
+	)
+
+	_, err := d.Download(context.Background(), DownloadParams{
+		ID:      "xiaohongshu-cookie-file",
+		Type:    TypeXiaohongshu,
+		URL:     "https://www.xiaohongshu.com/explore/abc123?xsec_token=signed-token",
+		Name:    taskName,
+		Headers: []string{"Referer: https://www.xiaohongshu.com/", "Cookie: web_session=test-only; a1=device-only"},
+	}, Callbacks{})
+	if err != nil {
+		t.Fatalf("Download() error = %v", err)
+	}
+	if cookiePath == "" {
+		t.Fatal("runner did not receive a cookie file")
+	}
+	if _, err := os.Stat(cookiePath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("temporary cookie file still exists: %v", err)
+	}
+}
+
+func TestDownloadExplainsXiaohongshuNoVideoFormats(t *testing.T) {
+	ensureTestLogger()
+	tempDir := t.TempDir()
+	bin := filepath.Join(tempDir, BinaryNames[TypeXiaohongshu])
+	if err := os.WriteFile(bin, []byte("test"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	d := NewDownloader(
+		map[DownloadType]string{TypeXiaohongshu: bin},
+		runnerFunc(func(_ context.Context, _ string, _ []string, emit func(string)) error {
+			emit(`WARNING: Extractor failed to obtain "title". Creating a generic title instead`)
+			emit(`ERROR: [XiaoHongShu] abc123: No video formats found!`)
+			return errors.New("exit status 1")
+		}),
+		schema.DefaultSchemas(),
+		testDownloaderConfig{localDir: tempDir},
+	)
+
+	_, err := d.Download(context.Background(), DownloadParams{
+		ID:   "xiaohongshu-no-video",
+		Type: TypeXiaohongshu,
+		URL:  "https://www.xiaohongshu.com/explore/abc123?xsec_token=signed-token",
+		Name: "xiaohongshu-no-video",
+	}, Callbacks{})
+	if !errors.Is(err, ErrXiaohongshuVideoUnavailable) {
+		t.Fatalf("Download() error = %v, want %v", err, ErrXiaohongshuVideoUnavailable)
+	}
+}
+
+func TestDownloadReturnsEveryBilibiliMultiPartArtifact(t *testing.T) {
+	ensureTestLogger()
+	tempDir := t.TempDir()
+	bin := filepath.Join(tempDir, BinaryNames[TypeBilibili])
+	if err := os.WriteFile(bin, []byte("test"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	const taskName = "bilibili-series"
+	partOne := filepath.Join(tempDir, taskName+".P1.mp4")
+	partTwo := filepath.Join(tempDir, taskName+".P2.mp4")
+	d := NewDownloader(
+		map[DownloadType]string{TypeBilibili: bin},
+		runnerFunc(func(context.Context, string, []string, func(string)) error {
+			if err := os.WriteFile(partOne, []byte("part one"), 0o600); err != nil {
+				return err
+			}
+			return os.WriteFile(partTwo, []byte("part two"), 0o600)
+		}),
+		schema.DefaultSchemas(),
+		testDownloaderConfig{localDir: tempDir},
+	)
+
+	result, err := d.Download(context.Background(), DownloadParams{
+		ID:   "bilibili-multi-part",
+		Type: TypeBilibili,
+		URL:  "https://www.bilibili.com/video/BV-multi-part?p=1",
+		Name: taskName,
+	}, Callbacks{})
+	if err != nil {
+		t.Fatalf("Download() error = %v", err)
+	}
+	want := []string{partOne, partTwo}
+	if !slices.Equal(result.ArtifactPaths, want) {
+		t.Fatalf("Download() artifact paths = %q, want %q", result.ArtifactPaths, want)
 	}
 }
 

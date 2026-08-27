@@ -11,11 +11,12 @@ import (
 type DownloadType string
 
 const (
-	TypeM3U8     DownloadType = "m3u8"
-	TypeBilibili DownloadType = "bilibili"
-	TypeDirect   DownloadType = "direct"
-	TypeMediago  DownloadType = "mediago"
-	TypeYoutube  DownloadType = "youtube"
+	TypeM3U8        DownloadType = "m3u8"
+	TypeBilibili    DownloadType = "bilibili"
+	TypeDirect      DownloadType = "direct"
+	TypeMediago     DownloadType = "mediago"
+	TypeYoutube     DownloadType = "youtube"
+	TypeXiaohongshu DownloadType = "xiaohongshu"
 )
 
 // InferDownloadType chooses the existing downloader channel for a URL when a
@@ -38,11 +39,49 @@ func InferDownloadType(rawURL string) DownloadType {
 		return TypeYoutube
 	case isShortVideoURL(hostname, pathname):
 		return TypeYoutube
+	case isXiaohongshuURL(hostname, pathname):
+		return TypeXiaohongshu
 	case strings.HasSuffix(pathname, ".m3u8"):
 		return TypeM3U8
 	default:
 		return TypeDirect
 	}
+}
+
+func isXiaohongshuURL(hostname, pathname string) bool {
+	parts := strings.Split(strings.Trim(pathname, "/"), "/")
+	if hostname == "xhslink.com" || strings.HasSuffix(hostname, ".xhslink.com") {
+		return len(parts) > 0 && parts[0] != ""
+	}
+	if hostname != "xiaohongshu.com" && !strings.HasSuffix(hostname, ".xiaohongshu.com") {
+		return false
+	}
+	if len(parts) >= 2 && (parts[0] == "explore" || (len(parts) >= 3 && parts[0] == "discovery" && parts[1] == "item")) {
+		if parts[0] == "explore" {
+			return parts[1] != ""
+		}
+		return parts[2] != ""
+	}
+	return len(parts) >= 4 && parts[0] == "user" && parts[1] == "profile" && parts[2] != "" && parts[3] != ""
+}
+
+func normalizeXiaohongshuURLForYTDLP(rawURL string) string {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return rawURL
+	}
+	hostname := strings.ToLower(parsed.Hostname())
+	if hostname != "xiaohongshu.com" && !strings.HasSuffix(hostname, ".xiaohongshu.com") {
+		return rawURL
+	}
+	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+	if len(parts) < 4 || parts[0] != "user" || parts[1] != "profile" || parts[3] == "" {
+		return rawURL
+	}
+	parsed.Path = "/explore/" + parts[3]
+	parsed.RawPath = ""
+	parsed.Fragment = ""
+	return parsed.String()
 }
 
 func isShortVideoURL(hostname, pathname string) bool {
@@ -94,11 +133,12 @@ func isXStatusURL(hostname, pathname string) bool {
 
 // BinaryNames maps each DownloadType to its executable filename (without extension).
 var BinaryNames = map[DownloadType]string{
-	TypeM3U8:     "N_m3u8DL-RE",
-	TypeBilibili: "BBDown",
-	TypeDirect:   "aria2c",
-	TypeMediago:  "mediago",
-	TypeYoutube:  "yt-dlp",
+	TypeM3U8:        "N_m3u8DL-RE",
+	TypeBilibili:    "BBDown",
+	TypeDirect:      "aria2c",
+	TypeMediago:     "mediago",
+	TypeYoutube:     "yt-dlp",
+	TypeXiaohongshu: "yt-dlp",
 }
 
 // FFmpegBinaryName is the filename for the ffmpeg binary (without extension).
@@ -148,23 +188,25 @@ type MessageEvent struct {
 
 // TaskInfo holds information about a task
 type TaskInfo struct {
-	ID         TaskID       `json:"id"`                   // task ID
-	Type       DownloadType `json:"type"`                 // download type
-	URL        string       `json:"url"`                  // download URL
-	Name       string       `json:"name"`                 // file name
-	OutputPath string       `json:"outputPath,omitempty"` // verified primary output path
-	Status     TaskStatus   `json:"status"`               // task status
-	Percent    float64      `json:"percent"`              // completion percentage
-	Speed      string       `json:"speed"`                // download speed
-	IsLive     bool         `json:"isLive"`               // whether this is a live stream
-	Error      string       `json:"error,omitempty"`      // error message (if any)
+	ID            TaskID       `json:"id"`                      // task ID
+	Type          DownloadType `json:"type"`                    // download type
+	URL           string       `json:"url"`                     // download URL
+	Name          string       `json:"name"`                    // file name
+	OutputPath    string       `json:"outputPath,omitempty"`    // verified primary output path
+	ArtifactPaths []string     `json:"artifactPaths,omitempty"` // every verified output path
+	Status        TaskStatus   `json:"status"`                  // task status
+	Percent       float64      `json:"percent"`                 // completion percentage
+	Speed         string       `json:"speed"`                   // download speed
+	IsLive        bool         `json:"isLive"`                  // whether this is a live stream
+	Error         string       `json:"error,omitempty"`         // error message (if any)
 }
 
-// DownloadResult identifies the verified primary artifact produced by a
-// downloader. The path is absolute so changing the configured download
-// directory cannot detach a completed task from its file.
+// DownloadResult identifies every verified artifact produced by a downloader.
+// Paths are absolute so changing the configured download directory cannot
+// detach a completed task from its files.
 type DownloadResult struct {
-	PrimaryPath string `json:"primaryPath"`
+	PrimaryPath   string   `json:"primaryPath"`
+	ArtifactPaths []string `json:"artifactPaths"`
 }
 
 // Callbacks is a collection of download callback functions

@@ -961,11 +961,19 @@ describe("BrowserTabManagerService", () => {
       cookieURL: "https://www.tiktok.com",
       name: "sessionid",
       url: "https://www.tiktok.com/@creator/video/7480123456789012345",
+      type: DownloadType.youtube,
     },
     {
       cookieURL: "https://www.douyin.com",
       name: "s_v_web_id",
       url: "https://www.douyin.com/video/7480123456789012345",
+      type: DownloadType.youtube,
+    },
+    {
+      cookieURL: "https://www.xiaohongshu.com",
+      name: "web_session",
+      url: "https://www.xiaohongshu.com/explore/66f00abc1234567890abcdef?xsec_token=token",
+      type: DownloadType.xiaohongshu,
     },
   ])("adds current $cookieURL cookies to explicit downloads", async (test) => {
     const { service } = createHarness();
@@ -976,7 +984,7 @@ describe("BrowserTabManagerService", () => {
     ]);
 
     const result = await service.withSessionCookies(tabId, {
-      type: DownloadType.youtube,
+      type: test.type,
       url: test.url,
     });
 

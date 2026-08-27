@@ -188,8 +188,8 @@ func TestParseStoredHeadersMultiline(t *testing.T) {
 		"User-Agent:Mozilla/5.0",
 	}
 
-	if got := parseStoredHeaders(raw); !slices.Equal(got, want) {
-		t.Fatalf("parseStoredHeaders() = %v, want %v", got, want)
+	if got := ParseStoredHeaders(raw); !slices.Equal(got, want) {
+		t.Fatalf("ParseStoredHeaders() = %v, want %v", got, want)
 	}
 }
 
@@ -200,14 +200,14 @@ func TestParseStoredHeadersJSON(t *testing.T) {
 		"Cookie:SESSDATA=secret",
 	}
 
-	if got := parseStoredHeaders(raw); !slices.Equal(got, want) {
-		t.Fatalf("parseStoredHeaders() = %v, want %v", got, want)
+	if got := ParseStoredHeaders(raw); !slices.Equal(got, want) {
+		t.Fatalf("ParseStoredHeaders() = %v, want %v", got, want)
 	}
 }
 
 func TestParseStoredHeadersEmpty(t *testing.T) {
-	if got := parseStoredHeaders("\r\n \n"); len(got) != 0 {
-		t.Fatalf("parseStoredHeaders() = %v, want empty", got)
+	if got := ParseStoredHeaders("\r\n \n"); len(got) != 0 {
+		t.Fatalf("ParseStoredHeaders() = %v, want empty", got)
 	}
 }
 
@@ -321,6 +321,58 @@ func TestGetDownloadTaskUsesPersistedOutputOutsideCurrentDirectory(t *testing.T)
 	}
 	if !result.Exists || result.File != actualOutput {
 		t.Fatalf("GetDownloadTask() = exists %v, file %q", result.Exists, result.File)
+	}
+}
+
+func TestCompleteDownloadPersistsAndResolvesEveryArtifact(t *testing.T) {
+	svc, videoRepo := newTestDownloadTaskService(t)
+	outputDir := t.TempDir()
+	primary := filepath.Join(outputDir, "part-1.mp4")
+	secondary := filepath.Join(outputDir, "part-2.mp4")
+	writeTestOutput(t, primary, "part one")
+	writeTestOutput(t, secondary, "part two")
+
+	video, err := videoRepo.Create(&db.Video{
+		Name:   "multi-part download",
+		Type:   string(core.TypeBilibili),
+		URL:    "https://www.bilibili.com/video/BV-multi-part",
+		Status: "downloading",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := core.DownloadResult{
+		PrimaryPath:   primary,
+		ArtifactPaths: []string{primary, secondary},
+	}
+	if err := svc.CompleteDownload(video.ID, result); err != nil {
+		t.Fatal(err)
+	}
+
+	storedPaths, err := videoRepo.FindArtifactPaths([]int64{video.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(storedPaths[video.ID], result.ArtifactPaths) {
+		t.Fatalf("stored artifacts = %q, want %q", storedPaths[video.ID], result.ArtifactPaths)
+	}
+	download, err := svc.GetDownloadTask(video.ID, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !download.Exists || download.File != primary || !slices.Equal(download.Files, result.ArtifactPaths) {
+		t.Fatalf("resolved download = exists %v, file %q, files %q", download.Exists, download.File, download.Files)
+	}
+
+	if err := videoRepo.PrepareDownload(video.ID); err != nil {
+		t.Fatal(err)
+	}
+	storedPaths, err = videoRepo.FindArtifactPaths([]int64{video.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(storedPaths[video.ID]) != 0 {
+		t.Fatalf("artifacts after PrepareDownload = %q, want none", storedPaths[video.ID])
 	}
 }
 

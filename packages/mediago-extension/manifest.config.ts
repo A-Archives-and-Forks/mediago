@@ -43,6 +43,10 @@ const PAGE_ACTION_MATCHES = [
   "*://douyin.com/*",
   "*://www.douyin.com/*",
   "*://v.douyin.com/*",
+  "*://xiaohongshu.com/*",
+  "*://www.xiaohongshu.com/*",
+  "*://xhslink.com/*",
+  "*://www.xhslink.com/*",
 ];
 
 export default defineManifest({
@@ -98,6 +102,6 @@ export default defineManifest({
       matches: PAGE_ACTION_MATCHES,
     },
   ],
-  permissions: ["webRequest", "tabs", "storage"],
+  permissions: ["webRequest", "tabs", "storage", "cookies"],
   host_permissions: ["<all_urls>"],
 });

@@ -6,6 +6,7 @@ export {
 export { matchesBilibiliPageLocation } from "./bilibili-match";
 export { matchesTwitterPageLocation } from "./twitter-match";
 export { matchesShortVideoPageLocation } from "./short-video-match";
+export { matchesXiaohongshuPageLocation } from "./xiaohongshu-match";
 export {
   matchesPageAdapterLocation,
   matchesYoutubePageLocation,
@@ -26,6 +27,11 @@ export {
   YOUTUBE_SELECTORS,
   youtubePageAdapter,
 } from "./youtube";
+export {
+  XIAOHONGSHU_PROCESSED_ATTRIBUTE,
+  XIAOHONGSHU_SELECTORS,
+  xiaohongshuPageAdapter,
+} from "./xiaohongshu";
 export type {
   PageAdapter,
   PageAdapterLocation,

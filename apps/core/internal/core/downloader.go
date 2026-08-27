@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -20,9 +21,12 @@ import (
 )
 
 var (
-	ErrUnsupportedType       = errors.New("unsupported download type")
-	ErrDownloadOutputMissing = errors.New("download finished without a media output")
-	ErrM3U8OutputMissing     = errors.New("m3u8 download finished without a merged media file")
+	ErrUnsupportedType             = errors.New("unsupported download type")
+	ErrDownloadOutputMissing       = errors.New("download finished without a media output")
+	ErrM3U8OutputMissing           = errors.New("m3u8 download finished without a merged media file")
+	ErrXiaohongshuVideoUnavailable = errors.New(
+		"xiaohongshu video unavailable: this note has no video, or its signed link/session has expired; reopen the video note and click download again",
+	)
 )
 
 const ytDLPOutputMarker = "__MEDIAGO_OUTPUT__:"
@@ -105,7 +109,11 @@ func (d *DownloaderSvc) buildArgs(p DownloadParams, s schema.Schema) []string {
 			if len(spec.ArgsName) > 0 {
 				out = append(out, spec.ArgsName...)
 			}
-			out = append(out, p.URL)
+			downloadURL := p.URL
+			if p.Type == TypeXiaohongshu {
+				downloadURL = normalizeXiaohongshuURLForYTDLP(downloadURL)
+			}
+			out = append(out, downloadURL)
 
 		case "localDir":
 			// local directory argument: may need to join with subdirectory
@@ -139,6 +147,12 @@ func (d *DownloaderSvc) buildArgs(p DownloadParams, s schema.Schema) []string {
 		case "headers":
 			// HTTP header argument: expand multiple values
 			for _, h := range p.Headers {
+				// yt-dlp warns that Cookie passed through --add-header is unsafe
+				// and scopes it itself. Download writes the same browser cookies to
+				// a short-lived Netscape cookie file instead.
+				if isYTDLPType(p.Type) && strings.EqualFold(headerNameForLog(h), "Cookie") {
+					continue
+				}
 				for _, k := range spec.ArgsName {
 					out = append(out, k, h)
 				}
@@ -187,6 +201,59 @@ func (d *DownloaderSvc) buildArgs(p DownloadParams, s schema.Schema) []string {
 	}
 
 	return out
+}
+
+func isYTDLPType(downloadType DownloadType) bool {
+	return downloadType == TypeYoutube || downloadType == TypeXiaohongshu
+}
+
+func appendYTDLPCookieFile(args []string, p DownloadParams) ([]string, func(), error) {
+	cookieHeader := headerValue(p.Headers, "Cookie")
+	if !isYTDLPType(p.Type) || cookieHeader == "" {
+		return args, func() {}, nil
+	}
+
+	parsedURL, err := url.Parse(p.URL)
+	if err != nil || parsedURL.Hostname() == "" {
+		return nil, nil, fmt.Errorf("create yt-dlp cookie file: invalid download URL")
+	}
+
+	request := &http.Request{Header: http.Header{"Cookie": []string{cookieHeader}}}
+	cookies := request.Cookies()
+	if len(cookies) == 0 {
+		return args, func() {}, nil
+	}
+
+	tempDir, err := os.MkdirTemp("", "mediago-ytdlp-cookies-")
+	if err != nil {
+		return nil, nil, fmt.Errorf("create yt-dlp cookie directory: %w", err)
+	}
+	cleanup := func() { _ = os.RemoveAll(tempDir) }
+
+	secure := "FALSE"
+	if strings.EqualFold(parsedURL.Scheme, "https") {
+		secure = "TRUE"
+	}
+	var contents strings.Builder
+	contents.WriteString("# Netscape HTTP Cookie File\n")
+	contents.WriteString("# Generated temporarily by MediaGo.\n")
+	for _, cookie := range cookies {
+		fmt.Fprintf(
+			&contents,
+			"%s\tFALSE\t/\t%s\t0\t%s\t%s\n",
+			parsedURL.Hostname(),
+			secure,
+			cookie.Name,
+			cookie.Value,
+		)
+	}
+
+	cookiePath := filepath.Join(tempDir, "cookies.txt")
+	if err := os.WriteFile(cookiePath, []byte(contents.String()), 0o600); err != nil {
+		cleanup()
+		return nil, nil, fmt.Errorf("write yt-dlp cookie file: %w", err)
+	}
+	return append(args, "--cookies", cookiePath), cleanup, nil
 }
 
 func (d *DownloaderSvc) ytDLPDenoPath() string {
@@ -445,19 +512,30 @@ func trimMatchingQuotes(value string) string {
 	return value
 }
 
-func primaryOutputPath(outputDir, downloadName, reported string, before, after map[string]outputFileState) string {
-	if output := normalizeReportedOutputPath(outputDir, reported); output != "" {
-		return output
+func outputArtifactPaths(outputDir, downloadName, reported string, before, after map[string]outputFileState) []string {
+	artifacts := make([]string, 0)
+	seen := make(map[string]struct{})
+	appendArtifact := func(candidate string) {
+		if candidate == "" {
+			return
+		}
+		candidate = filepath.Clean(candidate)
+		if _, ok := seen[candidate]; ok {
+			return
+		}
+		seen[candidate] = struct{}{}
+		artifacts = append(artifacts, candidate)
 	}
-	candidates := changedOutputCandidates(outputDir, downloadName, before, after)
-	if len(candidates) == 0 {
-		return ""
+
+	appendArtifact(normalizeReportedOutputPath(outputDir, reported))
+	for _, candidate := range changedOutputCandidates(outputDir, downloadName, before, after) {
+		absolute, err := filepath.Abs(candidate.path)
+		if err != nil {
+			continue
+		}
+		appendArtifact(absolute)
 	}
-	absolute, err := filepath.Abs(candidates[0].path)
-	if err != nil {
-		return ""
-	}
-	return filepath.Clean(absolute)
+	return artifacts
 }
 
 func outputPathFromLine(line string) string {
@@ -596,6 +674,11 @@ func (d *DownloaderSvc) Download(ctx context.Context, p DownloadParams, cb Callb
 
 	// build command-line arguments
 	args := d.buildArgs(p, schema)
+	args, cleanupCookies, err := appendYTDLPCookieFile(args, p)
+	if err != nil {
+		return DownloadResult{}, err
+	}
+	defer cleanupCookies()
 	logger.Debug("Command arguments built",
 		zap.String("id", string(p.ID)),
 		zap.Int("arg_count", len(args)),
@@ -606,6 +689,7 @@ func (d *DownloaderSvc) Download(ctx context.Context, p DownloadParams, cb Callb
 	// initialize parse state
 	st := &parser.ParseState{}
 	var reportedOutput string
+	var sawXiaohongshuNoVideoFormats bool
 	var reportedOutputMu sync.Mutex
 
 	// process console output line by line
@@ -613,6 +697,11 @@ func (d *DownloaderSvc) Download(ctx context.Context, p DownloadParams, cb Callb
 		if output := outputPathFromLine(line); output != "" {
 			reportedOutputMu.Lock()
 			reportedOutput = output
+			reportedOutputMu.Unlock()
+		}
+		if p.Type == TypeXiaohongshu && strings.Contains(line, "No video formats found") {
+			reportedOutputMu.Lock()
+			sawXiaohongshuNoVideoFormats = true
 			reportedOutputMu.Unlock()
 		}
 		line = strings.TrimSpace(line)
@@ -674,6 +763,14 @@ func (d *DownloaderSvc) Download(ctx context.Context, p DownloadParams, cb Callb
 	d.tracker.Remove(parser.TaskID(p.ID))
 
 	if err != nil {
+		reportedOutputMu.Lock()
+		xiaohongshuVideoUnavailable := sawXiaohongshuNoVideoFormats
+		reportedOutputMu.Unlock()
+		if xiaohongshuVideoUnavailable {
+			logger.Error("Xiaohongshu note did not expose a video stream",
+				zap.String("id", string(p.ID)))
+			return DownloadResult{}, ErrXiaohongshuVideoUnavailable
+		}
 		logger.Error("Download failed",
 			zap.String("id", string(p.ID)),
 			zap.Error(err))
@@ -687,8 +784,8 @@ func (d *DownloaderSvc) Download(ctx context.Context, p DownloadParams, cb Callb
 	reportedOutputMu.Lock()
 	reported := reportedOutput
 	reportedOutputMu.Unlock()
-	outputPath := primaryOutputPath(outputDir, p.Name, reported, outputBefore, outputAfter)
-	if outputPath == "" {
+	artifactPaths := outputArtifactPaths(outputDir, p.Name, reported, outputBefore, outputAfter)
+	if len(artifactPaths) == 0 {
 		if p.Type == TypeM3U8 {
 			logger.Error("M3U8 downloader exited without creating a merged media file",
 				zap.String("id", string(p.ID)))
@@ -702,5 +799,5 @@ func (d *DownloaderSvc) Download(ctx context.Context, p DownloadParams, cb Callb
 
 	logger.Info("Download completed successfully",
 		zap.String("id", string(p.ID)))
-	return DownloadResult{PrimaryPath: outputPath}, nil
+	return DownloadResult{PrimaryPath: artifactPaths[0], ArtifactPaths: artifactPaths}, nil
 }

@@ -1230,6 +1230,9 @@ function getSessionCookieURL(
   if (item.type === DownloadType.bilibili) {
     return "https://www.bilibili.com";
   }
+  if (item.type === DownloadType.xiaohongshu) {
+    return "https://www.xiaohongshu.com";
+  }
   if (item.type !== DownloadType.youtube) return undefined;
 
   try {

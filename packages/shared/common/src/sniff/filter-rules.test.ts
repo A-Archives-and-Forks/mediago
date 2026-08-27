@@ -43,6 +43,24 @@ describe("matchPageUrl", () => {
   ])("does not treat a short-video browsing page as a download: %s", (url) => {
     expect(matchPageUrl(url)).toBeUndefined();
   });
+
+  it.each([
+    "https://www.xiaohongshu.com/explore/66f00abc1234567890abcdef?xsec_token=token&xsec_source=pc_feed",
+    "https://www.xiaohongshu.com/discovery/item/66f00abc1234567890abcdef?xsec_token=token",
+    "https://www.xiaohongshu.com/user/profile/5abc1234567890abcdef1234/66f00abc1234567890abcdef?xsec_token=token",
+    "https://xhslink.com/a1B2c3D4",
+  ])("routes Xiaohongshu notes through its dedicated downloader: %s", (url) => {
+    expect(matchPageUrl(url)?.type).toBe(DownloadType.xiaohongshu);
+  });
+
+  it.each([
+    "https://www.xiaohongshu.com/",
+    "https://www.xiaohongshu.com/explore",
+    "https://www.xiaohongshu.com/search_result?keyword=video",
+    "https://www.xiaohongshu.com/user/profile/5abc1234567890abcdef1234",
+  ])("does not treat Xiaohongshu browsing pages as notes: %s", (url) => {
+    expect(matchPageUrl(url)).toBeUndefined();
+  });
 });
 
 describe("shouldSuppressRequestSource", () => {
@@ -85,5 +103,16 @@ describe("shouldSuppressRequestSource", () => {
   ])("suppresses raw media renditions on short-video pages: %s", (url) => {
     expect(shouldSuppressRequestSource(url, DownloadType.direct)).toBe(true);
     expect(shouldSuppressRequestSource(url, DownloadType.m3u8)).toBe(true);
+  });
+
+  it.each([
+    "https://www.xiaohongshu.com/explore",
+    "https://www.xiaohongshu.com/explore/66f00abc1234567890abcdef?xsec_token=token",
+  ])("suppresses raw media renditions on Xiaohongshu pages: %s", (url) => {
+    expect(shouldSuppressRequestSource(url, DownloadType.direct)).toBe(true);
+    expect(shouldSuppressRequestSource(url, DownloadType.m3u8)).toBe(true);
+    expect(shouldSuppressRequestSource(url, DownloadType.xiaohongshu)).toBe(
+      false,
+    );
   });
 });

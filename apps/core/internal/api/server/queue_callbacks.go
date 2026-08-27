@@ -48,7 +48,7 @@ func (s *Server) setupQueueCallbacks() {
 		// Persist the actual output path together with the success status.
 		if s.downloadService != nil {
 			if dbID, err := strconv.ParseInt(string(id), 10, 64); err == nil {
-				if err := s.downloadService.CompleteDownload(dbID, result.PrimaryPath); err != nil {
+				if err := s.downloadService.CompleteDownload(dbID, result); err != nil {
 					logger.Warn("Failed to update DB status on success",
 						zap.String("id", string(id)),
 						zap.Error(err))

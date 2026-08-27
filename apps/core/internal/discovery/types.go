@@ -34,11 +34,12 @@ const (
 type SourceType string
 
 const (
-	SourceTypeM3U8     SourceType = "m3u8"
-	SourceTypeBilibili SourceType = "bilibili"
-	SourceTypeDirect   SourceType = "direct"
-	SourceTypeMediago  SourceType = "mediago"
-	SourceTypeYoutube  SourceType = "youtube"
+	SourceTypeM3U8        SourceType = "m3u8"
+	SourceTypeBilibili    SourceType = "bilibili"
+	SourceTypeDirect      SourceType = "direct"
+	SourceTypeMediago     SourceType = "mediago"
+	SourceTypeYoutube     SourceType = "youtube"
+	SourceTypeXiaohongshu SourceType = "xiaohongshu"
 )
 
 type PlaylistType string

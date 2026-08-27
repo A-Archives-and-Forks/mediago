@@ -265,6 +265,7 @@ func (q *TaskQueue) execute(p DownloadParams, ctx context.Context) {
 			task.Status = StatusSuccess
 			task.Percent = 100
 			task.OutputPath = result.PrimaryPath
+			task.ArtifactPaths = append([]string(nil), result.ArtifactPaths...)
 		}
 	case errors.Is(err, context.Canceled):
 		if task != nil {

@@ -36,6 +36,35 @@ type SchemaList struct {
 	Schemas []Schema `json:"schemas"` // schemas for all download types
 }
 
+func ytDLPSchema(downloadType string) Schema {
+	return Schema{
+		Type: downloadType,
+		Args: map[string]ArgSpec{
+			"url":      {ArgsName: []string{}},
+			"localDir": {ArgsName: []string{"-P"}},
+			"name":     {ArgsName: []string{"-o"}, Postfix: ".%(ext)s"},
+			"headers":  {ArgsName: []string{"--add-header"}},
+			"proxy":    {ArgsName: []string{"--proxy"}},
+			"__common__": {ArgsName: []string{
+				"--no-mtime",
+				"--progress",
+				"--newline",
+				"--no-colors",
+				"--no-simulate",
+				"--print",
+				"after_move:__MEDIAGO_OUTPUT__:%(filepath)s",
+			}},
+		},
+		ConsoleReg: ConsoleReg{
+			Percent: `([\d.]+)%`,
+			Speed:   `([\d.]+\s?[MKG]?i?B/s)`,
+			Error:   `(?m)^ERROR:`,
+			Start:   `\[download\] Destination:`,
+			IsLive:  ``,
+		},
+	}
+}
+
 // GetByType retrieves the Schema corresponding to the given download type
 func (sl SchemaList) GetByType(t string) (Schema, bool) {
 	for _, s := range sl.Schemas {
@@ -116,24 +145,7 @@ func DefaultSchemas() SchemaList {
 					IsLive:  ``, // direct downloads never have a live-stream phase
 				},
 			},
-			{
-				Type: "youtube",
-				Args: map[string]ArgSpec{
-					"url":        {ArgsName: []string{}},
-					"localDir":   {ArgsName: []string{"-P"}},
-					"name":       {ArgsName: []string{"-o"}, Postfix: ".%(ext)s"},
-					"headers":    {ArgsName: []string{"--add-header"}},
-					"proxy":      {ArgsName: []string{"--proxy"}},
-					"__common__": {ArgsName: []string{"--no-mtime", "--progress", "--newline", "--no-colors", "--no-simulate", "--print", "after_move:__MEDIAGO_OUTPUT__:%(filepath)s"}},
-				},
-				ConsoleReg: ConsoleReg{
-					Percent: `([\d.]+)%`,
-					Speed:   `([\d.]+\s?[MKG]?i?B/s)`,
-					Error:   `(?m)^ERROR:`,
-					Start:   `\[download\] Destination:`,
-					IsLive:  ``,
-				},
-			},
+			ytDLPSchema("youtube"),
 			{
 				Type: "mediago",
 				Args: map[string]ArgSpec{
@@ -153,6 +165,7 @@ func DefaultSchemas() SchemaList {
 					IsLive:  `is_live:\s*true|\[live\]`,
 				},
 			},
+			ytDLPSchema("xiaohongshu"),
 		},
 	}
 }

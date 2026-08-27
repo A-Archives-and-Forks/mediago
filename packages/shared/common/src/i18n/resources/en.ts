@@ -11,6 +11,7 @@ export const en = {
   playOnMobile: "Play on mobile",
   openFolder: "Download folder",
   fileNotExist: "File not found",
+  outputFiles: "{{count}} files",
   downloadSuccess: "Download complete",
   downloadFailed: "Download failed",
   dependencyMissing:
@@ -272,6 +273,7 @@ export const en = {
   bilibiliMedia: "Bilibili",
   mediagoMedia: "MediaGo download",
   youtubeMedia: "yt-dlp (YouTube / X / TikTok / Douyin)",
+  xiaohongshuMedia: "Xiaohongshu (yt-dlp)",
   checkUpdate: "Check for updates",
   viewReleases: "View Releases",
   allowBetaVersion: "Include beta versions",

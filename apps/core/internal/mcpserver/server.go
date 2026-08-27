@@ -178,7 +178,7 @@ type healthOutput struct {
 
 type createDownloadInput struct {
 	URL     string   `json:"url" jsonschema:"required,video or stream URL to download"`
-	Type    string   `json:"type,omitempty" jsonschema:"optional download type: m3u8, bilibili, direct, mediago, or youtube; inferred from the URL when omitted; youtube uses yt-dlp for YouTube, X/Twitter, TikTok, and Douyin URLs"`
+	Type    string   `json:"type,omitempty" jsonschema:"optional download type: m3u8, bilibili, direct, mediago, youtube, or xiaohongshu; inferred from the URL when omitted; youtube and xiaohongshu use yt-dlp"`
 	Name    string   `json:"name,omitempty" jsonschema:"optional output file name"`
 	Folder  string   `json:"folder,omitempty" jsonschema:"optional subdirectory under the MediaGo download directory"`
 	Headers []string `json:"headers,omitempty" jsonschema:"optional HTTP headers such as User-Agent: value"`

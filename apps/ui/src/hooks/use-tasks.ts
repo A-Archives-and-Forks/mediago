@@ -13,6 +13,7 @@ export interface DownloadTaskDetails extends DownloadTask {
   speed: string;
   exists?: boolean;
   file?: string;
+  files?: string[];
 }
 
 export function useTasks(filter: DownloadFilter = DownloadFilter.list) {

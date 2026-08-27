@@ -567,6 +567,14 @@ export function getCookieBackedType(url: string): DownloadType | undefined {
     ) {
       return DownloadType.youtube;
     }
+    if (
+      hostname === "xiaohongshu.com" ||
+      hostname.endsWith(".xiaohongshu.com") ||
+      hostname === "xhslink.com" ||
+      hostname.endsWith(".xhslink.com")
+    ) {
+      return DownloadType.xiaohongshu;
+    }
   } catch {
     // Ignore malformed request URLs.
   }

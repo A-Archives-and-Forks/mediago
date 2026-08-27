@@ -11,6 +11,7 @@ export const zh = {
   playOnMobile: "手机上播放",
   openFolder: "下载目录",
   fileNotExist: "文件不存在",
+  outputFiles: "{{count}} 个文件",
   downloadSuccess: "成功",
   downloadFailed: "失败",
   dependencyMissing:
@@ -262,6 +263,7 @@ export const zh = {
   bilibiliMedia: "哔哩哔哩",
   mediagoMedia: "MediaGo 下载",
   youtubeMedia: "yt-dlp（YouTube / X / TikTok / 抖音）",
+  xiaohongshuMedia: "小红书（yt-dlp）",
   checkUpdate: "检查更新",
   viewReleases: "查看 Releases",
   allowBetaVersion: "允许升级测试版本",

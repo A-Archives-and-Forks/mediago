@@ -282,6 +282,15 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
             />,
           );
         }
+        if ((task.files?.length ?? 0) > 1) {
+          list.push(
+            <DownloadTag
+              key="artifacts"
+              text={t("outputFiles", { count: task.files?.length })}
+              variant="info"
+            />,
+          );
+        }
         break;
       case DownloadStatus.Failed:
         list.push(

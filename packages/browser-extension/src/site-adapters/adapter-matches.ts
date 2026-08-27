@@ -3,11 +3,13 @@ import type { PageAdapterLocation } from "./types";
 import { matchesTwitterPageLocation } from "./twitter-match";
 import { matchesYoutubePageLocation } from "./youtube-match";
 import { matchesShortVideoPageLocation } from "./short-video-match";
+import { matchesXiaohongshuPageLocation } from "./xiaohongshu-match";
 
 export { matchesBilibiliPageLocation } from "./bilibili-match";
 export { matchesTwitterPageLocation } from "./twitter-match";
 export { matchesShortVideoPageLocation } from "./short-video-match";
 export { matchesYoutubePageLocation } from "./youtube-match";
+export { matchesXiaohongshuPageLocation } from "./xiaohongshu-match";
 
 export function matchesPageAdapterLocation(
   location: PageAdapterLocation,
@@ -16,6 +18,7 @@ export function matchesPageAdapterLocation(
     matchesBilibiliPageLocation(location) ||
     matchesYoutubePageLocation(location) ||
     matchesTwitterPageLocation(location) ||
-    matchesShortVideoPageLocation(location)
+    matchesShortVideoPageLocation(location) ||
+    matchesXiaohongshuPageLocation(location)
   );
 }

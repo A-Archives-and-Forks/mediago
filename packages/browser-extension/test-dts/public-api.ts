@@ -5,6 +5,7 @@ import {
   matchesShortVideoPageLocation,
   matchesTwitterPageLocation,
   matchesYoutubePageLocation,
+  matchesXiaohongshuPageLocation,
 } from "@mediago/browser-extension/site-adapter-matches";
 
 export const candidate: PageCandidate = {
@@ -25,4 +26,8 @@ export const matchesTwitter = matchesTwitterPageLocation({ hostname: "x.com" });
 
 export const matchesShortVideo = matchesShortVideoPageLocation({
   hostname: "www.tiktok.com",
+});
+
+export const matchesXiaohongshu = matchesXiaohongshuPageLocation({
+  hostname: "www.xiaohongshu.com",
 });

@@ -48,6 +48,7 @@ interface RuntimeInjection {
   card: PageCard;
   handleClick: (event: MouseEvent) => void;
   host: HTMLElement;
+  key: string;
 }
 
 function releaseInjection(adapter: PageAdapter, injection: RuntimeInjection) {
@@ -64,6 +65,8 @@ function injectButton(
   transport: PageTransport,
 ): RuntimeInjection | null {
   if (card.querySelector(BUTTON_TAG)) return null;
+  const key = adapter.extractCandidate(card)?.url;
+  if (!key) return null;
 
   const host = document.createElement(BUTTON_TAG);
   const shadow = host.attachShadow({ mode: "open" });
@@ -88,7 +91,7 @@ function injectButton(
   card.appendChild(host);
   adapter.markProcessed(card);
 
-  return { button, card, handleClick, host };
+  return { button, card, handleClick, host, key };
 }
 
 export function startPageRuntime({
@@ -108,12 +111,21 @@ export function startPageRuntime({
     document.defaultView?.MutationObserver ?? MutationObserver;
   const removalObserver = new MutationObserverConstructor(() => {
     for (const injection of injections) {
-      if (injection.card.isConnected && injection.host.isConnected) continue;
+      const currentKey = adapter.extractCandidate(injection.card)?.url;
+      if (
+        injection.card.isConnected &&
+        injection.host.isConnected &&
+        currentKey === injection.key
+      ) {
+        continue;
+      }
       releaseInjection(adapter, injection);
       injections.delete(injection);
     }
   });
   removalObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["href"],
     childList: true,
     subtree: true,
   });

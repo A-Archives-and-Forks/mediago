@@ -18,9 +18,11 @@ export function SourceItem({ source, onImport, disabled }: Props) {
   const typeLabel =
     source.type === DownloadType.m3u8
       ? "HLS"
-      : source.type === DownloadType.direct
-        ? "FILE"
-        : source.type.slice(0, 4).toUpperCase();
+      : source.type === DownloadType.xiaohongshu
+        ? "XHS"
+        : source.type === DownloadType.direct
+          ? "FILE"
+          : source.type.slice(0, 4).toUpperCase();
 
   return (
     <li className="group relative flex items-center gap-3 rounded-lg border border-border bg-surface-raised p-3 shadow-ambient transition-[border-color,background-color] duration-150 hover:border-border-strong hover:bg-surface motion-reduce:transition-none">

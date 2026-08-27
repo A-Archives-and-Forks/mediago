@@ -5,6 +5,7 @@ export function sourceTypeLabel(source: {
   url: string;
 }): string {
   if (source.type === DownloadType.m3u8) return "HLS";
+  if (source.type === DownloadType.xiaohongshu) return "小红书";
   if (source.type !== DownloadType.youtube) return source.type;
 
   try {

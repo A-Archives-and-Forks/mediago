@@ -109,6 +109,7 @@ function trustedSender(
 const BILIBILI_HOMEPAGE_URL = "https://www.bilibili.com/";
 const YOUTUBE_HOMEPAGE_URL = "https://www.youtube.com/";
 const TIKTOK_HOMEPAGE_URL = "https://www.tiktok.com/foryou";
+const XIAOHONGSHU_FEED_URL = "https://www.xiaohongshu.com/explore";
 
 function homepageTab(
   overrides: Partial<chrome.tabs.Tab> = {},
@@ -181,6 +182,26 @@ function tiktokHomepageSender(
   return trustedSender({
     tab: tiktokHomepageTab(),
     url: TIKTOK_HOMEPAGE_URL,
+    ...overrides,
+  });
+}
+
+function xiaohongshuFeedTab(
+  overrides: Partial<chrome.tabs.Tab> = {},
+): chrome.tabs.Tab {
+  return supportedTab({
+    url: XIAOHONGSHU_FEED_URL,
+    title: "Xiaohongshu feed",
+    ...overrides,
+  });
+}
+
+function xiaohongshuFeedSender(
+  overrides: Partial<chrome.runtime.MessageSender> = {},
+): chrome.runtime.MessageSender {
+  return trustedSender({
+    tab: xiaohongshuFeedTab(),
+    url: XIAOHONGSHU_FEED_URL,
     ...overrides,
   });
 }
@@ -656,6 +677,36 @@ describe("page candidate command", () => {
       },
     ]);
     expect(memory.badges).toEqual([1]);
+    expect(ports.openPopup).toHaveBeenCalledWith({ windowId: 12 });
+  });
+
+  test("accepts a Xiaohongshu card candidate from the Xiaohongshu feed", async () => {
+    const memory = memorySourceService();
+    const ports = pageActionPorts([
+      xiaohongshuFeedTab({ windowId: 7 }),
+      xiaohongshuFeedTab({ windowId: 12 }),
+    ]);
+    const handle = createPageActionHandler(memory.service, ports);
+    const candidate = pageCandidate({
+      name: "Xiaohongshu card",
+      url: "https://www.xiaohongshu.com/explore/66f00abc1234567890abcdef?xsec_token=token&xsec_source=pc_feed",
+      type: DownloadType.xiaohongshu,
+    });
+
+    await expect(
+      handlePageCandidate(handle, xiaohongshuFeedSender(), candidate),
+    ).resolves.toEqual({ type: "PAGE_ACTION_RESULT", ok: true });
+
+    expect(memory.sources()).toEqual([
+      {
+        id: "page-action-41-1234",
+        name: "Xiaohongshu card",
+        url: candidate.url,
+        documentURL: XIAOHONGSHU_FEED_URL,
+        type: DownloadType.xiaohongshu,
+        detectedAt: 1_234,
+      },
+    ]);
     expect(ports.openPopup).toHaveBeenCalledWith({ windowId: 12 });
   });
 

@@ -14,6 +14,10 @@ vi.mock("./mediago-client", () => ({
   probe: vi.fn(),
 }));
 
+vi.mock("./page-cookies", () => ({
+  enrichSourcesWithPageCookies: vi.fn(async (sources) => sources),
+}));
+
 type MessageListener = (
   message: unknown,
   sender: chrome.runtime.MessageSender,

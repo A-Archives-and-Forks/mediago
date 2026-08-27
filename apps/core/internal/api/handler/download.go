@@ -35,14 +35,22 @@ func (h *DownloadHandler) Create(c *gin.Context) {
 	}
 
 	inputs := make([]*service.AddDownloadTaskInput, 0, len(req.Tasks))
+	runtimeHeaders := make([][]string, 0, len(req.Tasks))
 	for _, t := range req.Tasks {
+		storedHeaders := t.Headers
+		var ephemeralHeaders []string
+		if req.StartDownload && t.Headers != nil {
+			ephemeralHeaders = service.ParseStoredHeaders(*t.Headers)
+			storedHeaders = service.PersistentDiscoveryHeaders(ephemeralHeaders)
+		}
 		inputs = append(inputs, &service.AddDownloadTaskInput{
 			Name:    t.Name,
 			Type:    t.Type,
 			URL:     t.URL,
-			Headers: t.Headers,
+			Headers: storedHeaders,
 			Folder:  t.Folder,
 		})
+		runtimeHeaders = append(runtimeHeaders, ephemeralHeaders)
 	}
 
 	videos, err := h.svc.AddDownloadTasks(inputs)
@@ -60,8 +68,8 @@ func (h *DownloadHandler) Create(c *gin.Context) {
 	if req.StartDownload {
 		localPath, _ := h.conf.Get("local").(string)
 		deleteSegments, _ := h.conf.Get("deleteSegments").(bool)
-		for _, v := range videos {
-			if err := h.svc.StartDownload(v.ID, localPath, deleteSegments); err != nil {
+		for index, v := range videos {
+			if err := h.svc.StartDownloadWithRuntimeHeaders(v.ID, localPath, deleteSegments, runtimeHeaders[index]); err != nil {
 				logger.Warn("auto-start download failed", zap.Int64("id", v.ID), zap.Error(err))
 			}
 		}

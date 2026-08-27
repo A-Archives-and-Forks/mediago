@@ -41,6 +41,17 @@ test("infers download types from parsed hostnames and paths", () => {
   expect(inferDownloadType("https://v.douyin.com/iF123AbC/")).toBe(
     DownloadType.youtube,
   );
+  expect(
+    inferDownloadType(
+      "https://www.xiaohongshu.com/explore/66f00abc1234567890abcdef?xsec_token=token",
+    ),
+  ).toBe(DownloadType.xiaohongshu);
+  expect(inferDownloadType("https://xhslink.com/a1B2c3D4")).toBe(
+    DownloadType.xiaohongshu,
+  );
+  expect(inferDownloadType("https://www.xiaohongshu.com/explore")).toBe(
+    DownloadType.direct,
+  );
   expect(inferDownloadType("https://www.tiktok.com/@creator/live")).toBe(
     DownloadType.direct,
   );

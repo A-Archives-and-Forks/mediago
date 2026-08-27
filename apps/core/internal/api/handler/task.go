@@ -35,7 +35,7 @@ func NewTaskHandler(queue *core.TaskQueue, logs *tasklog.Manager) *TaskHandler {
 // Create creates a download task.
 // @Summary Create a download task
 // @Description Creates a new download task and adds it to the queue; task ID is optional
-// @Description Supports M3U8, Bilibili, Direct, MediaGo, and yt-dlp downloads for YouTube, X/Twitter, TikTok, and Douyin. Type is inferred from the URL when omitted.
+// @Description Supports M3U8, Bilibili, Direct, MediaGo, and yt-dlp downloads for YouTube, X/Twitter, TikTok, Douyin, and Xiaohongshu videos. Type is inferred from the URL when omitted.
 // @Tags Tasks
 // @Accept json
 // @Produce json

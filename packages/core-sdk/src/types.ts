@@ -17,6 +17,7 @@ export enum DownloadType {
   Direct = "direct",
   Mediago = "mediago",
   Youtube = "youtube",
+  Xiaohongshu = "xiaohongshu",
 }
 
 /**
@@ -38,6 +39,8 @@ export interface Task {
   type: DownloadType;
   url: string;
   name: string;
+  outputPath?: string;
+  artifactPaths?: string[];
   status: TaskStatus;
   percent?: number;
   speed?: string;
@@ -141,7 +144,8 @@ export type DiscoverySourceType =
   | "bilibili"
   | "direct"
   | "mediago"
-  | "youtube";
+  | "youtube"
+  | "xiaohongshu";
 
 export interface DiscoverySource {
   id: string;
@@ -285,6 +289,7 @@ export interface DownloadTask {
   updatedDate: string;
   exists?: boolean;
   file?: string;
+  files?: string[];
 }
 
 /**

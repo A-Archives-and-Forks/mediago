@@ -59,6 +59,7 @@ export function variantForDownloadType(
     case DownloadType.direct:
       return "grep";
     case DownloadType.youtube:
+    case DownloadType.xiaohongshu:
       return "read";
     case DownloadType.m3u8:
       return "edit";

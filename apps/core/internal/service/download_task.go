@@ -43,8 +43,9 @@ type AddDownloadTaskInput struct {
 // DownloadTaskWithFile is a download task augmented with file existence information.
 type DownloadTaskWithFile struct {
 	*db.Video
-	Exists bool   `json:"exists"`
-	File   string `json:"file,omitempty"`
+	Exists bool     `json:"exists"`
+	File   string   `json:"file,omitempty"`
+	Files  []string `json:"files,omitempty"`
 }
 
 // PaginatedResult holds the paginated result.
@@ -224,18 +225,27 @@ func (s *DownloadTaskService) GetDownloadTasks(current, pageSize int, filter, lo
 	}
 
 	list := make([]*DownloadTaskWithFile, 0, len(result.Items))
+	videoIDs := make([]int64, 0, len(result.Items))
+	for _, item := range result.Items {
+		videoIDs = append(videoIDs, item.ID)
+	}
+	artifactPaths, err := s.repo.FindArtifactPaths(videoIDs)
+	if err != nil {
+		return nil, err
+	}
 	for _, item := range result.Items {
 		taskWithFile := &DownloadTaskWithFile{
 			Video:  item,
 			Exists: false,
 		}
 		if item.Status == "success" {
-			exists, file, resolveErr := s.resolveTaskFile(item, localPath)
+			exists, file, files, resolveErr := s.resolveTaskFiles(item, localPath, artifactPaths[item.ID])
 			if resolveErr != nil {
 				return nil, resolveErr
 			}
 			taskWithFile.Exists = exists
 			taskWithFile.File = file
+			taskWithFile.Files = files
 		}
 		list = append(list, taskWithFile)
 	}
@@ -252,7 +262,11 @@ func (s *DownloadTaskService) GetDownloadTask(id int64, localPath string) (*Down
 
 	result := &DownloadTaskWithFile{Video: item}
 	if item.Status == "success" {
-		result.Exists, result.File, err = s.resolveTaskFile(item, localPath)
+		artifactPaths, artifactErr := s.repo.FindArtifactPaths([]int64{id})
+		if artifactErr != nil {
+			return nil, artifactErr
+		}
+		result.Exists, result.File, result.Files, err = s.resolveTaskFiles(item, localPath, artifactPaths[id])
 		if err != nil {
 			return nil, err
 		}
@@ -260,15 +274,32 @@ func (s *DownloadTaskService) GetDownloadTask(id int64, localPath string) (*Down
 	return result, nil
 }
 
-func (s *DownloadTaskService) resolveTaskFile(item *db.Video, localPath string) (bool, string, error) {
-	if exists, file := ResolveOutputPath(item.OutputPath); exists {
-		if file != item.OutputPath {
-			if err := s.repo.UpdateOutputPath(item.ID, file); err != nil {
-				return false, "", err
+func (s *DownloadTaskService) resolveTaskFiles(item *db.Video, localPath string, storedArtifacts []string) (bool, string, []string, error) {
+	files := make([]string, 0, len(storedArtifacts)+1)
+	seen := make(map[string]struct{}, len(storedArtifacts)+1)
+	appendResolved := func(candidate string) {
+		if exists, file := ResolveOutputPath(candidate); exists {
+			if _, ok := seen[file]; ok {
+				return
 			}
-			item.OutputPath = file
+			seen[file] = struct{}{}
+			files = append(files, file)
 		}
-		return true, file, nil
+	}
+
+	appendResolved(item.OutputPath)
+	for _, artifactPath := range storedArtifacts {
+		appendResolved(artifactPath)
+	}
+	if len(files) > 0 {
+		primary := files[0]
+		if primary != item.OutputPath || !slices.Equal(files, storedArtifacts) {
+			if err := s.repo.UpdateResolvedArtifacts(item.ID, primary, files); err != nil {
+				return false, "", nil, err
+			}
+			item.OutputPath = primary
+		}
+		return true, primary, files, nil
 	}
 
 	searchDir := localPath
@@ -279,10 +310,10 @@ func (s *DownloadTaskService) resolveTaskFile(item *db.Video, localPath string) 
 		if content, readErr := s.logs.Read(string(queueTaskIDForDownload(item.ID))); readErr == nil {
 			if exists, file := ResolveOutputPathFromLog(content, item.Name, searchDir); exists {
 				if err := s.repo.UpdateOutputPath(item.ID, file); err != nil {
-					return false, "", err
+					return false, "", nil, err
 				}
 				item.OutputPath = file
-				return true, file, nil
+				return true, file, []string{file}, nil
 			}
 		}
 	}
@@ -290,13 +321,13 @@ func (s *DownloadTaskService) resolveTaskFile(item *db.Video, localPath string) 
 	if searchDir != "" {
 		if exists, file := CheckFileExists(item.Name, searchDir); exists {
 			if err := s.repo.UpdateOutputPath(item.ID, file); err != nil {
-				return false, "", err
+				return false, "", nil, err
 			}
 			item.OutputPath = file
-			return true, file, nil
+			return true, file, []string{file}, nil
 		}
 	}
-	return false, "", nil
+	return false, "", nil, nil
 }
 
 // StartDownload starts a download task.
@@ -411,8 +442,8 @@ func (s *DownloadTaskService) SetStatus(ids []int64, status string) error {
 
 // CompleteDownload persists the verified primary output and success status in
 // one database update.
-func (s *DownloadTaskService) CompleteDownload(id int64, outputPath string) error {
-	return s.repo.CompleteDownload(id, outputPath)
+func (s *DownloadTaskService) CompleteDownload(id int64, result core.DownloadResult) error {
+	return s.repo.CompleteDownload(id, result.PrimaryPath, result.ArtifactPaths)
 }
 
 // SetIsLive updates the live-stream flag.
@@ -445,7 +476,9 @@ func (s *DownloadTaskService) FindByURL(url string) (*db.Video, error) {
 	return s.repo.FindByURL(url)
 }
 
-func parseStoredHeaders(raw string) []string {
+// ParseStoredHeaders accepts the JSON and legacy newline formats used by
+// download creation clients.
+func ParseStoredHeaders(raw string) []string {
 	var headers []string
 	if err := json.Unmarshal([]byte(raw), &headers); err == nil {
 		return headers
@@ -469,7 +502,7 @@ func downloadParamsForVideo(video *db.Video, downloadID int64) core.DownloadPara
 
 	var headers []string
 	if video.Headers != nil && *video.Headers != "" {
-		headers = parseStoredHeaders(*video.Headers)
+		headers = ParseStoredHeaders(*video.Headers)
 	}
 
 	return core.DownloadParams{

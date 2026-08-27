@@ -1,5 +1,6 @@
 import type { ExtensionMessage, ExtensionResponse } from "../shared/types";
 import { importSources, probe } from "./mediago-client";
+import { enrichSourcesWithPageCookies } from "./page-cookies";
 import { createPageActionHandler, type PageActionHandler } from "./page-action";
 import { loadSettings, loadTabSources, saveSettings } from "./storage";
 import { tabSourceService, type TabSourceService } from "./tab-sources";
@@ -52,7 +53,11 @@ async function handle(
     }
     case "IMPORT_SOURCES": {
       const settings = await loadSettings();
-      const result = await importSources(settings, message.sources);
+      const sources =
+        settings.mode !== "desktop-schema" && settings.downloadNow
+          ? await enrichSourcesWithPageCookies(message.sources)
+          : message.sources;
+      const result = await importSources(settings, sources);
       return {
         type: "IMPORT_RESULT",
         ok: result.ok,

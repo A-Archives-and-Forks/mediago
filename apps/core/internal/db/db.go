@@ -36,7 +36,7 @@ func New(dbPath string) (*Database, error) {
 			return nil, err
 		}
 	}
-	if err := db.AutoMigrate(&Favorite{}, &Conversion{}); err != nil {
+	if err := db.AutoMigrate(&Favorite{}, &Conversion{}, &DownloadArtifact{}); err != nil {
 		return nil, err
 	}
 

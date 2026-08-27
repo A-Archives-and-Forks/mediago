@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { DownloadType } from "@mediago/shared-common";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -183,5 +184,6 @@ describe("Switch and Badge", () => {
     );
     expect(badgeVariants({ variant: "destructive" })).not.toContain("/15");
     expect(variantForDownloadType("unknown")).toBe("secondary");
+    expect(variantForDownloadType(DownloadType.xiaohongshu)).toBe("read");
   });
 });

@@ -220,7 +220,7 @@ func validBridgeURL(rawURL string) bool {
 
 func validSourceType(sourceType discovery.SourceType) bool {
 	switch sourceType {
-	case discovery.SourceTypeM3U8, discovery.SourceTypeBilibili, discovery.SourceTypeDirect, discovery.SourceTypeMediago, discovery.SourceTypeYoutube:
+	case discovery.SourceTypeM3U8, discovery.SourceTypeBilibili, discovery.SourceTypeDirect, discovery.SourceTypeMediago, discovery.SourceTypeYoutube, discovery.SourceTypeXiaohongshu:
 		return true
 	default:
 		return false

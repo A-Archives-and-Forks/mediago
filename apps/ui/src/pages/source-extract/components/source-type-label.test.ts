@@ -48,6 +48,12 @@ describe("sourceTypeLabel", () => {
   it("keeps platform and protocol labels readable", () => {
     expect(
       sourceTypeLabel({
+        type: DownloadType.xiaohongshu,
+        url: "https://www.xiaohongshu.com/explore/abc123?xsec_token=token",
+      }),
+    ).toBe("小红书");
+    expect(
+      sourceTypeLabel({
         type: DownloadType.youtube,
         url: "https://www.youtube.com/watch?v=video",
       }),

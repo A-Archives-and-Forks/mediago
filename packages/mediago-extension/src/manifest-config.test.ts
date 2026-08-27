@@ -25,6 +25,10 @@ const expectedPageMatches = [
   "*://douyin.com/*",
   "*://www.douyin.com/*",
   "*://v.douyin.com/*",
+  "*://xiaohongshu.com/*",
+  "*://www.xiaohongshu.com/*",
+  "*://xhslink.com/*",
+  "*://www.xhslink.com/*",
 ];
 
 const basename = (entry: string | undefined) => entry?.split("/").at(-1);
@@ -61,5 +65,10 @@ describe("page quick action manifest wiring", () => {
         matches: expectedPageMatches,
       },
     ]);
+  });
+
+  test("can forward signed-in Xiaohongshu cookies in HTTP mode", () => {
+    expect(manifest.permissions).toContain("cookies");
+    expect(manifest.host_permissions).toContain("<all_urls>");
   });
 });

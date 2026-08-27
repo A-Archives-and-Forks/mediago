@@ -70,6 +70,7 @@ export enum DownloadType {
   direct = "direct",
   mediago = "mediago",
   youtube = "youtube",
+  xiaohongshu = "xiaohongshu",
 }
 
 export type HLSInspectionStatus = "inspecting" | "ready" | "failed";
@@ -137,6 +138,7 @@ export interface DownloadParams {
 export interface DownloadTaskWithFile extends DownloadTask {
   exists?: boolean;
   file?: string;
+  files?: string[];
 }
 
 export interface ListPagination {

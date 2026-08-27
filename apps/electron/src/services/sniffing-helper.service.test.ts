@@ -284,6 +284,10 @@ describe("cookie-backed page types", () => {
       DownloadType.youtube,
     ],
     ["https://www.douyin.com/video/7480123456789012345", DownloadType.youtube],
+    [
+      "https://www.xiaohongshu.com/explore/66f00abc1234567890abcdef?xsec_token=token",
+      DownloadType.xiaohongshu,
+    ],
   ])("maps %s to %s", (url, type) => {
     expect(getCookieBackedType(url)).toBe(type);
   });
