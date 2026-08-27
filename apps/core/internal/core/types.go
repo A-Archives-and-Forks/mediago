@@ -5,6 +5,7 @@ import (
 	"context"
 	"net/url"
 	"strings"
+	"time"
 )
 
 // DownloadType is the download type enum
@@ -198,6 +199,7 @@ type TaskInfo struct {
 	Percent       float64      `json:"percent"`                 // completion percentage
 	Speed         string       `json:"speed"`                   // download speed
 	IsLive        bool         `json:"isLive"`                  // whether this is a live stream
+	StartedAt     *time.Time   `json:"startedAt,omitempty"`     // actual task execution start time
 	Error         string       `json:"error,omitempty"`         // error message (if any)
 }
 
@@ -205,8 +207,11 @@ type TaskInfo struct {
 // Paths are absolute so changing the configured download directory cannot
 // detach a completed task from its files.
 type DownloadResult struct {
-	PrimaryPath   string   `json:"primaryPath"`
-	ArtifactPaths []string `json:"artifactPaths"`
+	PrimaryPath         string   `json:"primaryPath"`
+	ArtifactPaths       []string `json:"artifactPaths"`
+	FinalizedAfterStop  bool     `json:"finalizedAfterStop,omitempty"`
+	RecoveredAfterError bool     `json:"recoveredAfterError,omitempty"`
+	RecoveredSegments   bool     `json:"recoveredSegments,omitempty"`
 }
 
 // Callbacks is a collection of download callback functions
@@ -219,6 +224,20 @@ type Callbacks struct {
 type Runner interface {
 	// Run executes a command and processes stdout/stderr line by line
 	Run(ctx context.Context, binPath string, args []string, onStdLine func(line string)) error
+}
+
+// RunnerOptions controls cancellation behavior without changing the legacy
+// Runner contract used by lightweight integrations and tests.
+type RunnerOptions struct {
+	ShouldGracefullyStop func() bool
+	GracePeriod          time.Duration
+}
+
+// ConfigurableRunner supports cooperative process cancellation. Downloaders
+// fall back to Runner.Run when an implementation does not provide it.
+type ConfigurableRunner interface {
+	Runner
+	RunWithOptions(ctx context.Context, binPath string, args []string, onStdLine func(line string), options RunnerOptions) error
 }
 
 // Downloader is the interface for a downloader

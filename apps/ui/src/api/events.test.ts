@@ -246,4 +246,47 @@ describe("initGoEvents", () => {
       expect(requestedUrls.join("\n")).not.toContain(forbidden);
     }
   });
+
+  test("polls live recordings even before they report a percentage", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("EventSource", FakeEventSource);
+    httpGet.mockResolvedValue({
+      tasks: [
+        {
+          id: "42",
+          type: "m3u8",
+          percent: 0,
+          speed: "1.55MBps",
+          isLive: true,
+          startedAt: "2026-08-27T07:20:00Z",
+          status: "downloading",
+        },
+      ],
+      total: 1,
+    });
+    const listener = vi.fn();
+    const unsubscribe = onDownloadEvent(listener);
+
+    try {
+      initGoEvents("http://127.0.0.1:43210");
+      await vi.advanceTimersByTimeAsync(1_000);
+
+      expect(listener).toHaveBeenCalledWith(null, {
+        type: "progress",
+        data: [
+          {
+            id: 42,
+            type: "m3u8",
+            percent: "0",
+            speed: "1.55MBps",
+            isLive: true,
+            startedAt: "2026-08-27T07:20:00Z",
+            status: "downloading",
+          },
+        ],
+      });
+    } finally {
+      unsubscribe();
+    }
+  });
 });

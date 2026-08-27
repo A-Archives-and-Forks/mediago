@@ -51,6 +51,7 @@ type controlledIdentityDownloader struct {
 	result      error
 	outputPath  string
 	didStart    atomic.Bool
+	isLive      bool
 	releaseOnce sync.Once
 }
 
@@ -64,9 +65,12 @@ func newControlledIdentityDownloader(result error) *controlledIdentityDownloader
 	}
 }
 
-func (d *controlledIdentityDownloader) Download(ctx context.Context, params core.DownloadParams, _ core.Callbacks) (core.DownloadResult, error) {
+func (d *controlledIdentityDownloader) Download(ctx context.Context, params core.DownloadParams, callbacks core.Callbacks) (core.DownloadResult, error) {
 	d.didStart.Store(true)
 	defer close(d.finished)
+	if d.isLive && callbacks.OnProgress != nil {
+		callbacks.OnProgress(core.ProgressEvent{ID: params.ID, Type: "progress", IsLive: true})
+	}
 
 	select {
 	case d.started <- params:
@@ -79,6 +83,66 @@ func (d *controlledIdentityDownloader) Download(ctx context.Context, params core
 	case <-ctx.Done():
 		return core.DownloadResult{}, ctx.Err()
 	}
+}
+
+func TestQueueProgressPersistsLiveDetection(t *testing.T) {
+	previousLogger, previousSugar := logger.Logger, logger.Sugar
+	logger.Logger = zap.NewNop()
+	logger.Sugar = logger.Logger.Sugar()
+	t.Cleanup(func() {
+		logger.Logger = previousLogger
+		logger.Sugar = previousSugar
+	})
+
+	database, err := db.New(filepath.Join(t.TempDir(), "downloads.db"))
+	if err != nil {
+		t.Fatalf("db.New() error = %v", err)
+	}
+	defer database.Close()
+
+	downloader := newControlledIdentityDownloader(nil)
+	downloader.isLive = true
+	queue := core.NewTaskQueue(downloader, 1)
+	config := &downloadIdentityConfigStore{values: map[string]any{
+		"language":       "en",
+		"local":          t.TempDir(),
+		"deleteSegments": false,
+	}}
+	srv := New(queue, nil, database, config)
+
+	body := []byte(`{"tasks":[{"type":"m3u8","name":"live-contract","url":"https://example.com/live.m3u8"}],"startDownload":true}`)
+	request := httptest.NewRequest(http.MethodPost, "/api/downloads", bytes.NewReader(body))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	srv.Engine().ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("POST /api/downloads status = %d, body = %s", response.Code, response.Body.String())
+	}
+	id := decodeCreatedDownloadID(t, response.Body.String())
+
+	select {
+	case <-downloader.started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for live downloader to start")
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		stored, findErr := srv.downloadService.FindByIDOrFail(id)
+		if findErr != nil {
+			t.Fatalf("FindByIDOrFail() error = %v", findErr)
+		}
+		if stored.IsLive {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("live flag was not persisted")
+		}
+		time.Sleep(time.Millisecond)
+	}
+
+	downloader.Release()
+	waitForIdentityDownloader(t, downloader)
+	waitForIdentityQueueCompletion(t, queue)
 }
 
 func (*controlledIdentityDownloader) Config() interface{} { return nil }

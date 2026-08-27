@@ -8,16 +8,18 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
+	mediagocore "caorushizi.cn/mediago/internal/core"
 	"github.com/UserExistsError/conpty"
 )
 
 // runWithPTY uses ConPTY on the Windows platform
-func (r *PTYRunner) runWithPTY(ctx context.Context, binPath string, args []string, onStdLine func(string)) error {
+func (r *PTYRunner) runWithPTY(ctx context.Context, binPath string, args []string, onStdLine func(string), options mediagocore.RunnerOptions) error {
 	// check if ConPTY is available (requires Windows 10 1809+)
 	if !conpty.IsConPtyAvailable() {
 		// ConPTY not available, fall back to regular pipe
-		return r.fallbackToPipe(ctx, binPath, args, onStdLine)
+		return r.fallbackToPipe(ctx, binPath, args, onStdLine, options)
 	}
 
 	// build the command-line string
@@ -28,7 +30,7 @@ func (r *PTYRunner) runWithPTY(ctx context.Context, binPath string, args []strin
 	cpty, err := conpty.Start(cmdLine, conpty.ConPtyDimensions(80, 24))
 	if err != nil {
 		// ConPTY creation failed, fall back to regular pipe
-		return r.fallbackToPipe(ctx, binPath, args, onStdLine)
+		return r.fallbackToPipe(ctx, binPath, args, onStdLine, options)
 	}
 
 	// use defer to ensure ConPTY is always closed
@@ -67,10 +69,22 @@ func (r *PTYRunner) runWithPTY(ctx context.Context, binPath string, args []strin
 	var finalErr error
 	select {
 	case <-ctx.Done():
-		// context cancelled
-		waitCancel()  // cancel Wait
-		closeConPty() // close ConPTY (terminates the child process)
-		<-readDone    // wait for reading to complete
+		if gracefulStopRequested(options) {
+			_, _ = cpty.Write([]byte{3})
+			timer := time.NewTimer(gracefulStopPeriod(options))
+			select {
+			case <-waitDone:
+				timer.Stop()
+			case <-timer.C:
+				waitCancel()
+				closeConPty()
+			}
+		} else {
+			waitCancel()
+			closeConPty()
+		}
+		closeConPty()
+		<-readDone // wait for reading to complete
 		finalErr = ctx.Err()
 
 	case err := <-waitDone:

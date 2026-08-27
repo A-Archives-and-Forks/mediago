@@ -71,7 +71,7 @@ const electronApi: PlatformApi = {
           : { tabId: "", bounds: tabIdOrRect },
       );
     },
-    setUserAgent(
+    setDeviceMode(
       tabIdOrIsMobile: string | boolean,
       isMobile?: boolean,
     ): Promise<void> {

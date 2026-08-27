@@ -13,14 +13,24 @@ import {
   Download,
   Pause,
   Pencil,
+  Square,
   SquareTerminal,
 } from "lucide-react";
-import { memo, type ReactNode, useMemo } from "react";
+import { memo, type ReactNode, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 import { useShallow } from "zustand/react/shallow";
 import { DownloadTag } from "@/components/download-tag";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import {
   CONTINUE_DOWNLOAD,
@@ -31,6 +41,11 @@ import {
 } from "@/const";
 import type { DownloadTaskDetails } from "@/hooks/use-tasks";
 import { appStoreSelector, useAppStore } from "@/store/app";
+import {
+  formatDownloadSpeed,
+  formatRecordingDuration,
+  formatRecordingStartTime,
+} from "@/store/download-progress";
 import { cn, formatRelativeTime, fromatDateTime, isWeb, tdApp } from "@/utils";
 import { TaskActionsMenu } from "./task-actions-menu";
 import { TerminalDialog } from "./terminal-dialog";
@@ -43,7 +58,7 @@ interface Props {
   onSelect: (id: number) => void;
   selected: boolean;
   onStartDownload: (id: number) => void;
-  onStopDownload: (taskId: number) => void;
+  onStopDownload: (taskId: number) => Promise<void> | void;
   onContextMenu: (taskId: number) => void;
   onDelete: (taskId: number) => void;
   onRefresh: () => void;
@@ -68,6 +83,14 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
   const { t, i18n } = useTranslation();
   const { shell } = usePlatform();
   const { envPath } = useEnvPath();
+  const [stopRecordingOpen, setStopRecordingOpen] = useState(false);
+  const [isStoppingRecording, setIsStoppingRecording] = useState(false);
+
+  useEffect(() => {
+    if (task.status !== DownloadStatus.Downloading) {
+      setIsStoppingRecording(false);
+    }
+  }, [task.status]);
 
   // Handlers
   const handlePlay = useMemoizedFn(() => {
@@ -82,9 +105,30 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
     tdApp.onEvent(eventName);
   });
 
-  const handleStop = useMemoizedFn(() => {
-    onStopDownload(task.id);
-    tdApp.onEvent(STOP_DOWNLOAD);
+  const stopTask = useMemoizedFn(async () => {
+    try {
+      await onStopDownload(task.id);
+      tdApp.onEvent(STOP_DOWNLOAD);
+    } catch {
+      setIsStoppingRecording(false);
+      toast.error(
+        task.isLive ? t("endRecordingFailed") : t("stopDownloadFailed"),
+      );
+    }
+  });
+
+  const requestStop = useMemoizedFn(() => {
+    if (task.isLive) {
+      setStopRecordingOpen(true);
+      return;
+    }
+    void stopTask();
+  });
+
+  const confirmStopRecording = useMemoizedFn(() => {
+    setStopRecordingOpen(false);
+    setIsStoppingRecording(true);
+    void stopTask();
   });
 
   // Action buttons by status (consolidated for clarity)
@@ -155,11 +199,28 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
             variant="ghost"
             size="icon"
             className="text-muted-foreground hover:text-foreground"
-            title={t("pause")}
-            aria-label={t("pause")}
-            onClick={handleStop}
+            title={
+              task.isLive
+                ? isStoppingRecording
+                  ? t("endingRecording")
+                  : t("endRecording")
+                : t("pause")
+            }
+            aria-label={
+              task.isLive
+                ? isStoppingRecording
+                  ? t("endingRecording")
+                  : t("endRecording")
+                : t("pause")
+            }
+            disabled={task.isLive && isStoppingRecording}
+            onClick={requestStop}
           >
-            <CirclePause className="size-4" />
+            {task.isLive ? (
+              <Square className="size-4" />
+            ) : (
+              <CirclePause className="size-4" />
+            )}
           </Button>,
         );
         break;
@@ -194,9 +255,11 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
             variant="ghost"
             size="icon"
             className="text-muted-foreground hover:text-foreground"
-            title={t("continueDownload")}
-            aria-label={t("continueDownload")}
-            onClick={() => startWithEvent(CONTINUE_DOWNLOAD)}
+            title={task.isLive ? t("recordAgain") : t("continueDownload")}
+            aria-label={task.isLive ? t("recordAgain") : t("continueDownload")}
+            onClick={() =>
+              startWithEvent(task.isLive ? RESTART_DOWNLOAD : CONTINUE_DOWNLOAD)
+            }
           >
             <CircleArrowDown className="size-4" />
           </Button>,
@@ -226,7 +289,8 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
   }, [
     appStore.showTerminal,
     handlePlay,
-    handleStop,
+    isStoppingRecording,
+    requestStop,
     task,
     onShowEditForm,
     startWithEvent,
@@ -260,7 +324,13 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
           <DownloadTag
             key="downloading"
             icon={<Download />}
-            text={t("downloading")}
+            text={
+              task.isLive && isStoppingRecording
+                ? t("endingRecording")
+                : task.isLive
+                  ? t("recording")
+                  : t("downloading")
+            }
             variant="brand"
           />,
         );
@@ -313,18 +383,51 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
         list.push(
           <DownloadTag
             key="pause"
-            icon={<Pause />}
-            text={t("downloadPause")}
+            icon={task.isLive ? <Square /> : <Pause />}
+            text={task.isLive ? t("recordingStopped") : t("downloadPause")}
             variant="muted"
           />,
         );
         break;
     }
     return list;
-  }, [task, t]);
+  }, [isStoppingRecording, task, t]);
 
   const renderDescription = useMemoizedFn(
     (item: DownloadTaskDetails): ReactNode => {
+      if (item.isLive && item.status === DownloadStatus.Downloading) {
+        const recordingDuration = formatRecordingDuration(
+          item.recordingStartedAt,
+        );
+        const recordingStartTime = formatRecordingStartTime(
+          item.recordingStartedAt,
+          i18n.resolvedLanguage ?? i18n.language,
+        );
+        return (
+          <div className="flex flex-wrap items-center gap-2 text-xs text-foreground-secondary">
+            {recordingDuration && recordingStartTime ? (
+              <>
+                <span className="shrink-0 tabular-nums">
+                  {t("recordedDuration")} {recordingDuration}
+                </span>
+                <span className="text-border-strong" aria-hidden="true">
+                  ·
+                </span>
+                <span className="shrink-0 tabular-nums">
+                  {t("recordingStartedAt")} {recordingStartTime}
+                </span>
+                <span className="text-border-strong" aria-hidden="true">
+                  ·
+                </span>
+              </>
+            ) : null}
+            <span className="shrink-0 tabular-nums">
+              {formatDownloadSpeed(item.speed)}
+            </span>
+          </div>
+        );
+      }
+
       if (item.percent && item.status === DownloadStatus.Downloading) {
         const val = Math.round(Number(item.percent));
 
@@ -393,65 +496,93 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
   );
 
   return (
-    <div
-      role="article"
-      aria-label={task.name}
-      className={cn(
-        "relative flex flex-row gap-3 border-b px-3 py-3 transition-colors last:border-b-0 hover:bg-surface-hover",
-        {
-          "bg-surface-selected hover:bg-surface-selected": selected,
-          "opacity-70": task.status === DownloadStatus.Success && !task.exists,
-        },
-      )}
-      onContextMenu={
-        isWeb
-          ? undefined
-          : (event) => {
-              event.preventDefault();
-              void onContextMenu(task.id);
-            }
-      }
-    >
-      <Checkbox
-        className="mt-2"
-        checked={selected}
-        onCheckedChange={() => onSelectChange(task.id)}
-      />
-      <div className={cn("flex flex-1 flex-col gap-1 overflow-hidden")}>
-        <div className="relative flex flex-row items-center gap-2">
-          {renderTitle(task)}
-          <div className="flex shrink-0 grow flex-row gap-2">{tags}</div>
-          <div
-            className={cn(
-              "flex flex-row items-center gap-1",
-              isWeb && "hidden",
-            )}
-          >
-            {actionButtons}
-          </div>
-          {isWeb ? (
-            <TaskActionsMenu
-              task={task}
-              onSelect={() => onSelect(task.id)}
-              onStart={() =>
-                startWithEvent(
-                  task.status === DownloadStatus.Failed
-                    ? RESTART_DOWNLOAD
-                    : task.status === DownloadStatus.Stopped
-                      ? CONTINUE_DOWNLOAD
-                      : DOWNLOAD_NOW,
-                )
+    <>
+      <div
+        role="article"
+        aria-label={task.name}
+        className={cn(
+          "relative flex flex-row gap-3 border-b px-3 py-3 transition-colors last:border-b-0 hover:bg-surface-hover",
+          {
+            "bg-surface-selected hover:bg-surface-selected": selected,
+            "opacity-70":
+              task.status === DownloadStatus.Success && !task.exists,
+          },
+        )}
+        onContextMenu={
+          isWeb
+            ? undefined
+            : (event) => {
+                event.preventDefault();
+                void onContextMenu(task.id);
               }
-              onStop={handleStop}
-              onPlay={handlePlay}
-              onEdit={() => onShowEditForm?.(task)}
-              onRefresh={onRefresh}
-              onDelete={() => onDelete(task.id)}
-            />
-          ) : null}
+        }
+      >
+        <Checkbox
+          className="mt-2"
+          checked={selected}
+          onCheckedChange={() => onSelectChange(task.id)}
+        />
+        <div className={cn("flex flex-1 flex-col gap-1 overflow-hidden")}>
+          <div className="relative flex flex-row items-center gap-2">
+            {renderTitle(task)}
+            <div className="flex shrink-0 grow flex-row gap-2">{tags}</div>
+            <div
+              className={cn(
+                "flex flex-row items-center gap-1",
+                isWeb && "hidden",
+              )}
+            >
+              {actionButtons}
+            </div>
+            {isWeb ? (
+              <TaskActionsMenu
+                task={task}
+                onSelect={() => onSelect(task.id)}
+                onStart={() =>
+                  startWithEvent(
+                    task.status === DownloadStatus.Failed
+                      ? RESTART_DOWNLOAD
+                      : task.status === DownloadStatus.Stopped
+                        ? task.isLive
+                          ? RESTART_DOWNLOAD
+                          : CONTINUE_DOWNLOAD
+                        : DOWNLOAD_NOW,
+                  )
+                }
+                isStoppingRecording={isStoppingRecording}
+                onStop={requestStop}
+                onPlay={handlePlay}
+                onEdit={() => onShowEditForm?.(task)}
+                onRefresh={onRefresh}
+                onDelete={() => onDelete(task.id)}
+              />
+            ) : null}
+          </div>
+          {renderDescription(task)}
         </div>
-        {renderDescription(task)}
       </div>
-    </div>
+      <Dialog open={stopRecordingOpen} onOpenChange={setStopRecordingOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("endLiveRecordingTitle")}</DialogTitle>
+            <DialogDescription>
+              {t("endLiveRecordingDescription")}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setStopRecordingOpen(false)}
+            >
+              {t("continueRecording")}
+            </Button>
+            <Button type="button" onClick={confirmStopRecording}>
+              {t("endAndSaveRecording")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 });

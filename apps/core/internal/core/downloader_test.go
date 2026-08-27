@@ -42,6 +42,16 @@ func (f runnerFunc) Run(ctx context.Context, bin string, args []string, onLine f
 	return f(ctx, bin, args, onLine)
 }
 
+type configurableRunnerFunc func(context.Context, string, []string, func(string), RunnerOptions) error
+
+func (f configurableRunnerFunc) Run(ctx context.Context, bin string, args []string, onLine func(string)) error {
+	return f(ctx, bin, args, onLine, RunnerOptions{})
+}
+
+func (f configurableRunnerFunc) RunWithOptions(ctx context.Context, bin string, args []string, onLine func(string), options RunnerOptions) error {
+	return f(ctx, bin, args, onLine, options)
+}
+
 func ensureTestLogger() {
 	if logger.Logger == nil {
 		logger.Logger = zap.NewNop()
@@ -451,6 +461,309 @@ func TestDownloadAcceptsNewMergedM3U8Output(t *testing.T) {
 	}
 	if result.PrimaryPath != filepath.Join(tempDir, "video.mp4") {
 		t.Fatalf("Download() primary path = %q", result.PrimaryPath)
+	}
+}
+
+func TestDownloadDoesNotTreatM3U8SegmentsAsCompletedOutput(t *testing.T) {
+	ensureTestLogger()
+	tempDir := t.TempDir()
+	bin := filepath.Join(tempDir, "N_m3u8DL-RE")
+	if err := os.WriteFile(bin, []byte("test"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	d := NewDownloader(
+		map[DownloadType]string{TypeM3U8: bin},
+		runnerFunc(func(context.Context, string, []string, func(string)) error {
+			segmentDir := filepath.Join(tempDir, "video", "0___1000_")
+			if err := os.MkdirAll(segmentDir, 0o700); err != nil {
+				return err
+			}
+			return os.WriteFile(filepath.Join(segmentDir, "100.ts"), []byte("segment"), 0o600)
+		}),
+		schema.DefaultSchemas(),
+		testDownloaderConfig{localDir: tempDir},
+	)
+
+	_, err := d.Download(context.Background(), DownloadParams{
+		ID: "segments-only", Type: TypeM3U8, URL: "https://example.com/video.m3u8", Name: "video",
+	}, Callbacks{})
+	if !errors.Is(err, ErrM3U8OutputMissing) {
+		t.Fatalf("Download() error = %v, want ErrM3U8OutputMissing", err)
+	}
+}
+
+func TestDownloadReturnsOnlyTopLevelM3U8Artifact(t *testing.T) {
+	ensureTestLogger()
+	tempDir := t.TempDir()
+	bin := filepath.Join(tempDir, "N_m3u8DL-RE")
+	if err := os.WriteFile(bin, []byte("test"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	outputPath := filepath.Join(tempDir, "live.ts")
+	segmentPath := filepath.Join(tempDir, "live", "0___1000_", "100.ts")
+	d := NewDownloader(
+		map[DownloadType]string{TypeM3U8: bin},
+		runnerFunc(func(context.Context, string, []string, func(string)) error {
+			if err := os.MkdirAll(filepath.Dir(segmentPath), 0o700); err != nil {
+				return err
+			}
+			if err := os.WriteFile(segmentPath, []byte("segment"), 0o600); err != nil {
+				return err
+			}
+			return os.WriteFile(outputPath, []byte("merged"), 0o600)
+		}),
+		schema.DefaultSchemas(),
+		testDownloaderConfig{localDir: tempDir},
+	)
+
+	result, err := d.Download(context.Background(), DownloadParams{
+		ID: "top-level-only", Type: TypeM3U8, URL: "https://example.com/live.m3u8", Name: "live",
+	}, Callbacks{})
+	if err != nil {
+		t.Fatalf("Download() error = %v", err)
+	}
+	if !slices.Equal(result.ArtifactPaths, []string{outputPath}) {
+		t.Fatalf("Download() artifact paths = %q, want [%q]", result.ArtifactPaths, outputPath)
+	}
+}
+
+func TestDownloadRecoversCompletedLiveOutputAfterDownloaderError(t *testing.T) {
+	ensureTestLogger()
+	tempDir := t.TempDir()
+	bin := filepath.Join(tempDir, "N_m3u8DL-RE")
+	if err := os.WriteFile(bin, []byte("test"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	downloaderErr := errors.New("live playlist ended with exit status 1")
+	outputPath := filepath.Join(tempDir, "live.ts")
+	d := NewDownloader(
+		map[DownloadType]string{TypeM3U8: bin},
+		runnerFunc(func(_ context.Context, _ string, _ []string, onLine func(string)) error {
+			onLine("检测到直播流")
+			onLine("保存文件名: live")
+			if err := os.WriteFile(outputPath, []byte("recorded media"), 0o600); err != nil {
+				return err
+			}
+			return downloaderErr
+		}),
+		schema.DefaultSchemas(),
+		testDownloaderConfig{localDir: tempDir},
+	)
+
+	result, err := d.Download(context.Background(), DownloadParams{
+		ID: "live-natural-end", Type: TypeM3U8, URL: "https://example.com/live.m3u8", Name: "live",
+	}, Callbacks{})
+	if err != nil {
+		t.Fatalf("Download() error = %v", err)
+	}
+	if result.PrimaryPath != outputPath {
+		t.Fatalf("Download() primary path = %q, want %q", result.PrimaryPath, outputPath)
+	}
+	if !result.RecoveredAfterError {
+		t.Fatal("Download() did not mark the live output as recovered after downloader error")
+	}
+	if result.FinalizedAfterStop {
+		t.Fatal("natural live end must not be marked as a user stop")
+	}
+}
+
+func TestDownloadMergesPreservedSingleTrackLiveSegmentsAfterDownloaderError(t *testing.T) {
+	ensureTestLogger()
+	tempDir := t.TempDir()
+	bin := filepath.Join(tempDir, "N_m3u8DL-RE")
+	if err := os.WriteFile(bin, []byte("test"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	segmentDir := filepath.Join(tempDir, "live", "0___1000_")
+	segmentPaths := []string{
+		filepath.Join(segmentDir, "100.ts"),
+		filepath.Join(segmentDir, "101.ts"),
+		filepath.Join(segmentDir, "102.ts"),
+	}
+	d := NewDownloader(
+		map[DownloadType]string{TypeM3U8: bin},
+		runnerFunc(func(_ context.Context, _ string, _ []string, onLine func(string)) error {
+			onLine("检测到直播流")
+			onLine("保存文件名: live")
+			if err := os.MkdirAll(segmentDir, 0o700); err != nil {
+				return err
+			}
+			for index, path := range segmentPaths {
+				if err := os.WriteFile(path, []byte(fmt.Sprintf("segment-%d", index)), 0o600); err != nil {
+					return err
+				}
+			}
+			return errors.New("live source ended unexpectedly")
+		}),
+		schema.DefaultSchemas(),
+		testDownloaderConfig{localDir: tempDir},
+	)
+
+	result, err := d.Download(context.Background(), DownloadParams{
+		ID: "live-segment-recovery", Type: TypeM3U8, URL: "https://example.com/live.m3u8", Name: "live",
+	}, Callbacks{})
+	if err != nil {
+		t.Fatalf("Download() error = %v", err)
+	}
+	if result.PrimaryPath != filepath.Join(tempDir, "live.ts") {
+		t.Fatalf("Download() primary path = %q", result.PrimaryPath)
+	}
+	if !result.RecoveredAfterError || !result.RecoveredSegments {
+		t.Fatalf("Download() recovery flags = %#v", result)
+	}
+	contents, err := os.ReadFile(result.PrimaryPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := string(contents), "segment-0segment-1segment-2"; got != want {
+		t.Fatalf("recovered contents = %q, want %q", got, want)
+	}
+	for _, segmentPath := range segmentPaths {
+		if _, err := os.Stat(segmentPath); err != nil {
+			t.Fatalf("preserved segment was removed: %v", err)
+		}
+	}
+	if !slices.Equal(result.ArtifactPaths, []string{result.PrimaryPath}) {
+		t.Fatalf("Download() artifacts = %q", result.ArtifactPaths)
+	}
+}
+
+func TestDownloadPreservesAmbiguousLiveSegmentsWhenRecoveryIsUnsafe(t *testing.T) {
+	ensureTestLogger()
+	tempDir := t.TempDir()
+	bin := filepath.Join(tempDir, "N_m3u8DL-RE")
+	if err := os.WriteFile(bin, []byte("test"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	d := NewDownloader(
+		map[DownloadType]string{TypeM3U8: bin},
+		runnerFunc(func(_ context.Context, _ string, _ []string, onLine func(string)) error {
+			onLine("检测到直播流")
+			for _, track := range []string{"video", "audio"} {
+				directory := filepath.Join(tempDir, "live", track)
+				if err := os.MkdirAll(directory, 0o700); err != nil {
+					return err
+				}
+				if err := os.WriteFile(filepath.Join(directory, "100.ts"), []byte(track), 0o600); err != nil {
+					return err
+				}
+			}
+			return errors.New("live source ended unexpectedly")
+		}),
+		schema.DefaultSchemas(),
+		testDownloaderConfig{localDir: tempDir},
+	)
+
+	_, err := d.Download(context.Background(), DownloadParams{
+		ID: "live-ambiguous-segments", Type: TypeM3U8, URL: "https://example.com/live.m3u8", Name: "live",
+	}, Callbacks{})
+	if !errors.Is(err, ErrLiveSegmentRecovery) {
+		t.Fatalf("Download() error = %v, want ErrLiveSegmentRecovery", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(tempDir, "live", "video", "100.ts")); statErr != nil {
+		t.Fatalf("video segment was removed: %v", statErr)
+	}
+	if _, statErr := os.Stat(filepath.Join(tempDir, "live", "audio", "100.ts")); statErr != nil {
+		t.Fatalf("audio segment was removed: %v", statErr)
+	}
+}
+
+func TestDownloadReturnsFinalizedLiveOutputAfterCancellation(t *testing.T) {
+	ensureTestLogger()
+	tempDir := t.TempDir()
+	bin := filepath.Join(tempDir, "N_m3u8DL-RE")
+	if err := os.WriteFile(bin, []byte("test"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	d := NewDownloader(
+		map[DownloadType]string{TypeM3U8: bin},
+		configurableRunnerFunc(func(_ context.Context, _ string, _ []string, onLine func(string), options RunnerOptions) error {
+			onLine("检测到直播流")
+			onLine("保存文件名: live")
+			if options.ShouldGracefullyStop == nil || !options.ShouldGracefullyStop() {
+				t.Fatal("live runner did not request graceful cancellation")
+			}
+			if err := os.WriteFile(filepath.Join(tempDir, "live.mp4"), []byte("recorded media"), 0o600); err != nil {
+				return err
+			}
+			return context.Canceled
+		}),
+		schema.DefaultSchemas(),
+		testDownloaderConfig{localDir: tempDir},
+	)
+
+	result, err := d.Download(context.Background(), DownloadParams{
+		ID: "live-stop", Type: TypeM3U8, URL: "https://example.com/live.m3u8", Name: "live",
+	}, Callbacks{})
+	if err != nil {
+		t.Fatalf("Download() error = %v", err)
+	}
+	if result.PrimaryPath != filepath.Join(tempDir, "live.mp4") {
+		t.Fatalf("Download() primary path = %q", result.PrimaryPath)
+	}
+	if !result.FinalizedAfterStop {
+		t.Fatal("Download() did not mark the live output as finalized after stop")
+	}
+}
+
+func TestDownloadKeepsCanceledLiveWithoutOutputStopped(t *testing.T) {
+	ensureTestLogger()
+	tempDir := t.TempDir()
+	bin := filepath.Join(tempDir, "N_m3u8DL-RE")
+	if err := os.WriteFile(bin, []byte("test"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	d := NewDownloader(
+		map[DownloadType]string{TypeM3U8: bin},
+		configurableRunnerFunc(func(_ context.Context, _ string, _ []string, onLine func(string), _ RunnerOptions) error {
+			onLine("检测到直播流")
+			onLine("保存文件名: live")
+			return context.Canceled
+		}),
+		schema.DefaultSchemas(),
+		testDownloaderConfig{localDir: tempDir},
+	)
+
+	_, err := d.Download(context.Background(), DownloadParams{
+		ID: "live-empty", Type: TypeM3U8, URL: "https://example.com/live.m3u8", Name: "live",
+	}, Callbacks{})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("Download() error = %v, want context.Canceled", err)
+	}
+}
+
+func TestDownloadDoesNotFinalizeCanceledNonLiveOutput(t *testing.T) {
+	ensureTestLogger()
+	tempDir := t.TempDir()
+	bin := filepath.Join(tempDir, "N_m3u8DL-RE")
+	if err := os.WriteFile(bin, []byte("test"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	d := NewDownloader(
+		map[DownloadType]string{TypeM3U8: bin},
+		configurableRunnerFunc(func(_ context.Context, _ string, _ []string, _ func(string), _ RunnerOptions) error {
+			if err := os.WriteFile(filepath.Join(tempDir, "vod.mp4"), []byte("partial media"), 0o600); err != nil {
+				return err
+			}
+			return context.Canceled
+		}),
+		schema.DefaultSchemas(),
+		testDownloaderConfig{localDir: tempDir},
+	)
+
+	_, err := d.Download(context.Background(), DownloadParams{
+		ID: "vod-stop", Type: TypeM3U8, URL: "https://example.com/vod.m3u8", Name: "vod",
+	}, Callbacks{})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("Download() error = %v, want context.Canceled", err)
 	}
 }
 

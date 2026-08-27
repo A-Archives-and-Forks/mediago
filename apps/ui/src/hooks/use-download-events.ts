@@ -108,23 +108,22 @@ function isDownloadTasksCacheKey(key: unknown): boolean {
   );
 }
 
-function applyProgressToTaskCache(
+export function applyProgressToTaskCache(
   current: DownloadTaskResponse | undefined,
   progress: DownloadProgress[],
 ): DownloadTaskResponse | undefined {
   if (!current) return current;
 
-  const progressIds = new Set(progress.map((item) => item.id));
+  const progressById = new Map(progress.map((item) => [item.id, item]));
   let changed = false;
   const list = current.list.map((item) => {
-    if (
-      !progressIds.has(item.id) ||
-      item.status === DownloadStatus.Downloading
-    ) {
-      return item;
-    }
+    const progressItem = progressById.get(item.id);
+    if (!progressItem) return item;
+    const status = DownloadStatus.Downloading;
+    const isLive = item.isLive === true || progressItem.isLive;
+    if (item.status === status && item.isLive === isLive) return item;
     changed = true;
-    return { ...item, status: DownloadStatus.Downloading };
+    return { ...item, status, isLive };
   });
 
   return changed ? { ...current, list } : current;
@@ -151,6 +150,8 @@ export function useDownloadEvents() {
           percent: item.percent,
           speed: item.speed,
           id: item.id,
+          isLive: item.isLive,
+          startedAt: item.startedAt,
         })),
       );
       return mutate<DownloadTaskResponse>(

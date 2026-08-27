@@ -2,14 +2,13 @@ import { provide } from "@inversifyjs/binding-decorators";
 import {
   type BrowserBoundsPayload,
   type BrowserLoadURLPayload,
-  type BrowserUserAgentPayload,
+  type BrowserDeviceModePayload,
   type Controller,
   type CreateBrowserTabInput,
   type DownloadTask,
   IPC,
 } from "@mediago/shared-common";
 import { handle } from "../core/decorators";
-import { DownloaderServer } from "../services/downloader.server";
 import OverlayDialogService from "../services/overlay-dialog.service";
 import { TYPES } from "../types/symbols";
 import { type IpcMainEvent } from "electron";
@@ -23,8 +22,6 @@ export default class WebviewController implements Controller {
   constructor(
     @inject(BrowserTabManagerService)
     private readonly tabs: BrowserTabManagerService,
-    @inject(DownloaderServer)
-    private readonly downloaderServer: DownloaderServer,
     @inject(SniffingHelper)
     private readonly sniffingHelper: SniffingHelper,
     @inject(OverlayDialogService)
@@ -100,14 +97,14 @@ export default class WebviewController implements Controller {
   }
 
   @handle(IPC.browser.setUserAgent)
-  async webviewChangeUserAgent(
+  webviewChangeDeviceMode(
     _event: IpcMainEvent,
-    payload: BrowserUserAgentPayload | boolean,
+    payload: BrowserDeviceModePayload | boolean,
   ) {
     const isMobile = typeof payload === "boolean" ? payload : payload.isMobile;
-    this.tabs.setUserAgent(isMobile);
-    const client = this.downloaderServer.getClient();
-    await client.setConfigKey("isMobile", isMobile);
+    const tabId =
+      typeof payload === "boolean" ? this.tabId() : this.tabId(payload.tabId);
+    this.tabs.setDeviceMode(tabId, isMobile);
   }
 
   @handle(IPC.browser.pluginReady)

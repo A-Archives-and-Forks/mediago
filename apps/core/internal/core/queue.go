@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"time"
 
 	"caorushizi.cn/mediago/internal/logger"
 	"go.uber.org/zap"
@@ -126,8 +127,16 @@ func (q *TaskQueue) Enqueue(p DownloadParams) TaskStatus {
 func (q *TaskQueue) Stop(id TaskID) error {
 	q.mu.Lock()
 	if cancel, ok := q.active[id]; ok {
+		isLive := q.tasks[id] != nil && q.tasks[id].IsLive
 		q.mu.Unlock()
-		logger.Info("Stopping active task", zap.String("id", string(id)))
+		if isLive {
+			logger.Info("Ending live recording", zap.String("id", string(id)))
+			if q.onMessage != nil {
+				q.onMessage(MessageEvent{ID: id, Message: "Ending live recording and finalizing media"})
+			}
+		} else {
+			logger.Info("Stopping active task", zap.String("id", string(id)))
+		}
 		cancel()
 		return nil
 	}
@@ -216,9 +225,13 @@ func (q *TaskQueue) execute(p DownloadParams, ctx context.Context) {
 		zap.String("id", string(p.ID)),
 		zap.String("type", string(p.Type)))
 
-	q.mu.RLock()
-	_, exists := q.tasks[p.ID]
-	q.mu.RUnlock()
+	q.mu.Lock()
+	runtimeTask, exists := q.tasks[p.ID]
+	if exists && runtimeTask.StartedAt == nil {
+		startedAt := time.Now().UTC()
+		runtimeTask.StartedAt = &startedAt
+	}
+	q.mu.Unlock()
 	if exists && q.onStart != nil {
 		q.onStart(p.ID)
 	}
@@ -230,7 +243,7 @@ func (q *TaskQueue) execute(p DownloadParams, ctx context.Context) {
 			if exists {
 				task.Percent = e.Percent
 				task.Speed = e.Speed
-				task.IsLive = e.IsLive
+				task.IsLive = task.IsLive || e.IsLive
 			}
 			q.mu.Unlock()
 
@@ -281,7 +294,11 @@ func (q *TaskQueue) execute(p DownloadParams, ctx context.Context) {
 
 	switch {
 	case err == nil:
-		logger.Info("Task completed successfully", zap.String("id", string(p.ID)))
+		if result.FinalizedAfterStop {
+			logger.Info("Live recording stopped and saved", zap.String("id", string(p.ID)))
+		} else {
+			logger.Info("Task completed successfully", zap.String("id", string(p.ID)))
+		}
 		if q.onSuccess != nil {
 			q.onSuccess(p.ID, result)
 		}

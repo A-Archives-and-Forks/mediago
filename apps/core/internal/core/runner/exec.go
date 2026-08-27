@@ -6,9 +6,12 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"os"
 	"os/exec"
+	"time"
 	"unicode/utf8"
 
+	mediagocore "caorushizi.cn/mediago/internal/core"
 	"golang.org/x/text/encoding"
 	"golang.org/x/text/encoding/simplifiedchinese"
 	"golang.org/x/text/transform"
@@ -28,8 +31,16 @@ func NewExecRunner() *ExecRunner {
 // args: command-line arguments
 // onStdLine: per-line callback (all output is normalized to UTF-8)
 func (r *ExecRunner) Run(ctx context.Context, binPath string, args []string, onStdLine func(string)) error {
-	// use context for cancellation support
-	cmd := exec.CommandContext(ctx, binPath, args...)
+	return r.RunWithOptions(ctx, binPath, args, onStdLine, mediagocore.RunnerOptions{})
+}
+
+// RunWithOptions executes a command and supports a bounded cooperative stop
+// before falling back to a forced kill.
+func (r *ExecRunner) RunWithOptions(ctx context.Context, binPath string, args []string, onStdLine func(string), options mediagocore.RunnerOptions) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	cmd := exec.Command(binPath, args...)
 
 	// obtain stdout and stderr pipes
 	stdout, err := cmd.StdoutPipe()
@@ -73,12 +84,42 @@ func (r *ExecRunner) Run(ctx context.Context, binPath string, args []string, onS
 		done <- struct{}{}
 	}()
 
-	// wait for reading to complete
-	<-done
-	<-done
+	cmdDone := make(chan error, 1)
+	go func() {
+		cmdDone <- cmd.Wait()
+	}()
 
-	// wait for the process to exit
-	return cmd.Wait()
+	waitForReaders := func() {
+		<-done
+		<-done
+	}
+
+	select {
+	case err := <-cmdDone:
+		waitForReaders()
+		return err
+	case <-ctx.Done():
+		if gracefulStopRequested(options) {
+			if err := cmd.Process.Signal(os.Interrupt); err == nil {
+				timer := time.NewTimer(gracefulStopPeriod(options))
+				select {
+				case <-cmdDone:
+					timer.Stop()
+				case <-timer.C:
+					_ = cmd.Process.Kill()
+					<-cmdDone
+				}
+			} else {
+				_ = cmd.Process.Kill()
+				<-cmdDone
+			}
+		} else {
+			_ = cmd.Process.Kill()
+			<-cmdDone
+		}
+		waitForReaders()
+		return ctx.Err()
+	}
 }
 
 // decodeToUTF8 attempts to decode a byte slice of unknown encoding to a UTF-8 string

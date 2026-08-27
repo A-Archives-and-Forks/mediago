@@ -13,6 +13,8 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"caorushizi.cn/mediago/internal/core/parser"
 	"caorushizi.cn/mediago/internal/core/schema"
@@ -512,7 +514,7 @@ func trimMatchingQuotes(value string) string {
 	return value
 }
 
-func outputArtifactPaths(outputDir, downloadName, reported string, before, after map[string]outputFileState) []string {
+func outputArtifactPaths(outputDir, downloadName, reported string, before, after map[string]outputFileState, topLevelOnly bool) []string {
 	artifacts := make([]string, 0)
 	seen := make(map[string]struct{})
 	appendArtifact := func(candidate string) {
@@ -520,6 +522,9 @@ func outputArtifactPaths(outputDir, downloadName, reported string, before, after
 			return
 		}
 		candidate = filepath.Clean(candidate)
+		if topLevelOnly && !isTopLevelOutputPath(outputDir, candidate) {
+			return
+		}
 		if _, ok := seen[candidate]; ok {
 			return
 		}
@@ -536,6 +541,19 @@ func outputArtifactPaths(outputDir, downloadName, reported string, before, after
 		appendArtifact(absolute)
 	}
 	return artifacts
+}
+
+func isTopLevelOutputPath(outputDir, candidate string) bool {
+	absoluteDir, err := filepath.Abs(outputDir)
+	if err != nil {
+		return false
+	}
+	absoluteCandidate, err := filepath.Abs(candidate)
+	if err != nil {
+		return false
+	}
+	relative, err := filepath.Rel(absoluteDir, absoluteCandidate)
+	return err == nil && relative != "." && filepath.Dir(relative) == "."
 }
 
 func outputPathFromLine(line string) string {
@@ -688,6 +706,7 @@ func (d *DownloaderSvc) Download(ctx context.Context, p DownloadParams, cb Callb
 
 	// initialize parse state
 	st := &parser.ParseState{}
+	var liveDetected atomic.Bool
 	var reportedOutput string
 	var sawXiaohongshuNoVideoFormats bool
 	var reportedOutputMu sync.Mutex
@@ -713,6 +732,9 @@ func (d *DownloaderSvc) Download(ctx context.Context, p DownloadParams, cb Callb
 
 		// parse console output
 		evt, errStr := lp.Parse(line, st)
+		if st.IsLive {
+			liveDetected.Store(true)
+		}
 		if errStr != "" {
 			logger.Warn("Parse error in download output",
 				zap.String("id", string(p.ID)),
@@ -757,10 +779,48 @@ func (d *DownloaderSvc) Download(ctx context.Context, p DownloadParams, cb Callb
 	logger.Info("Executing download command",
 		zap.String("id", string(p.ID)),
 		zap.String("binary", bin))
-	err = d.runner.Run(ctx, bin, args, onLine)
+	if configurable, ok := d.runner.(ConfigurableRunner); ok {
+		err = configurable.RunWithOptions(ctx, bin, args, onLine, RunnerOptions{
+			ShouldGracefullyStop: liveDetected.Load,
+			GracePeriod:          8 * time.Second,
+		})
+	} else {
+		err = d.runner.Run(ctx, bin, args, onLine)
+	}
 
 	// clean up progress records
 	d.tracker.Remove(parser.TaskID(p.ID))
+
+	collectResult := func(recoverLiveSegments bool) (DownloadResult, error) {
+		outputAfter, inspectErr := captureOutputFiles(outputDir, p.Name)
+		if inspectErr != nil {
+			return DownloadResult{}, fmt.Errorf("inspect output directory after download: %w", inspectErr)
+		}
+		reportedOutputMu.Lock()
+		reported := reportedOutput
+		reportedOutputMu.Unlock()
+		artifactPaths := outputArtifactPaths(outputDir, p.Name, reported, outputBefore, outputAfter, p.Type == TypeM3U8)
+		if len(artifactPaths) == 0 {
+			if p.Type == TypeM3U8 {
+				if recoverLiveSegments {
+					recoveredPath, recoverErr := recoverLiveM3U8Segments(outputDir, p.Name)
+					if recoverErr == nil {
+						return DownloadResult{
+							PrimaryPath:       recoveredPath,
+							ArtifactPaths:     []string{recoveredPath},
+							RecoveredSegments: true,
+						}, nil
+					}
+					if !errors.Is(recoverErr, ErrM3U8OutputMissing) {
+						return DownloadResult{}, recoverErr
+					}
+				}
+				return DownloadResult{}, ErrM3U8OutputMissing
+			}
+			return DownloadResult{}, ErrDownloadOutputMissing
+		}
+		return DownloadResult{PrimaryPath: artifactPaths[0], ArtifactPaths: artifactPaths}, nil
+	}
 
 	if err != nil {
 		reportedOutputMu.Lock()
@@ -771,33 +831,61 @@ func (d *DownloaderSvc) Download(ctx context.Context, p DownloadParams, cb Callb
 				zap.String("id", string(p.ID)))
 			return DownloadResult{}, ErrXiaohongshuVideoUnavailable
 		}
+		if liveDetected.Load() {
+			result, finalizeErr := collectResult(true)
+			switch {
+			case finalizeErr == nil:
+				if errors.Is(err, context.Canceled) {
+					logger.Info("Live recording stopped and saved",
+						zap.String("id", string(p.ID)),
+						zap.Bool("recovered_segments", result.RecoveredSegments))
+					result.FinalizedAfterStop = true
+				} else {
+					logger.Warn("Live downloader exited with an error; saved the completed recording",
+						zap.String("id", string(p.ID)),
+						zap.Bool("recovered_segments", result.RecoveredSegments),
+						zap.Error(err))
+					result.RecoveredAfterError = true
+				}
+				return result, nil
+			case errors.Is(err, context.Canceled) && errors.Is(finalizeErr, ErrM3U8OutputMissing):
+				logger.Info("Live recording stopped before a media file was created",
+					zap.String("id", string(p.ID)))
+				return DownloadResult{}, err
+			default:
+				logger.Error("Live recording finalization failed",
+					zap.String("id", string(p.ID)),
+					zap.Error(finalizeErr))
+				if errors.Is(finalizeErr, ErrM3U8OutputMissing) {
+					return DownloadResult{}, err
+				}
+				if errors.Is(err, context.Canceled) {
+					return DownloadResult{}, finalizeErr
+				}
+				return DownloadResult{}, errors.Join(err, finalizeErr)
+			}
+		}
 		logger.Error("Download failed",
 			zap.String("id", string(p.ID)),
 			zap.Error(err))
 		return DownloadResult{}, err
 	}
 
-	outputAfter, inspectErr := captureOutputFiles(outputDir, p.Name)
-	if inspectErr != nil {
-		return DownloadResult{}, fmt.Errorf("inspect output directory after download: %w", inspectErr)
-	}
-	reportedOutputMu.Lock()
-	reported := reportedOutput
-	reportedOutputMu.Unlock()
-	artifactPaths := outputArtifactPaths(outputDir, p.Name, reported, outputBefore, outputAfter)
-	if len(artifactPaths) == 0 {
-		if p.Type == TypeM3U8 {
+	result, resultErr := collectResult(liveDetected.Load())
+	if resultErr != nil {
+		if errors.Is(resultErr, ErrM3U8OutputMissing) {
 			logger.Error("M3U8 downloader exited without creating a merged media file",
 				zap.String("id", string(p.ID)))
-			return DownloadResult{}, ErrM3U8OutputMissing
+		} else if errors.Is(resultErr, ErrDownloadOutputMissing) {
+			logger.Error("Downloader exited without creating a media file",
+				zap.String("id", string(p.ID)),
+				zap.String("type", string(p.Type)))
 		}
-		logger.Error("Downloader exited without creating a media file",
-			zap.String("id", string(p.ID)),
-			zap.String("type", string(p.Type)))
-		return DownloadResult{}, ErrDownloadOutputMissing
+		return DownloadResult{}, resultErr
 	}
 
 	logger.Info("Download completed successfully",
-		zap.String("id", string(p.ID)))
-	return DownloadResult{PrimaryPath: artifactPaths[0], ArtifactPaths: artifactPaths}, nil
+		zap.String("id", string(p.ID)),
+		zap.Bool("recovered_segments", result.RecoveredSegments))
+	return result, nil
 }

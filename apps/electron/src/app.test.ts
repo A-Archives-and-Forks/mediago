@@ -117,7 +117,7 @@ test("does not apply unrelated initial webview config when ad blocking is off", 
 
   expect(webviewService.setBlocking).not.toHaveBeenCalled();
   expect(webviewService.setProxy).not.toHaveBeenCalled();
-  expect(webviewService.setUserAgent).not.toHaveBeenCalled();
+  expect(webviewService.setDeviceMode).not.toHaveBeenCalled();
   expect(webviewService.setDefaultSession).not.toHaveBeenCalled();
   expect(webviewService.setAudioMuted).not.toHaveBeenCalled();
 });
@@ -285,7 +285,7 @@ function createApp(config: Record<string, unknown>) {
     setBlocking: vi.fn(),
     setDefaultSession: vi.fn(),
     setProxy: vi.fn(),
-    setUserAgent: vi.fn(),
+    setDeviceMode: vi.fn(),
   };
   const overlayDialogService = { init: vi.fn() };
   const configCache = {

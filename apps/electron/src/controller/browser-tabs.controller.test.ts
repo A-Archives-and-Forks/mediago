@@ -54,7 +54,6 @@ describe("tab-aware browser controllers", () => {
     const tabs = createTabManager();
     const controller = new WebviewController(
       tabs as never,
-      downloaderServer() as never,
       { getPageHeaders: vi.fn(), pluginReady: vi.fn() } as never,
       { hide: vi.fn(), show: vi.fn() } as never,
     );
@@ -70,6 +69,10 @@ describe("tab-aware browser controllers", () => {
     controller.setWebviewBounds({} as never, {
       tabId: "tab-b",
       bounds: { x: 1, y: 2, width: 3, height: 4 },
+    });
+    await controller.webviewChangeDeviceMode({} as never, {
+      tabId: "tab-b",
+      isMobile: true,
     });
 
     expect(tabs.loadURL).toHaveBeenNthCalledWith(
@@ -88,6 +91,7 @@ describe("tab-aware browser controllers", () => {
       width: 3,
       height: 4,
     });
+    expect(tabs.setDeviceMode).toHaveBeenCalledWith("tab-b", true);
   });
 
   it("uses headers from the same tab when opening its download dialog", async () => {
@@ -99,7 +103,6 @@ describe("tab-aware browser controllers", () => {
     };
     const controller = new WebviewController(
       tabs as never,
-      downloaderServer() as never,
       sniffing as never,
       overlay as never,
     );
@@ -187,7 +190,7 @@ function createTabManager() {
     reparentActiveView: vi.fn(),
     restoreSnapshot: vi.fn(() => snapshot),
     setBounds: vi.fn(),
-    setUserAgent: vi.fn(),
+    setDeviceMode: vi.fn(),
     show: vi.fn(),
     withSessionCookies: vi.fn(async (_tabId, task) => task),
   };

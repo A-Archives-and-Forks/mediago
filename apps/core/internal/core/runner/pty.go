@@ -4,6 +4,9 @@ package runner
 import (
 	"context"
 	"io"
+	"time"
+
+	mediagocore "caorushizi.cn/mediago/internal/core"
 )
 
 // PTYRunner is a command executor based on a pseudo-terminal
@@ -19,7 +22,13 @@ func NewPTYRunner() *PTYRunner {
 // This method correctly captures progress bars that use control characters like \r and \b
 // Platform-specific implementations are in pty_windows.go and pty_unix.go
 func (r *PTYRunner) Run(ctx context.Context, binPath string, args []string, onStdLine func(string)) error {
-	return r.runWithPTY(ctx, binPath, args, onStdLine)
+	return r.RunWithOptions(ctx, binPath, args, onStdLine, mediagocore.RunnerOptions{})
+}
+
+// RunWithOptions executes a command and optionally gives a live recording a
+// bounded period to finalize after cancellation.
+func (r *PTYRunner) RunWithOptions(ctx context.Context, binPath string, args []string, onStdLine func(string), options mediagocore.RunnerOptions) error {
+	return r.runWithPTY(ctx, binPath, args, onStdLine, options)
 }
 
 // The concrete implementation of runWithPTY is in the platform-specific files:
@@ -45,8 +54,19 @@ func (r *PTYRunner) readPTYOutput(reader io.Reader, onStdLine func(string)) erro
 }
 
 // fallbackToPipe is the fallback strategy when PTY fails
-func (r *PTYRunner) fallbackToPipe(ctx context.Context, binPath string, args []string, onStdLine func(string)) error {
+func (r *PTYRunner) fallbackToPipe(ctx context.Context, binPath string, args []string, onStdLine func(string), options mediagocore.RunnerOptions) error {
 	// use the existing ExecRunner as the fallback
 	runner := NewExecRunner()
-	return runner.Run(ctx, binPath, args, onStdLine)
+	return runner.RunWithOptions(ctx, binPath, args, onStdLine, options)
+}
+
+func gracefulStopRequested(options mediagocore.RunnerOptions) bool {
+	return options.ShouldGracefullyStop != nil && options.ShouldGracefullyStop()
+}
+
+func gracefulStopPeriod(options mediagocore.RunnerOptions) time.Duration {
+	if options.GracePeriod > 0 {
+		return options.GracePeriod
+	}
+	return 8 * time.Second
 }

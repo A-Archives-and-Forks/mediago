@@ -89,10 +89,12 @@ vi.mock("electron", () => ({
         id: electronMocks.nextWebContentsId++,
         capturePage: vi.fn(async () => null),
         close: vi.fn(),
+        disableDeviceEmulation: vi.fn(),
         emit: (event: string, ...args: any[]) => {
           for (const handler of handlers.get(event) ?? []) handler(...args);
         },
         executeJavaScript: vi.fn(async () => undefined),
+        enableDeviceEmulation: vi.fn(),
         getTitle: vi.fn(() => title),
         getURL: vi.fn(() => url),
         getUserAgent: vi.fn(
@@ -101,6 +103,7 @@ vi.mock("electron", () => ({
             "AppleWebKit/537.36 (KHTML, like Gecko) " +
             "Chrome/150.0.7871.129 Electron/43.2.0 Safari/537.36",
         ),
+        isDestroyed: vi.fn(() => false),
         loadURL: vi.fn(async (nextURL: string) => {
           url = nextURL;
         }),
@@ -827,24 +830,23 @@ describe("BrowserTabManagerService", () => {
     await service.loadURL(second, "https://example.com/second");
 
     service.setAudioMuted(true);
-    service.setUserAgent(true);
+    service.setDeviceMode(first, true);
     service.setProxy(true, "http://127.0.0.1:7890");
     service.destroy();
 
     for (const view of electronMocks.views) {
       expect(view.webContents.setAudioMuted).toHaveBeenLastCalledWith(true);
-      expect(view.webContents.setUserAgent).toHaveBeenLastCalledWith(
-        "mobile-user-agent",
-      );
       expect(view.webContents.close).toHaveBeenCalledOnce();
     }
     expect(discoveryExecutor.setBrowser).toHaveBeenLastCalledWith(null);
   });
 
-  it("uses a Chrome-compatible desktop UA and restores it after mobile mode", async () => {
+  it("uses a Chrome-compatible desktop UA and a centered mobile viewport", async () => {
     const { service } = createHarness();
     const tabId = service.getSnapshot().activeTabId;
     await service.loadURL(tabId, "https://x.com");
+    service.setBounds(tabId, { x: 10, y: 20, width: 900, height: 600 });
+    const view = electronMocks.views[0];
     const webContents = electronMocks.views[0].webContents;
 
     expect(webContents.setUserAgent).toHaveBeenNthCalledWith(
@@ -854,8 +856,8 @@ describe("BrowserTabManagerService", () => {
         "Chrome/150.0.7871.129 Safari/537.36",
     );
 
-    service.setUserAgent(true);
-    service.setUserAgent(false);
+    service.setDeviceMode(tabId, true);
+    service.setDeviceMode(tabId, false);
 
     expect(webContents.setUserAgent).toHaveBeenNthCalledWith(
       2,
@@ -867,6 +869,131 @@ describe("BrowserTabManagerService", () => {
         "AppleWebKit/537.36 (KHTML, like Gecko) " +
         "Chrome/150.0.7871.129 Safari/537.36",
     );
+    expect(view.setBounds).toHaveBeenNthCalledWith(2, {
+      x: 254,
+      y: 20,
+      width: 412,
+      height: 600,
+    });
+    expect(view.setBounds).toHaveBeenNthCalledWith(3, {
+      x: 10,
+      y: 20,
+      width: 900,
+      height: 600,
+    });
+    expect(webContents.enableDeviceEmulation).not.toHaveBeenCalled();
+    expect(webContents.disableDeviceEmulation).not.toHaveBeenCalled();
+    expect(webContents.reloadIgnoringCache).toHaveBeenCalledTimes(2);
+    expect(service.getSnapshot().tabs[0].isMobile).toBe(false);
+  });
+
+  it("keeps device mode isolated per tab", async () => {
+    const { service } = createHarness();
+    const first = service.getSnapshot().activeTabId;
+    await service.loadURL(first, "https://example.com/first");
+    const second = service.createTab().id;
+    await service.loadURL(second, "https://example.com/second");
+
+    service.setDeviceMode(first, true);
+
+    const snapshot = service.getSnapshot();
+    expect(snapshot.tabs.find((tab) => tab.id === first)?.isMobile).toBe(true);
+    expect(snapshot.tabs.find((tab) => tab.id === second)?.isMobile).toBe(
+      false,
+    );
+    expect(
+      electronMocks.views[0].webContents.setUserAgent,
+    ).toHaveBeenLastCalledWith("mobile-user-agent");
+    expect(
+      electronMocks.views[1].webContents.setUserAgent,
+    ).not.toHaveBeenCalledWith("mobile-user-agent");
+    expect(
+      electronMocks.views[0].webContents.enableDeviceEmulation,
+    ).not.toHaveBeenCalled();
+    expect(
+      electronMocks.views[1].webContents.enableDeviceEmulation,
+    ).not.toHaveBeenCalled();
+    expect(
+      electronMocks.views[0].webContents.reloadIgnoringCache,
+    ).toHaveBeenCalledOnce();
+    expect(
+      electronMocks.views[1].webContents.reloadIgnoringCache,
+    ).not.toHaveBeenCalled();
+  });
+
+  it("rolls back the tab when its user agent cannot be changed", async () => {
+    const { service } = createHarness();
+    const tabId = service.getSnapshot().activeTabId;
+    await service.loadURL(tabId, "https://example.com");
+    const webContents = electronMocks.views[0].webContents;
+    webContents.setUserAgent.mockImplementationOnce(() => {
+      throw new Error("user agent failed");
+    });
+
+    expect(() => service.setDeviceMode(tabId, true)).toThrow(
+      "user agent failed",
+    );
+
+    expect(service.getSnapshot().tabs[0]).toMatchObject({
+      isMobile: false,
+      status: "loading",
+    });
+    expect(webContents.setUserAgent).toHaveBeenLastCalledWith(
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) " +
+        "AppleWebKit/537.36 (KHTML, like Gecko) " +
+        "Chrome/150.0.7871.129 Safari/537.36",
+    );
+    expect(webContents.enableDeviceEmulation).not.toHaveBeenCalled();
+    expect(webContents.disableDeviceEmulation).not.toHaveBeenCalled();
+    expect(webContents.reloadIgnoringCache).not.toHaveBeenCalled();
+  });
+
+  it("does not mutate device state after the tab contents are destroyed", async () => {
+    const { service } = createHarness();
+    const tabId = service.getSnapshot().activeTabId;
+    await service.loadURL(tabId, "https://example.com");
+    const webContents = electronMocks.views[0].webContents;
+    webContents.isDestroyed.mockReturnValue(true);
+
+    expect(() => service.setDeviceMode(tabId, true)).toThrow(
+      "Browser tab contents were destroyed",
+    );
+
+    expect(service.getSnapshot().tabs[0].isMobile).toBe(false);
+    expect(webContents.reloadIgnoringCache).not.toHaveBeenCalled();
+  });
+
+  it("safely loads a favorite when mobile mode and bounds precede runtime creation", async () => {
+    const { mainNativeWindow, service } = createHarness({ isMobile: true });
+    const tabId = service.getSnapshot().activeTabId;
+    service.setBounds(tabId, { x: 0, y: 80, width: 1000, height: 700 });
+
+    await service.loadURL(tabId, "https://example.com/mobile");
+
+    expect(service.getSnapshot().tabs[0].isMobile).toBe(true);
+    expect(mainNativeWindow.contentView.addChildView).toHaveBeenCalledWith(
+      electronMocks.views[0],
+    );
+    expect(
+      mainNativeWindow.contentView.addChildView.mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      electronMocks.views[0].setBounds.mock.invocationCallOrder[0],
+    );
+    expect(electronMocks.views[0].setBounds).toHaveBeenCalledWith({
+      x: 294,
+      y: 80,
+      width: 412,
+      height: 700,
+    });
+    expect(
+      electronMocks.views[0].webContents.setUserAgent,
+    ).toHaveBeenCalledWith("mobile-user-agent");
+    expect(
+      electronMocks.views[0].webContents.enableDeviceEmulation,
+    ).not.toHaveBeenCalled();
+    expect(
+      electronMocks.views[0].webContents.disableDeviceEmulation,
+    ).not.toHaveBeenCalled();
   });
 
   it("reloads only the active browser view while it is visible", async () => {
@@ -995,7 +1122,16 @@ describe("BrowserTabManagerService", () => {
   });
 });
 
-function createHarness() {
+function createHarness(
+  storeOverrides: Partial<{
+    audioMuted: boolean;
+    blockAds: boolean;
+    isMobile: boolean;
+    privacy: boolean;
+    proxy: string;
+    useProxy: boolean;
+  }> = {},
+) {
   const mainNativeWindow = createNativeWindow();
   const browserNativeWindow = createNativeWindow();
   const mainWindow = { window: mainNativeWindow };
@@ -1012,6 +1148,7 @@ function createHarness() {
     privacy: false,
     proxy: "",
     useProxy: false,
+    ...storeOverrides,
   };
   const configCache = {
     get: vi.fn((key: keyof typeof store) => store[key]),
@@ -1048,6 +1185,7 @@ function createHarness() {
     logger,
     service,
     sniffingHelper,
+    store,
   };
 }
 

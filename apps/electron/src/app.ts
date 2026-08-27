@@ -222,9 +222,6 @@ export default class ElectronApp {
           blockAds: (v) => {
             this.browserTabs.setBlocking(v);
           },
-          isMobile: (v) => {
-            this.browserTabs.setUserAgent(v);
-          },
           privacy: (v) => {
             this.browserTabs.setDefaultSession(v);
           },

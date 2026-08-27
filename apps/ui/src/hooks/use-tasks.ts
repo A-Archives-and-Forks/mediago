@@ -11,6 +11,7 @@ import { useHomeStore } from "@/store/home";
 export interface DownloadTaskDetails extends DownloadTask {
   percent: string;
   speed: string;
+  recordingStartedAt?: string;
   exists?: boolean;
   file?: string;
   files?: string[];
@@ -44,9 +45,9 @@ export function useTasks(filter: DownloadFilter = DownloadFilter.list) {
 
   const detail: DownloadTaskDetails[] = useMemo(() => {
     return (data?.list || []).map((item) => {
-      const evnetItem = eventsMap.get(String(item.id));
+      const eventItem = eventsMap.get(String(item.id));
 
-      if (!evnetItem) {
+      if (!eventItem) {
         return {
           ...item,
           percent: "0",
@@ -56,8 +57,10 @@ export function useTasks(filter: DownloadFilter = DownloadFilter.list) {
 
       return {
         ...item,
-        percent: evnetItem.percent || "0",
-        speed: evnetItem.speed || "0 B/s",
+        percent: eventItem.percent || "0",
+        speed: eventItem.speed || "0 B/s",
+        isLive: item.isLive === true || eventItem.isLive,
+        recordingStartedAt: eventItem.startedAt,
       };
     });
   }, [data, eventsMap]);

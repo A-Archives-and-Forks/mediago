@@ -1,7 +1,10 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { enableMapSet } from "immer";
-import { normalizeDownloadPercent } from "./download-progress";
+import {
+  formatDownloadSpeed,
+  normalizeDownloadPercent,
+} from "./download-progress";
 
 // Allow Immer to work with Map in state
 enableMapSet();
@@ -10,6 +13,8 @@ interface DownloadEvent {
   percent: string;
   speed: string;
   id: number;
+  isLive: boolean;
+  startedAt?: string;
 }
 
 interface DownloadStore {
@@ -44,18 +49,20 @@ export const useDownloadStore = create<DownloadStore & Actions>()(
     setEvents: (events: DownloadEvent[]) =>
       set((state) => {
         const normalized = events.map((item) => {
-          const prevPercent = normalizeDownloadPercent(
-            state.eventsMap.get(String(item.id))?.percent,
-          );
+          const previous = state.eventsMap.get(String(item.id));
+          const isLive = item.isLive || previous?.isLive === true;
+          const prevPercent = normalizeDownloadPercent(previous?.percent);
           const currentPercent = normalizeDownloadPercent(item.percent);
-          const percent = Math.min(
-            100,
-            Math.max(currentPercent ?? 0, prevPercent ?? 0, 0),
-          );
+          const percent = isLive
+            ? 0
+            : Math.min(100, Math.max(currentPercent ?? 0, prevPercent ?? 0, 0));
 
           return {
             ...item,
+            isLive,
             percent: percent.toString(),
+            speed: formatDownloadSpeed(item.speed),
+            startedAt: item.startedAt ?? previous?.startedAt,
           };
         });
 

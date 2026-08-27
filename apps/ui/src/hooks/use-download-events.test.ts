@@ -7,9 +7,42 @@ import {
 } from "@mediago/shared-common";
 import { describe, expect, test, vi } from "vitest";
 import {
+  applyProgressToTaskCache,
   registerDownloadEventSubscription,
   type DownloadEventSubscriber,
 } from "./use-download-events";
+
+test("merges a live progress signal into an already-downloading task", () => {
+  const current = {
+    total: 1,
+    list: [
+      {
+        id: 42,
+        type: "m3u8" as const,
+        name: "Live stream",
+        url: "https://example.com/live.m3u8",
+        status: DownloadStatus.Downloading,
+        isLive: false,
+      },
+    ],
+  };
+
+  const result = applyProgressToTaskCache(current, [
+    {
+      id: 42,
+      type: "m3u8",
+      percent: "12",
+      speed: "1 MB/s",
+      isLive: true,
+      status: DownloadStatus.Downloading,
+    },
+  ]);
+
+  expect(result?.list[0]).toMatchObject({
+    status: DownloadStatus.Downloading,
+    isLive: true,
+  });
+});
 
 describe("registerDownloadEventSubscription", () => {
   test("reports a missing dependency and revalidates without a HomePage subscriber", () => {

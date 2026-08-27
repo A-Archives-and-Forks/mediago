@@ -69,6 +69,7 @@ function createHomeTab(id = nextLocalTabId()): BrowserTabState {
     kind: "user",
     mode: "home",
     status: "default",
+    isMobile: false,
     url: "",
     title: "",
     sources: [],
@@ -101,6 +102,7 @@ function normalizeTab(
     kind: "user",
     mode: tab.mode,
     status: tab.status,
+    isMobile: tab.isMobile === true,
     url: tab.url,
     title: tab.title,
     favicon: tab.favicon,
@@ -258,6 +260,7 @@ export const browserStoreSelector = (state: BrowserStore) => {
     url: tab.url,
     title: tab.title,
     status: tab.status,
+    isMobile: tab.isMobile,
     errMsg: tab.errorMessage,
     errCode: tab.errorCode,
     sources: tab.sources,
@@ -272,6 +275,7 @@ export const browserNavSelector = (state: BrowserStore) => {
     url: tab.url,
     title: tab.title,
     status: tab.status,
+    isMobile: tab.isMobile,
   };
 };
 
@@ -294,6 +298,7 @@ export const browserErrorSelector = (state: BrowserStore) => {
   return {
     tabId: tab.id,
     status: tab.status,
+    isMobile: tab.isMobile,
     errMsg: tab.errorMessage,
     errCode: tab.errorCode,
     url: tab.url,
@@ -325,6 +330,7 @@ export const browserSnapshotSelector = (
     kind: "user",
     mode: tab.mode,
     status: tab.status,
+    isMobile: tab.isMobile,
     url: tab.url,
     title: tab.title,
     favicon: tab.favicon,

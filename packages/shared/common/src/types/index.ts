@@ -61,6 +61,7 @@ export interface DownloadProgress {
   percent: string;
   speed: string;
   isLive: boolean;
+  startedAt?: string;
   status: DownloadStatus;
 }
 
@@ -355,6 +356,7 @@ export interface BrowserTabSnapshot {
   kind: BrowserTabKind;
   mode: BrowserPageMode;
   status: BrowserTabStatus;
+  isMobile: boolean;
   url: string;
   title: string;
   favicon?: string;
@@ -386,9 +388,12 @@ export interface BrowserBoundsPayload extends BrowserTabScopedPayload {
   bounds: Rectangle;
 }
 
-export interface BrowserUserAgentPayload extends BrowserTabScopedPayload {
+export interface BrowserDeviceModePayload extends BrowserTabScopedPayload {
   isMobile: boolean;
 }
+
+/** @deprecated Use BrowserDeviceModePayload. */
+export type BrowserUserAgentPayload = BrowserDeviceModePayload;
 
 export interface BrowserNavigationPayload extends BrowserTabScopedPayload {
   url: string;
@@ -551,7 +556,7 @@ export interface PlatformApi {
     hide(tabId?: string): Promise<void>;
     home(tabId?: string): Promise<void>;
     setBounds(tabIdOrRect: string | Rectangle, rect?: Rectangle): Promise<void>;
-    setUserAgent(
+    setDeviceMode(
       tabIdOrIsMobile: string | boolean,
       isMobile?: boolean,
     ): Promise<void>;

@@ -25,6 +25,7 @@ const tab = (
   kind: "user",
   mode: "home",
   status: "default",
+  isMobile: false,
   url: "",
   title: "",
   sources: [],
@@ -102,6 +103,21 @@ describe("multi-tab browser store", () => {
       status: "loading",
       sources: [expect.objectContaining({ headers: "Cookie: private-b" })],
     });
+  });
+
+  it("keeps device mode isolated and preserves it in snapshots", () => {
+    const store = useBrowserStore.getState();
+    const first = store.activeTabId;
+    store.addTab(tab("tab-b", { isMobile: true }));
+    store.updateTab(first, { isMobile: false });
+
+    const state = useBrowserStore.getState();
+    expect(state.tabs.find((item) => item.id === first)?.isMobile).toBe(false);
+    expect(state.tabs.find((item) => item.id === "tab-b")?.isMobile).toBe(true);
+    expect(
+      browserSnapshotSelector(state).tabs.find((item) => item.id === "tab-b")
+        ?.isMobile,
+    ).toBe(true);
   });
 
   it("groups HLS variants only inside their owning tab", () => {

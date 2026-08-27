@@ -228,6 +228,7 @@ interface TaskListResponse {
     percent: number;
     speed: string;
     isLive: boolean;
+    startedAt?: string;
     status: string;
   }>;
   total: number;
@@ -260,7 +261,9 @@ async function pollProgress() {
     if (requestGeneration !== pollingGeneration || !pollingEnabled) return;
 
     const activeTasks = result.tasks.filter(
-      (t) => t.percent > 0 && t.percent < 100 && t.status === "downloading",
+      (task) =>
+        task.status === "downloading" &&
+        (task.isLive || (task.percent > 0 && task.percent < 100)),
     );
     if (activeTasks.length > 0) {
       const progress = activeTasks.map((t) => ({
@@ -269,6 +272,7 @@ async function pollProgress() {
         percent: String(t.percent || 0),
         speed: t.speed || "",
         isLive: t.isLive || false,
+        startedAt: t.startedAt,
         status: t.status,
       }));
       dispatchDownload({ type: "progress", data: progress });

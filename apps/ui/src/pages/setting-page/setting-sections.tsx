@@ -229,7 +229,7 @@ export const BrowserSettingsCard = memo(function BrowserSettingsCard() {
         }}
       />
       <SettingSwitchField name="blockAds" label={t("blockAds")} />
-      <SettingSwitchField name="isMobile" label={t("enterMobileMode")} />
+      <SettingSwitchField name="isMobile" label={t("defaultMobileMode")} />
       <SettingSwitchField
         name="useExtension"
         label={t("useImmersiveSniffing")}

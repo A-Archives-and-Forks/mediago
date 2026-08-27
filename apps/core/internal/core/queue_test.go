@@ -61,6 +61,9 @@ func TestTaskQueueEnqueueIsIdempotentForActiveTask(t *testing.T) {
 		t.Fatalf("first Enqueue() = %s, want %s", status, StatusDownloading)
 	}
 	waitForStarted(t, downloader.started, "1")
+	if task, ok := queue.GetTask("1"); !ok || task.StartedAt == nil {
+		t.Fatalf("active task start time = %#v, exists = %v", task, ok)
+	}
 
 	if status := queue.Enqueue(params); status != StatusDownloading {
 		t.Fatalf("duplicate Enqueue() = %s, want %s", status, StatusDownloading)
@@ -85,6 +88,9 @@ func TestTaskQueueEnqueueIsIdempotentForPendingTask(t *testing.T) {
 	if status := queue.Enqueue(second); status != StatusPending {
 		t.Fatalf("second Enqueue() = %s, want %s", status, StatusPending)
 	}
+	if task, ok := queue.GetTask("2"); !ok || task.StartedAt != nil {
+		t.Fatalf("pending task start time = %#v, exists = %v", task, ok)
+	}
 	if status := queue.Enqueue(second); status != StatusPending {
 		t.Fatalf("duplicate pending Enqueue() = %s, want %s", status, StatusPending)
 	}
@@ -92,6 +98,9 @@ func TestTaskQueueEnqueueIsIdempotentForPendingTask(t *testing.T) {
 	queue.Remove("1")
 	waitForStarted(t, downloader.finished, "1")
 	waitForStarted(t, downloader.started, "2")
+	if task, ok := queue.GetTask("2"); !ok || task.StartedAt == nil {
+		t.Fatalf("started queued task start time = %#v, exists = %v", task, ok)
+	}
 	if got := downloader.count("2"); got != 1 {
 		t.Fatalf("Download() call count = %d, want 1", got)
 	}
@@ -156,6 +165,62 @@ func TestTaskQueueStopRemovesPendingTask(t *testing.T) {
 	time.Sleep(20 * time.Millisecond)
 	if got := downloader.count("2"); got != 0 {
 		t.Fatalf("pending task Download() call count = %d, want 0", got)
+	}
+}
+
+func TestTaskQueueTreatsFinalizedLiveStopAsSuccess(t *testing.T) {
+	started := make(chan struct{})
+	queue := NewTaskQueue(downloaderFunc(func(ctx context.Context, params DownloadParams, callbacks Callbacks) (DownloadResult, error) {
+		callbacks.OnProgress(ProgressEvent{ID: params.ID, Type: "ready", IsLive: true})
+		callbacks.OnProgress(ProgressEvent{ID: params.ID, Type: "progress", IsLive: false})
+		close(started)
+		<-ctx.Done()
+		return DownloadResult{
+			PrimaryPath:        "/downloads/live.mp4",
+			ArtifactPaths:      []string{"/downloads/live.mp4"},
+			FinalizedAfterStop: true,
+		}, nil
+	}), 1)
+	succeeded := make(chan DownloadResult, 1)
+	stopped := make(chan TaskID, 1)
+	messages := make(chan MessageEvent, 1)
+	queue.OnSuccess(func(_ TaskID, result DownloadResult) { succeeded <- result })
+	queue.OnStopped(func(id TaskID) { stopped <- id })
+	queue.OnMessage(func(message MessageEvent) { messages <- message })
+
+	queue.Enqueue(DownloadParams{ID: "live", Type: TypeM3U8})
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for live task")
+	}
+	if err := queue.Stop("live"); err != nil {
+		t.Fatalf("Stop() error = %v", err)
+	}
+	select {
+	case message := <-messages:
+		if message.Message != "Ending live recording and finalizing media" {
+			t.Fatalf("live stop message = %q", message.Message)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for live finalization message")
+	}
+
+	select {
+	case result := <-succeeded:
+		if result.PrimaryPath != "/downloads/live.mp4" {
+			t.Fatalf("success result = %#v", result)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for finalized live success")
+	}
+	select {
+	case id := <-stopped:
+		t.Fatalf("finalized live task emitted stopped for %s", id)
+	case <-time.After(20 * time.Millisecond):
+	}
+	if task, ok := queue.GetTask("live"); !ok || task.Status != StatusSuccess || task.OutputPath != "/downloads/live.mp4" {
+		t.Fatalf("finalized live task = %#v, exists = %v", task, ok)
 	}
 }
 

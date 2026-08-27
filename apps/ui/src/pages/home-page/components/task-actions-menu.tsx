@@ -10,6 +10,7 @@ import {
   Pause,
   Pencil,
   RefreshCw,
+  Square,
   Trash2,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -30,6 +31,7 @@ interface Props {
   onSelect: () => void;
   onStart: () => void;
   onStop: () => void;
+  isStoppingRecording?: boolean;
   task: DownloadTaskWithFile;
 }
 
@@ -41,6 +43,7 @@ export function TaskActionsMenu({
   onSelect,
   onStart,
   onStop,
+  isStoppingRecording = false,
   task,
 }: Props) {
   const { t } = useTranslation();
@@ -69,14 +72,23 @@ export function TaskActionsMenu({
             {task.status === DownloadStatus.Failed
               ? t("redownload")
               : task.status === DownloadStatus.Stopped
-                ? t("continueDownload")
+                ? task.isLive
+                  ? t("recordAgain")
+                  : t("continueDownload")
                 : t("download")}
           </DropdownMenuItem>
         ) : null}
         {task.status === DownloadStatus.Downloading ? (
-          <DropdownMenuItem onSelect={onStop}>
-            <Pause />
-            {t("pause")}
+          <DropdownMenuItem
+            disabled={task.isLive && isStoppingRecording}
+            onSelect={onStop}
+          >
+            {task.isLive ? <Square /> : <Pause />}
+            {task.isLive
+              ? isStoppingRecording
+                ? t("endingRecording")
+                : t("endRecording")
+              : t("pause")}
           </DropdownMenuItem>
         ) : null}
         {task.status === DownloadStatus.Success ? (

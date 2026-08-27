@@ -66,6 +66,7 @@ interface TabRuntime {
   attachedWindow: Electron.BrowserWindow | null;
   bounds: Electron.Rectangle | null;
   desktopUserAgent: string;
+  isMobile: boolean;
   kind: "user" | "agent";
   openerTabId?: string;
   partition: string;
@@ -88,9 +89,19 @@ const RENDER_PROCESS_GONE_ERROR_CODE = -1000;
 const WEB_CONTENTS_DESTROYED_ERROR_CODE = -1001;
 const UNSUPPORTED_PROTOCOL_ERROR_CODE = -1002;
 const ELECTRON_USER_AGENT_TOKEN = /\sElectron\/[^\s]+/gi;
+const MOBILE_VIEWPORT_WIDTH = 412;
 
 export function chromeCompatibleDesktopUserAgent(userAgent: string): string {
   return userAgent.replace(ELECTRON_USER_AGENT_TOKEN, "").trim();
+}
+
+function mobileBrowserBounds(bounds: Electron.Rectangle): Electron.Rectangle {
+  const width = Math.min(bounds.width, MOBILE_VIEWPORT_WIDTH);
+  return {
+    ...bounds,
+    x: bounds.x + Math.floor((bounds.width - width) / 2),
+    width,
+  };
 }
 
 export function isolatePagePluginSource(content: string): string {
@@ -149,6 +160,7 @@ function isExternalBrowserURL(value: string): boolean {
 
 export interface CreateTabOptions {
   activate?: boolean;
+  isMobile?: boolean;
   url?: string;
 }
 
@@ -157,6 +169,7 @@ export interface CreateTabOptions {
 export default class BrowserTabManagerService implements DiscoveryBrowserExecutor {
   private readonly tabs: BrowserTabSnapshot[] = [];
   private readonly runtimes = new Map<string, TabRuntime>();
+  private readonly tabBounds = new Map<string, Electron.Rectangle>();
   private readonly agentTabs = new Map<string, string>();
   private activeTabId = "";
   private sourcePanelCollapsed = false;
@@ -231,6 +244,7 @@ export default class BrowserTabManagerService implements DiscoveryBrowserExecuto
     for (const runtime of this.runtimes.values()) {
       if (runtime.kind === "user") this.destroyRuntime(runtime.tabId);
     }
+    this.tabBounds.clear();
     this.tabs.splice(
       0,
       this.tabs.length,
@@ -248,7 +262,7 @@ export default class BrowserTabManagerService implements DiscoveryBrowserExecuto
   }
 
   createTab(options: CreateTabOptions = {}): BrowserTabSnapshot {
-    const tab = this.createHomeSnapshot(options.url);
+    const tab = this.createHomeSnapshot(options.url, options.isMobile);
     this.tabs.push(tab);
     if (options.activate !== false || !this.activeTabId) {
       this.activateTab(tab.id);
@@ -283,6 +297,7 @@ export default class BrowserTabManagerService implements DiscoveryBrowserExecuto
     if (index < 0) return;
     const wasActive = this.activeTabId === tabId;
     this.tabs.splice(index, 1);
+    this.tabBounds.delete(tabId);
     if (this.tabs.length === 0) {
       const replacement = this.createHomeSnapshot();
       this.tabs.push(replacement);
@@ -400,10 +415,12 @@ export default class BrowserTabManagerService implements DiscoveryBrowserExecuto
   }
 
   setBounds(tabId: string, bounds: Electron.Rectangle): void {
+    if (!this.tabs.some((tab) => tab.id === tabId)) return;
+    const nextBounds = { ...bounds };
+    this.tabBounds.set(tabId, nextBounds);
     const runtime = this.runtimes.get(tabId);
     if (!runtime) return;
-    runtime.bounds = bounds;
-    runtime.view.setBounds(bounds);
+    runtime.bounds = nextBounds;
     this.attachRuntime(runtime);
   }
 
@@ -434,11 +451,32 @@ export default class BrowserTabManagerService implements DiscoveryBrowserExecuto
     }
   }
 
-  setUserAgent(isMobile?: boolean): void {
-    for (const runtime of this.runtimes.values()) {
-      runtime.view.webContents.setUserAgent(
-        isMobile ? mobileUA : runtime.desktopUserAgent,
-      );
+  setDeviceMode(tabId: string, isMobile: boolean): void {
+    const tab = this.requireTab(tabId);
+    const runtime = this.runtimes.get(tabId);
+    const previousMode = tab.isMobile;
+    const previousStatus = tab.status;
+
+    try {
+      if (runtime) this.applyDeviceMode(runtime, isMobile);
+      tab.isMobile = isMobile;
+      if (runtime && tab.mode === "browser") {
+        tab.status = "loading";
+        runtime.view.webContents.reloadIgnoringCache();
+      }
+      this.emitSnapshot();
+    } catch (error) {
+      tab.isMobile = previousMode;
+      tab.status = previousStatus;
+      if (runtime && !runtime.view.webContents.isDestroyed()) {
+        try {
+          this.applyDeviceMode(runtime, previousMode);
+        } catch {
+          this.logger.error("[BrowserTab] failed to roll back device mode");
+        }
+      }
+      this.emitSnapshot();
+      throw error;
     }
   }
 
@@ -578,16 +616,21 @@ export default class BrowserTabManagerService implements DiscoveryBrowserExecuto
   destroy(): void {
     this.discoveryExecutor.setBrowser(null);
     for (const tabId of this.runtimes.keys()) this.destroyRuntime(tabId);
+    this.tabBounds.clear();
     this.sniffingHelper.off("source", this.onSource);
     this.disableBlocking();
   }
 
-  private createHomeSnapshot(url = ""): BrowserTabSnapshot {
+  private createHomeSnapshot(url = "", isMobile?: boolean): BrowserTabSnapshot {
     return {
       id: randomUUID(),
       kind: "user",
       mode: url ? "browser" : "home",
       status: url ? "loading" : "default",
+      isMobile:
+        typeof isMobile === "boolean"
+          ? isMobile
+          : this.configCache.get("isMobile") === true,
       url,
       title: "",
       sources: [],
@@ -602,6 +645,7 @@ export default class BrowserTabManagerService implements DiscoveryBrowserExecuto
       status: ["loading", "loaded", "failed"].includes(tab.status)
         ? tab.status
         : "default",
+      isMobile: tab.isMobile === true,
       url: typeof tab.url === "string" ? tab.url : "",
       title: typeof tab.title === "string" ? tab.title : "",
       favicon: typeof tab.favicon === "string" ? tab.favicon : undefined,
@@ -666,6 +710,17 @@ export default class BrowserTabManagerService implements DiscoveryBrowserExecuto
     );
   }
 
+  private applyDeviceMode(runtime: TabRuntime, isMobile: boolean): void {
+    const { webContents } = runtime.view;
+    if (webContents.isDestroyed()) {
+      throw new Error("Browser tab contents were destroyed");
+    }
+
+    webContents.setUserAgent(isMobile ? mobileUA : runtime.desktopUserAgent);
+    runtime.isMobile = isMobile;
+    this.applyRuntimeBounds(runtime);
+  }
+
   private createRuntime(
     tabId: string,
     kind: "user" | "agent",
@@ -687,8 +742,12 @@ export default class BrowserTabManagerService implements DiscoveryBrowserExecuto
     );
     const runtime: TabRuntime = {
       attachedWindow: null,
-      bounds: null,
+      bounds: kind === "user" ? (this.tabBounds.get(tabId) ?? null) : null,
       desktopUserAgent,
+      isMobile:
+        kind === "user"
+          ? this.tabs.find((tab) => tab.id === tabId)?.isMobile === true
+          : false,
       kind,
       openerTabId,
       partition,
@@ -708,7 +767,7 @@ export default class BrowserTabManagerService implements DiscoveryBrowserExecuto
     view.setBackgroundColor("#fff");
     view.webContents.setAudioMuted(this.configCache.get("audioMuted") === true);
     view.webContents.setUserAgent(
-      this.configCache.get("isMobile") ? mobileUA : desktopUserAgent,
+      runtime.isMobile ? mobileUA : runtime.desktopUserAgent,
     );
     this.applyProxyToPartition(partition);
     if (this.blockingRequested) this.startBlocking(partition);
@@ -777,6 +836,7 @@ export default class BrowserTabManagerService implements DiscoveryBrowserExecuto
 
       const tab = this.createTab({
         activate: disposition !== "background-tab",
+        isMobile: runtime.isMobile,
         url,
       });
       return {
@@ -1076,16 +1136,27 @@ export default class BrowserTabManagerService implements DiscoveryBrowserExecuto
       !runtime ||
       runtime.kind !== "user" ||
       runtime.tabId !== this.activeTabId ||
-      !runtime.bounds
+      !runtime.bounds ||
+      runtime.bounds.width <= 0 ||
+      runtime.bounds.height <= 0
     )
       return;
     const targetWindow = this.currentWindow;
     if (!targetWindow || targetWindow.isDestroyed()) return;
-    if (runtime.attachedWindow === targetWindow) return;
-    this.detachRuntime(runtime);
-    targetWindow.contentView.addChildView(runtime.view);
-    runtime.attachedWindow = targetWindow;
-    runtime.view.setBounds(runtime.bounds);
+    if (runtime.attachedWindow !== targetWindow) {
+      this.detachRuntime(runtime);
+      targetWindow.contentView.addChildView(runtime.view);
+      runtime.attachedWindow = targetWindow;
+    }
+    this.applyRuntimeBounds(runtime);
+  }
+
+  private applyRuntimeBounds(runtime: TabRuntime): void {
+    if (!runtime.bounds || !runtime.attachedWindow) return;
+    const bounds = runtime.isMobile
+      ? mobileBrowserBounds(runtime.bounds)
+      : runtime.bounds;
+    runtime.view.setBounds(bounds);
   }
 
   private detachRuntime(runtime?: TabRuntime): void {

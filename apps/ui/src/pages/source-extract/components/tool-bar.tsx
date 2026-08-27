@@ -5,15 +5,15 @@ import {
   Combine,
   EyeOff,
   House,
-  Monitor,
   PanelRightOpen,
   RefreshCw,
   Smartphone,
   Star,
   X,
 } from "lucide-react";
-import { type KeyboardEvent, useMemo } from "react";
+import { type KeyboardEvent, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 import { useShallow } from "zustand/react/shallow";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,11 +24,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import {
-  appStoreSelector,
-  setAppStoreSelector,
-  useAppStore,
-} from "@/store/app";
+import { appStoreSelector, useAppStore } from "@/store/app";
 import {
   BrowserStatus,
   browserNavSelector,
@@ -58,19 +54,22 @@ export function ToolBar({ page }: Props) {
     useShallow(browserActionsSelector),
   );
   const appStore = useAppStore(useShallow(appStoreSelector));
-  const { setAppStore } = useAppStore(useShallow(setAppStoreSelector));
+  const [switchingDeviceMode, setSwitchingDeviceMode] = useState(false);
   const { t } = useTranslation();
 
   const disabled =
     store.status !== BrowserStatus.Loaded || store.mode !== PageMode.Browser;
 
-  // Set default UA
-  const onSetDefaultUA = useMemoizedFn(() => {
-    const nextMode = !appStore.isMobile;
-    browser.setUserAgent(store.tabId, nextMode);
-    setAppStore({
-      isMobile: nextMode,
-    });
+  const onToggleDeviceMode = useMemoizedFn(async () => {
+    if (switchingDeviceMode) return;
+    setSwitchingDeviceMode(true);
+    try {
+      await browser.setDeviceMode(store.tabId, !store.isMobile);
+    } catch {
+      toast.error(t("switchDeviceModeFailed"));
+    } finally {
+      setSwitchingDeviceMode(false);
+    }
   });
 
   const curIsFavorite = useMemo(() => {
@@ -129,12 +128,21 @@ export function ToolBar({ page }: Props) {
         type="button"
         variant="ghost"
         size="icon"
-        className="text-muted-foreground hover:text-foreground"
-        title={t("switchToMobileMode")}
-        aria-label={t("switchToMobileMode")}
-        onClick={onSetDefaultUA}
+        className={cn(
+          "text-muted-foreground hover:text-foreground",
+          store.isMobile &&
+            "bg-surface-selected text-brand hover:bg-surface-selected hover:text-brand",
+          switchingDeviceMode && "cursor-progress",
+        )}
+        title={store.isMobile ? t("disableMobileMode") : t("enableMobileMode")}
+        aria-label={
+          store.isMobile ? t("disableMobileMode") : t("enableMobileMode")
+        }
+        aria-pressed={store.isMobile}
+        disabled={switchingDeviceMode}
+        onClick={onToggleDeviceMode}
       >
-        {appStore.isMobile ? <Smartphone /> : <Monitor />}
+        <Smartphone />
       </Button>
       <Button
         type="button"
