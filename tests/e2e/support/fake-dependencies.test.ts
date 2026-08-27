@@ -13,7 +13,10 @@ import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { afterEach, describe, expect, test } from "vitest";
-import { createFakeBilibiliDependencyLeaf } from "./fake-dependencies.ts";
+import {
+  createFakeBilibiliDependencyLeaf,
+  fakeBBDownExecutableSource,
+} from "./fake-dependencies.ts";
 
 const execFileAsync = promisify(execFile);
 const roots: string[] = [];
@@ -72,6 +75,32 @@ describe.skipIf(process.platform !== "linux" || process.arch !== "x64")(
     });
   },
 );
+
+describe.skipIf(process.platform === "win32")("fake BBDown executable", () => {
+  test("creates a non-empty media artifact from BBDown output flags", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "mediago fake bbdown "));
+    roots.push(root);
+    const executable = path.join(root, "BBDown");
+    const argumentsPath = path.join(root, "bbdown-argv.jsonl");
+    const outputDirectory = path.join(root, "downloads");
+    await writeFile(executable, fakeBBDownExecutableSource(argumentsPath), {
+      mode: 0o755,
+    });
+
+    await execFileAsync(executable, [
+      "https://www.bilibili.com/video/BV1MediaGoFixture",
+      "--work-dir",
+      outputDirectory,
+      "--file-pattern",
+      "MediaGo Bilibili Fixture",
+    ]);
+
+    const artifact = await readFile(
+      path.join(outputDirectory, "MediaGo Bilibili Fixture.mp4"),
+    );
+    expect(artifact.byteLength).toBeGreaterThan(0);
+  });
+});
 
 async function createIsolatedFixture(): Promise<{
   provisionedAria2Path: string;

@@ -35,6 +35,23 @@ const adBlockerCacheMocks = vi.hoisted(() => ({
   })),
 }));
 
+vi.mock("./sniffing-helper.service", () => {
+  class AgentCollectionError extends Error {
+    constructor(
+      readonly errorCode: string,
+      message: string,
+    ) {
+      super(message);
+      this.name = "AgentCollectionError";
+    }
+  }
+
+  return {
+    AgentCollectionError,
+    SniffingHelper: class SniffingHelper {},
+  };
+});
+
 vi.mock("node:module", () => ({
   createRequire: () =>
     Object.assign(vi.fn(), {

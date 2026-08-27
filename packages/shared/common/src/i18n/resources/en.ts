@@ -447,6 +447,8 @@ export const en = {
   unauthorized: "Unauthorized",
   setup: "Set up",
   apiKey: "API key",
+  copyApiKey: "Copy API key",
+  apiKeyCopied: "API key copied",
   pleaseEnterApiKey: "Enter your API key",
   cliSetting: "Command-line tool",
   cliStatus: "Install status",
@@ -476,10 +478,24 @@ export const en = {
   mcpToken: "Token",
   mcpAgentConfig: "Agent configuration",
   mcpRegenerateToken: "Regenerate token",
+  mcpCopyForAgent: "Copy for Agent",
   mcpConfigCopied: "MCP configuration copied",
   mcpTokenRegenerated: "MCP token updated",
-  mcpRunningHint:
-    "MCP uses the MediaGo backend address and is available while the backend is running.",
+  mcpAgentConfigPrompt: `Configure an MCP server named "mediago" in the current Agent client.
+Transport: Streamable HTTP
+URL: {{endpoint}}
+HTTP header:
+Authorization: Bearer {{token}}
+
+Use the client's secure secret or environment-variable mechanism for the token when available; otherwise configure the header directly.
+The Agent must be able to reach this URL. A localhost or 127.0.0.1 URL works only when the Agent runs on the same machine as MediaGo.
+
+Write this configuration to the client's active MCP settings and verify the connection by calling the health_check tool.
+If you cannot modify the settings directly, return the exact configuration snippet for the current client.`,
+  mcpAgentConfigHint:
+    "Copies Agent setup instructions containing the endpoint and token. Do not share them with untrusted parties.",
+  mcpCopyRequiresRunning:
+    "Enable MCP and wait for the status to change to Running before copying.",
   confirm: "Confirm",
   shareIntentInvalid: "No valid downloadable link was found",
   shareIntentLegacyAutomaticActionDisabled:

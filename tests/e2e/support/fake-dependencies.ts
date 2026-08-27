@@ -18,6 +18,29 @@ export interface FakeBilibiliDependencyOptions {
   provisionedAria2Path?: string;
 }
 
+export function fakeBBDownExecutableSource(
+  bbdownArgumentsPath: string,
+): string {
+  return [
+    "#!/usr/bin/env node",
+    'const { appendFileSync, mkdirSync, writeFileSync } = require("node:fs");',
+    'const path = require("node:path");',
+    "const args = process.argv.slice(2);",
+    `appendFileSync(${JSON.stringify(bbdownArgumentsPath)}, JSON.stringify(args) + "\\n", { encoding: "utf8" });`,
+    "const valueAfter = (flag) => {",
+    "  const index = args.indexOf(flag);",
+    "  return index >= 0 ? args[index + 1] : undefined;",
+    "};",
+    'const workDirectory = valueAfter("--work-dir");',
+    'const filePattern = valueAfter("--file-pattern");',
+    "if (workDirectory && filePattern) {",
+    "  mkdirSync(workDirectory, { recursive: true });",
+    '  writeFileSync(path.join(workDirectory, `${filePattern}.mp4`), "mediago fake bbdown output\\n", { encoding: "utf8" });',
+    "}",
+    "",
+  ].join("\n");
+}
+
 /**
  * Create an isolated Core dependency leaf for the extension E2E.
  *
@@ -56,12 +79,7 @@ export async function createFakeBilibiliDependencyLeaf(
   await copyFile(provisionedAria2, isolatedAria2);
   await writeFile(
     path.join(depsDirectory, "BBDown"),
-    [
-      "#!/usr/bin/env node",
-      'const { appendFileSync } = require("node:fs");',
-      `appendFileSync(${JSON.stringify(bbdownArgumentsPath)}, JSON.stringify(process.argv.slice(2)) + "\\n", { encoding: "utf8" });`,
-      "",
-    ].join("\n"),
+    fakeBBDownExecutableSource(bbdownArgumentsPath),
     { encoding: "utf8", mode: 0o755 },
   );
   await Promise.all([

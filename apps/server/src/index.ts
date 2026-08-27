@@ -36,7 +36,8 @@ const runner = new ServiceRunner({
   executableName: "mediago-core",
   executableDir: path.dirname(core.coreBin),
   preferredPort: 9900,
-  internal: true,
+  // Web clients may run on other devices in the local network.
+  internal: false,
   shutdownTimeoutMs: CORE_SHUTDOWN_TIMEOUT_MS,
   extraArgs: [
     `--enable-auth`,

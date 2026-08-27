@@ -454,6 +454,8 @@ export const it = {
   unauthorized: "Non autorizzato",
   setup: "Impostazione",
   apiKey: "Chiave API",
+  copyApiKey: "Copia chiave API",
+  apiKeyCopied: "Chiave API copiata",
   pleaseEnterApiKey: "Inserisci chiave API",
   cliSetting: "Strumento da riga di comando",
   cliStatus: "Stato installazione",
@@ -483,10 +485,24 @@ export const it = {
   mcpToken: "Token",
   mcpAgentConfig: "Configurazione Agent",
   mcpRegenerateToken: "Rigenera token",
+  mcpCopyForAgent: "Copia per Agent",
   mcpConfigCopied: "Configurazione MCP copiata",
   mcpTokenRegenerated: "Token MCP aggiornato",
-  mcpRunningHint:
-    "MCP usa l'indirizzo del backend MediaGo ed è disponibile mentre il backend è in esecuzione.",
+  mcpAgentConfigPrompt: `Configura un server MCP denominato "mediago" nel client Agent corrente.
+Trasporto: Streamable HTTP
+URL: {{endpoint}}
+Intestazione HTTP:
+Authorization: Bearer {{token}}
+
+Quando disponibile, usa il meccanismo del client per segreti o variabili di ambiente; altrimenti configura direttamente l'intestazione.
+L'Agent deve poter raggiungere questo URL. Un indirizzo localhost o 127.0.0.1 funziona solo quando Agent e MediaGo sono in esecuzione sullo stesso computer.
+
+Salva questa configurazione nelle impostazioni MCP attive del client e verifica la connessione chiamando lo strumento health_check.
+Se non puoi modificare direttamente le impostazioni, restituisci il frammento di configurazione completo per il client corrente.`,
+  mcpAgentConfigHint:
+    "Copia le istruzioni di configurazione Agent con endpoint e token. Non condividerle con parti non attendibili.",
+  mcpCopyRequiresRunning:
+    "Abilita MCP e attendi che lo stato diventi In esecuzione prima di copiare.",
   confirm: "Conferma",
   shareIntentInvalid: "Nessun link scaricabile valido trovato",
   shareIntentLegacyAutomaticActionDisabled:

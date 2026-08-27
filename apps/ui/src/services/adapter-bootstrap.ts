@@ -4,6 +4,7 @@ import { initGoEvents } from "../api/events";
 import { useAppStore } from "../store/app";
 import { isWeb } from "../utils";
 import { setupHttp } from "../utils/http";
+import { resolveWebCoreUrl } from "./web-core-url";
 
 let adapterCoreUrl = "";
 let adapterInitialization: Promise<AppStore | null> | null = null;
@@ -24,9 +25,10 @@ export function initializeAdapter(): Promise<AppStore | null> {
       let coreUrl = adapterCoreUrl;
 
       if (!coreUrl && isWeb) {
-        coreUrl = import.meta.env.DEV
-          ? "http://127.0.0.1:9900"
-          : window.location.origin;
+        coreUrl = resolveWebCoreUrl(
+          window.location.origin,
+          import.meta.env.DEV,
+        );
       } else if (!coreUrl) {
         await new Promise((resolve) => setTimeout(resolve, 1000));
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

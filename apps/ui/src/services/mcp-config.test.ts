@@ -1,3 +1,9 @@
+import {
+  BASE_I18N_OPTIONS,
+  i18nResources,
+  type ResolvedAppLanguage,
+} from "@mediago/shared-common";
+import { createInstance } from "i18next";
 import { describe, expect, it } from "vitest";
 import { buildMCPAgentConfig, buildMCPEndpoint } from "./mcp-config";
 
@@ -13,11 +19,48 @@ describe("buildMCPEndpoint", () => {
   it("does not guess an endpoint before the backend URL is ready", () => {
     expect(buildMCPEndpoint("  ")).toBe("");
     expect(buildMCPAgentConfig("", "secret")).toBe("");
+    expect(buildMCPAgentConfig("http://127.0.0.1:9900", "  ")).toBe("");
   });
 });
 
 it("builds the copied agent configuration", () => {
-  expect(buildMCPAgentConfig("http://server:8899", "secret")).toBe(
-    "MCP URL: http://server:8899/mcp\nMCP Token: secret",
-  );
+  const config = buildMCPAgentConfig("http://server:8899", "secret");
+
+  expect(config).toContain('MCP server named "mediago"');
+  expect(config).toContain("Transport: Streamable HTTP");
+  expect(config).toContain("URL: http://server:8899/mcp");
+  expect(config).toContain("Authorization: Bearer secret");
+  expect(config).toContain("same machine as MediaGo");
+  expect(config).toContain("health_check");
 });
+
+const localizedAgentConfigCases = [
+  ["zh", "请在当前 Agent 客户端中配置"],
+  ["en", "Configure an MCP server"],
+  ["it", "Configura un server MCP"],
+] as const satisfies ReadonlyArray<readonly [ResolvedAppLanguage, string]>;
+
+it.each(localizedAgentConfigCases)(
+  "builds the copied Agent instruction in %s",
+  async (language, expectedText) => {
+    const i18n = createInstance();
+    await i18n.init({
+      ...BASE_I18N_OPTIONS,
+      lng: language,
+      resources: {
+        [language]: { translation: i18nResources[language] },
+      },
+    });
+
+    const config = buildMCPAgentConfig(
+      "http://192.168.1.20:9900",
+      "secret",
+      (values) => i18n.t("mcpAgentConfigPrompt", values),
+    );
+
+    expect(config).toContain(expectedText);
+    expect(config).toContain("http://192.168.1.20:9900/mcp");
+    expect(config).toContain("Authorization: Bearer secret");
+    expect(config).not.toContain("{{");
+  },
+);

@@ -27,6 +27,7 @@ import { useEnvPath } from "@/hooks/use-config";
 import { usePlatform } from "@/hooks/use-platform";
 import { useAppStore } from "@/store/app";
 import { useSessionStore } from "@/store/session";
+import { isAppTheme, useWebAppearanceStore } from "@/store/web-appearance";
 import { getAdapterCoreUrl } from "@/services/adapter-bootstrap";
 import { buildMCPAgentConfig, buildMCPEndpoint } from "@/services/mcp-config";
 import { isWeb } from "@/utils";
@@ -36,6 +37,7 @@ import {
   SettingNumberField,
   SettingRow,
   SettingSelectField,
+  SettingSelectRow,
   SettingSwitchField,
   SettingTextField,
   usePersistSetting,
@@ -58,6 +60,8 @@ export const BasicSettingsCard = memo(function BasicSettingsCard() {
   const { t } = useTranslation();
   const { dialog } = usePlatform();
   const persistSetting = usePersistSetting();
+  const webTheme = useWebAppearanceStore((state) => state.theme);
+  const setWebTheme = useWebAppearanceStore((state) => state.setTheme);
   const { control, setValue } = useFormContext<AppStore>();
   const { field: localField } = useController({ name: "local", control });
 
@@ -68,6 +72,12 @@ export const BasicSettingsCard = memo(function BasicSettingsCard() {
     setValue("local", local, { shouldDirty: true });
     await persistSetting("local", local);
   };
+
+  const themeOptions = [
+    { label: t("followSystem"), value: AppTheme.System },
+    { label: t("dark"), value: AppTheme.Dark },
+    { label: t("light"), value: AppTheme.Light },
+  ];
 
   return (
     <SettingCard title={t("basicSetting")}>
@@ -100,18 +110,25 @@ export const BasicSettingsCard = memo(function BasicSettingsCard() {
         />
       </SettingRow>
 
-      {!isWeb ? (
+      {isWeb ? (
+        <SettingSelectRow
+          id="setting-theme"
+          label={t("downloaderTheme")}
+          placeholder={t("pleaseSelectTheme")}
+          options={themeOptions}
+          value={webTheme}
+          onValueChange={(value) => {
+            if (isAppTheme(value)) setWebTheme(value);
+          }}
+        />
+      ) : (
         <SettingSelectField
           name="theme"
           label={t("downloaderTheme")}
           placeholder={t("pleaseSelectTheme")}
-          options={[
-            { label: t("followSystem"), value: AppTheme.System },
-            { label: t("dark"), value: AppTheme.Dark },
-            { label: t("light"), value: AppTheme.Light },
-          ]}
+          options={themeOptions}
         />
-      ) : null}
+      )}
 
       <SettingSelectField
         name="language"
@@ -544,7 +561,18 @@ export const MCPSettingsCard = memo(function MCPSettingsCard() {
   const isStatusPending = status === undefined || status.enabled !== enabled;
   const coreUrl = getAdapterCoreUrl();
   const endpoint = buildMCPEndpoint(coreUrl);
-  const agentConfig = buildMCPAgentConfig(coreUrl, token);
+  const agentConfig = buildMCPAgentConfig(
+    coreUrl,
+    token,
+    ({ endpoint: mcpEndpoint, token: mcpToken }) =>
+      t("mcpAgentConfigPrompt", {
+        endpoint: mcpEndpoint,
+        token: mcpToken,
+      }),
+  );
+  const canCopyAgentConfig = Boolean(
+    endpoint && token && status?.running && !isStatusPending,
+  );
 
   useEffect(() => {
     void mutate();
@@ -557,7 +585,7 @@ export const MCPSettingsCard = memo(function MCPSettingsCard() {
   }, [enabled, mutate, token]);
 
   const copyConfig = async () => {
-    if (!agentConfig) return;
+    if (!agentConfig || !canCopyAgentConfig) return;
     try {
       await navigator.clipboard.writeText(agentConfig);
       toast.success(t("mcpConfigCopied"));
@@ -637,13 +665,21 @@ export const MCPSettingsCard = memo(function MCPSettingsCard() {
               type="button"
               variant="outline"
               onClick={copyConfig}
-              disabled={!endpoint || !token}
+              disabled={!canCopyAgentConfig}
+              aria-describedby="mcp-agent-config-hint"
             >
               <Copy className="size-4" />
-              {t("copy")}
+              {t("mcpCopyForAgent")}
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground">{t("mcpRunningHint")}</p>
+          <p
+            id="mcp-agent-config-hint"
+            className="text-xs text-muted-foreground"
+          >
+            {canCopyAgentConfig
+              ? t("mcpAgentConfigHint")
+              : t("mcpCopyRequiresRunning")}
+          </p>
         </div>
       </SettingRow>
     </SettingCard>
@@ -738,16 +774,41 @@ export const MoreSettingsCard = memo(function MoreSettingsCard({
         ? t("downloadingUpdate")
         : t("checkUpdate");
 
+  const copyApiKey = async () => {
+    if (!apiKey) return;
+    try {
+      await navigator.clipboard.writeText(apiKey);
+      toast.success(t("apiKeyCopied"));
+    } catch {
+      toast.error(t("clipboardCopyFailed"));
+    }
+  };
+
   return (
     <SettingCard title={t("moreSettings")}>
       {isWeb ? (
         <SettingRow label={t("apiKey")} htmlFor="setting-web-api-key">
-          <Input
-            id="setting-web-api-key"
-            value={apiKey}
-            readOnly
-            className="h-8"
-          />
+          <div className="relative w-full">
+            <Input
+              id="setting-web-api-key"
+              value={apiKey}
+              readOnly
+              aria-readonly="true"
+              className="h-8 pr-10 font-mono text-xs"
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="absolute right-0.5 top-1/2 -translate-y-1/2"
+              onClick={copyApiKey}
+              disabled={!apiKey}
+              aria-label={t("copyApiKey")}
+              title={t("copyApiKey")}
+            >
+              <Copy className="size-4" />
+            </Button>
+          </div>
         </SettingRow>
       ) : (
         <div className="grid grid-cols-1 gap-2 py-4 @sm/settings:grid-cols-3">

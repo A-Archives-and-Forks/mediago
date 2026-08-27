@@ -435,6 +435,8 @@ export const zh = {
   unauthorized: "未授权",
   setup: "设置",
   apiKey: "API 密钥",
+  copyApiKey: "复制 API 密钥",
+  apiKeyCopied: "API 密钥已复制",
   pleaseEnterApiKey: "请输入 API 密钥",
   cliSetting: "命令行工具",
   cliStatus: "安装状态",
@@ -463,9 +465,23 @@ export const zh = {
   mcpToken: "令牌",
   mcpAgentConfig: "Agent 配置",
   mcpRegenerateToken: "重新生成令牌",
+  mcpCopyForAgent: "复制给 Agent",
   mcpConfigCopied: "MCP 配置已复制",
   mcpTokenRegenerated: "MCP 令牌已更新",
-  mcpRunningHint: "MCP 与 MediaGo 后端使用相同地址，后端运行时即可使用。",
+  mcpAgentConfigPrompt: `请在当前 Agent 客户端中配置一个名为“mediago”的 MCP 服务。
+传输类型：Streamable HTTP
+URL：{{endpoint}}
+HTTP 请求头：
+Authorization: Bearer {{token}}
+
+如果客户端支持，请使用其安全密钥或环境变量机制保存令牌；否则直接配置上述请求头。
+Agent 必须能够访问此 URL。localhost 或 127.0.0.1 地址仅在 Agent 与 MediaGo 运行于同一台机器时可用。
+
+请将配置写入当前客户端实际使用的 MCP 设置，并调用 health_check 工具验证连接。
+如果你无法直接修改设置，请返回适用于当前客户端的完整配置片段。`,
+  mcpAgentConfigHint:
+    "将复制包含连接地址和令牌的 Agent 配置指令，请勿分享给不受信任的人。",
+  mcpCopyRequiresRunning: "请先启用 MCP，并等待运行状态变为“运行中”。",
   confirm: "确认",
   shareIntentInvalid: "未找到可下载的有效链接",
   shareIntentLegacyAutomaticActionDisabled:

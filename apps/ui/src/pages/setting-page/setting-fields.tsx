@@ -522,24 +522,45 @@ export function SettingSelectField({
   const { field, fieldState } = useController({ name, control });
 
   return (
-    <SettingRow
+    <SettingSelectRow
+      id={id}
       label={label}
-      htmlFor={id}
       tooltip={tooltip}
+      placeholder={placeholder}
+      options={options}
+      value={String(field.value)}
+      onValueChange={(value) => {
+        field.onChange(value);
+        void persistSetting(name, value);
+      }}
       error={fieldState.error?.message}
-    >
-      <Select
-        value={String(field.value)}
-        onValueChange={(value) => {
-          field.onChange(value);
-          void persistSetting(name, value);
-        }}
-      >
-        <SelectTrigger
-          id={id}
-          className="w-full"
-          aria-invalid={fieldState.invalid}
-        >
+    />
+  );
+}
+
+export function SettingSelectRow({
+  id,
+  label,
+  tooltip,
+  placeholder,
+  options,
+  value,
+  onValueChange,
+  error,
+}: {
+  id: string;
+  label: ReactNode;
+  tooltip?: ReactNode;
+  placeholder?: string;
+  options: Array<{ label: ReactNode; value: string }>;
+  value: string;
+  onValueChange: (value: string) => void;
+  error?: string;
+}) {
+  return (
+    <SettingRow label={label} htmlFor={id} tooltip={tooltip} error={error}>
+      <Select value={value} onValueChange={onValueChange}>
+        <SelectTrigger id={id} className="w-full" aria-invalid={Boolean(error)}>
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>

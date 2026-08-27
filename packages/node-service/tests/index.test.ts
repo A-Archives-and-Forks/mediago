@@ -260,6 +260,11 @@ describe("ServiceRunner", () => {
       const state = await runner.start();
       expect(state.host).toBe("10.0.0.42");
       expect(state.url).toBe("http://10.0.0.42:5555");
+      const [, , spawnOptions] = spawnMock.mock.calls[0];
+      expect(spawnOptions?.env).toMatchObject({
+        PORT: "5555",
+        HOST: "0.0.0.0",
+      });
       expect(fetchMock).toHaveBeenCalled();
       const requestURL = fetchMock.mock.calls[0][0];
       expect(String(requestURL)).toBe("http://10.0.0.42:5555/healthy");
