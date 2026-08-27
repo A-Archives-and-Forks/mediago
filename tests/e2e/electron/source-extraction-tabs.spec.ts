@@ -107,7 +107,9 @@ test("preserves isolated sources and native page state across unlimited tabs", a
     createdTabIds.push(created.id);
   }
   await expect(page.getByRole("tab")).toHaveCount(27);
-  await expect(page.getByRole("button", { name: "New tab" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "New tab", exact: true }),
+  ).toBeVisible();
   await expect
     .poll(() =>
       page.getByRole("tablist").evaluate((tablist) => {

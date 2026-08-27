@@ -107,6 +107,7 @@ export async function startCoreProcess(
       ...environment,
       HOST: "127.0.0.1",
       PORT: String(options.port),
+      MEDIAGO_DEPS_DIR: depsDirectory,
       NO_PROXY: LOCAL_NO_PROXY,
       no_proxy: LOCAL_NO_PROXY,
     },
