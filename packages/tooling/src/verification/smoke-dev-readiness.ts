@@ -3,7 +3,7 @@ import { BoundedRedactedLog, type CommandResult } from "../process/index.ts";
 
 export const RUNTIME_MARKER = "MEDIAGO_RUNTIME_READY";
 export const PROCESSES_MARKER = "MEDIAGO_DEV_PROCESSES_STARTING";
-export const CORE_MARKER = "Go Core started at";
+export const CORE_MARKER = "Starting HTTP server on";
 const MARKER_CARRY_LENGTH = Math.max(
   RUNTIME_MARKER.length,
   PROCESSES_MARKER.length,

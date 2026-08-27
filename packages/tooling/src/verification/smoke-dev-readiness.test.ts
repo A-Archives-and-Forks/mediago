@@ -46,8 +46,8 @@ describe("dev readiness observation", () => {
     const observation = new StartupObservation();
     observation.append("MEDIAGO_RUNTIME_");
     observation.append("READY /tmp/deps\nMEDIAGO_DEV_PROCESSES_");
-    observation.append("STARTING\nGo Core start");
-    observation.append("ed at http://127.0.0.1:9900");
+    observation.append("STARTING\nStarting HTTP ser");
+    observation.append("ver on 0.0.0.0:9900");
 
     expect(observation.markersReady).toBe(true);
     expect(observation.invalidMarkerOrder).toBe(false);

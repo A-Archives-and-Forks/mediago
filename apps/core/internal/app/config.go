@@ -22,7 +22,6 @@ type AppConfig struct {
 	DBPath              string `json:"db_path"`
 	ConfigDir           string `json:"config_dir"`
 	EnableAuth          bool   `json:"enable_auth"`
-	StaticDir           string `json:"static_dir"`
 	ElectronBridgeToken string `json:"-"`
 }
 
@@ -49,7 +48,16 @@ func (c *AppConfig) ApplyEnvAndDefaults() {
 	c.Host = getEnv("HOST", c.Host)
 	c.Port = getEnv("PORT", c.Port)
 	c.DBPath = getEnv("DB_PATH", c.DBPath)
+	c.DepsDir = getEnv("MEDIAGO_DEPS_DIR", c.DepsDir)
 	c.ElectronBridgeToken = getEnv("MEDIAGO_ELECTRON_BRIDGE_TOKEN", c.ElectronBridgeToken)
+
+	if runtimeRoot := os.Getenv("MEDIAGO_RUNTIME_ROOT"); runtimeRoot != "" {
+		dataDir := filepath.Join(runtimeRoot, "data")
+		c.LogDir = filepath.Join(runtimeRoot, "logs")
+		c.LocalDir = filepath.Join(runtimeRoot, "downloads")
+		c.DBPath = filepath.Join(dataDir, "mediago.db")
+		c.ConfigDir = dataDir
+	}
 
 	if c.SchemaPath == "" {
 		c.SchemaPath = getDefaultSchemaPath()
@@ -98,7 +106,7 @@ func getDefaultSchemaPath() string {
 	if _, err := os.Stat(localConfig); err == nil {
 		return localConfig
 	}
-	return "configs/config.json"
+	return ""
 }
 
 func getEnv(key, def string) string {

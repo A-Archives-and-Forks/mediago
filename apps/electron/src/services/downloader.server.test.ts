@@ -86,7 +86,6 @@ vi.mock("@mediago/core-sdk", () => ({
 vi.mock("../utils/binaryResolver", () => ({
   resolveCoreBinaries: () => ({
     coreBin: "/fake/core/mediago-core",
-    coreConfig: "/fake/core/config.json",
   }),
   resolveDepsBinaries: () => ({
     depsDir: "/fake/deps",

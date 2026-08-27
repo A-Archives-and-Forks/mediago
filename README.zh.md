@@ -141,8 +141,9 @@ task dev:all
 开发、构建、测试和发布都以 `task` 命令作为统一入口；Turbo、pnpm 的 `:raw`
 脚本、Go 命令以及 `packages/tooling` 中的工具只作为内部实现，不需要日常直接调用。
 
-只开发 Web 端时使用 `task dev:web`（`dev:server` 是 `dev:web` 的别名），只开发
-桌面端时使用 `task dev:electron`。提交改动前请运行：
+只开发 Web 端时使用 `task dev:web`，只开发桌面端时使用 `task dev:electron`。
+可部署的 Web 版本只通过 Docker 镜像交付，不再维护独立的 Node.js Server 包。
+提交改动前请运行：
 
 ```shell
 task check

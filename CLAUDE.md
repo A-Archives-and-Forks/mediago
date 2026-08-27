@@ -4,13 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-MediaGo is a cross-platform video downloader supporting m3u8/HLS streams. The codebase is a pnpm monorepo with three products:
+MediaGo is a cross-platform video downloader supporting m3u8/HLS streams. The codebase is a pnpm monorepo with two delivery products:
 
 1. **Desktop app** (`apps/electron` + `apps/ui`) — Electron wrapper that launches Go Core as a subprocess
-2. **Web server** (`apps/server` + `apps/ui`) — Node.js launcher that spawns Go Core as a subprocess
-3. **Video player** (`apps/core` + `apps/player-ui`) — Player UI embedded in Go Core for video playback
+2. **Docker Web app** (`apps/core` + `apps/ui`) — Docker runs Go Core directly; the main UI is embedded in the Core binary
 
-All three products share the Go Core backend (`apps/core`) for download orchestration.
+The Player UI (`apps/player-ui`) is also embedded in every Core binary. Electron Core serves `/player/` but suppresses the embedded main UI because Electron owns the main renderer.
 
 ## Documentation Site Safety
 
@@ -26,10 +25,10 @@ All three products share the Go Core backend (`apps/core`) for download orchestr
 
 ```bash
 pnpm install                # Install all dependencies (run once per clone)
-pnpm dev:electron           # Start Electron desktop dev environment (HMR)
-pnpm dev:server             # Start server dev environment (HMR)
-pnpm build:electron         # Production build for Electron
-pnpm build:web              # Build UI only (server mode)
+task dev:electron           # Start Electron desktop dev environment (HMR)
+task dev:web                # Start Web Core directly plus the Vite UI
+task build:electron         # Production build for Electron
+task build:docker           # Build the deployable Web image
 pnpm core:dev               # Start Go Core dev server (port 9900)
 pnpm core:build             # Compile Go Core binary
 pnpm player:dev             # Start Player dev (alias for core:dev)
@@ -53,9 +52,8 @@ Commits use Conventional Commits format (e.g. `feat(electron): add queue UI`).
 
 **Apps:**
 
-- **`apps/core/`** — Go (Gin) REST API backend for download orchestration. Runs on port 9900. Uses SQLite (GORM), SSE for real-time events, PTY for capturing download tool output. Built through the typed Core tooling and Go cross-compilation.
+- **`apps/core/`** — Go (Gin) REST API backend for download orchestration. Runs on port 9900. Uses SQLite (GORM), SSE for real-time events, PTY for capturing download tool output, and embeds both browser UIs through `//go:embed`.
 - **`apps/electron/`** — Electron main process (tsdown build, inversify DI). Launches Go Core via `@mediago/service-runner`.
-- **`apps/server/`** — Node.js launcher (tsdown build). Spawns Go Core via `@mediago/service-runner`.
 - **`apps/ui/`** — Shared React 19 frontend (Vite 8, Ant Design 6, Zustand, TailwindCSS 4, i18next). Used by both Electron and server targets.
 - **`apps/player-ui/`** — React 19 frontend for player (Vite 8, shadcn/ui, video.js, TailwindCSS 4). Built assets are embedded into Go Core via `//go:embed`.
 
@@ -78,7 +76,7 @@ The UI adapter layer (`apps/ui/src/hooks/adapters/`) abstracts this: `electron.t
 
 ### Key Patterns
 
-- **Go Core as subprocess**: Both Electron and server apps launch Go Core via `@mediago/service-runner`, which manages the process lifecycle and port allocation
+- **Go Core lifecycle**: Electron launches Core via `@mediago/service-runner`; Task and Docker execute Core directly for Web usage
 - **Dependency Injection**: inversify with `@inversifyjs/binding-decorators` in Electron backend
 - **State Management**: Zustand in the UI
 - **Real-time events**: Go Core emits SSE events (`/api/events`); the UI's `api/events.ts` subscribes and dispatches to React via a listener pattern

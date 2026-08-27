@@ -168,9 +168,10 @@ dall'app. L'unica fonte delle loro versioni è `packages/tooling/manifests/runti
 non si aggiornano automaticamente. Eseguire solo `pnpm install` installa i
 pacchetti del workspace Node, ma non i binari runtime come BBDown.
 
-Usa `task dev:web` per la superficie web (`dev:server` è un alias di
-`dev:web`) oppure `task dev:electron` per lo sviluppo desktop. Prima di
-inviare modifiche, esegui:
+Usa `task dev:web` per la superficie web oppure `task dev:electron` per lo
+sviluppo desktop. La versione Web distribuibile è fornita solo come immagine
+Docker; non esiste più un pacchetto Server Node.js separato. Prima di inviare
+modifiche, esegui:
 
 ```shell
 task check

@@ -34,11 +34,9 @@ const projectRoot = path.resolve(
   "../../../..",
 );
 const productionLocalEnvPath = path.join(projectRoot, ".env.production.local");
-const bundleDirectories = [
-  "apps/server/build",
-  "apps/electron/build",
-  "apps/ui/build",
-].map((directory) => path.join(projectRoot, directory));
+const bundleDirectories = ["apps/electron/build", "apps/ui/build"].map(
+  (directory) => path.join(projectRoot, directory),
+);
 
 export async function handleTermination(options: {
   cleanup: EnvironmentTransaction["cleanup"] | undefined;
@@ -124,15 +122,6 @@ async function main(): Promise<void> {
         activeCleanup = cleanup;
       },
       runBuilds: async (environment) => {
-        await runPnpm({
-          args: ["--filter", "@mediago/server", "run", "build"],
-          cwd: projectRoot,
-          entrypoint,
-          environment,
-          setActiveChild: (child) => {
-            activeChild = child;
-          },
-        });
         await runPnpm({
           args: ["run", "build:electron", "--force"],
           cwd: projectRoot,

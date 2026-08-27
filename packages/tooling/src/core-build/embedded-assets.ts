@@ -1,24 +1,25 @@
 import { cpSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-interface PlayerAssetOperations {
+interface EmbeddedAssetOperations {
   copy?: (sourceDirectory: string, targetDirectory: string) => void;
   remove?: (targetDirectory: string) => void;
 }
 
-export const PLAYER_ASSET_PLACEHOLDER = "MediaGo player assets placeholder.\n";
+export const EMBEDDED_ASSET_PLACEHOLDER =
+  "MediaGo embedded assets placeholder.\n";
 
-const defaultOperations: Required<PlayerAssetOperations> = {
+const defaultOperations: Required<EmbeddedAssetOperations> = {
   copy: (sourceDirectory, targetDirectory) =>
     cpSync(sourceDirectory, targetDirectory, { recursive: true }),
   remove: (targetDirectory) =>
     rmSync(targetDirectory, { recursive: true, force: true }),
 };
 
-export function replacePlayerAssets(
+export function replaceEmbeddedAssets(
   sourceDirectory: string,
   targetDirectory: string,
-  operations: PlayerAssetOperations = {},
+  operations: EmbeddedAssetOperations = {},
 ): void {
   try {
     (operations.remove ?? defaultOperations.remove)(targetDirectory);
@@ -30,7 +31,7 @@ export function replacePlayerAssets(
     mkdirSync(targetDirectory, { recursive: true });
     writeFileSync(
       join(targetDirectory, "placeholder.txt"),
-      PLAYER_ASSET_PLACEHOLDER,
+      EMBEDDED_ASSET_PLACEHOLDER,
       "utf8",
     );
   }

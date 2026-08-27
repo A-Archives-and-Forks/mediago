@@ -139,8 +139,9 @@ task dev:all
 `packages/tooling/manifests/runtime-deps.json` だけを参照し、自動更新されません。`pnpm install` だけでは
 Node ワークスペース依存関係しか入らず、BBDown などのランタイムバイナリは入りません。
 
-Web のみを開発する場合は `task dev:web`（`dev:server` は `dev:web` のエイリアス）、
-デスクトップのみの場合は `task dev:electron` を使います。変更を送信する前に以下を実行します：
+Web のみを開発する場合は `task dev:web`、デスクトップのみの場合は
+`task dev:electron` を使います。デプロイ可能な Web 版は Docker イメージのみで提供され、
+独立した Node.js Server パッケージはありません。変更を送信する前に以下を実行します：
 
 ```shell
 task check

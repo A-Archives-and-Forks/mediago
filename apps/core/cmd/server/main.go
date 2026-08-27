@@ -91,7 +91,6 @@ func registerConfigFlags(fs *flag.FlagSet, cfg *app.AppConfig) {
 	fs.StringVar(&cfg.DBPath, "db-path", cfg.DBPath, "Path to SQLite database file")
 	fs.StringVar(&cfg.ConfigDir, "config-dir", cfg.ConfigDir, "Directory for persistent config file")
 	fs.BoolVar(&cfg.EnableAuth, "enable-auth", cfg.EnableAuth, "Enable API key authentication")
-	fs.StringVar(&cfg.StaticDir, "static-dir", cfg.StaticDir, "Directory to serve static files from (SPA mode)")
 }
 
 func runServer(rt *app.Runtime) error {
@@ -100,7 +99,6 @@ func runServer(rt *app.Runtime) error {
 	execPath, _ := os.Executable()
 	server := api.NewServer(rt.Queue, rt.TaskLogs, rt.Database, confStore, api.ServerOptions{
 		EnableAuth:          cfg.EnableAuth,
-		StaticDir:           cfg.StaticDir,
 		FFmpegBin:           app.FFmpegBinPath(cfg),
 		VideoRoot:           cfg.LocalDir,
 		ElectronBridgeToken: cfg.ElectronBridgeToken,

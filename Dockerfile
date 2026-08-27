@@ -21,7 +21,6 @@ WORKDIR /src
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc* ./
 COPY apps/ui/package.json apps/ui/package.json
 COPY apps/player-ui/package.json apps/player-ui/package.json
-COPY apps/server/package.json apps/server/package.json
 COPY apps/core/package.json apps/core/package.json
 COPY apps/electron/package.json apps/electron/package.json
 COPY packages/browser-extension/package.json packages/browser-extension/package.json
@@ -69,6 +68,9 @@ COPY apps/core/ apps/core/
 # Copy player-ui dist into assets for go:embed
 COPY --from=node-builder /src/apps/player-ui/dist apps/core/assets/player/
 
+# Copy the main Web UI into the same Core binary
+COPY --from=node-builder /src/apps/ui/build/server apps/core/assets/web/
+
 # Ensure all dependencies are downloaded (go.sum may have been updated)
 RUN cd apps/core && go mod download
 
@@ -88,9 +90,6 @@ WORKDIR /app
 
 # Core binary
 COPY --from=go-builder /out/mediago-core /usr/local/bin/mediago-core
-
-# Web UI static files
-COPY --from=node-builder /src/apps/ui/build/server /app/static
 
 # Third-party tools — copy from the platform-specific directory
 ARG TARGETARCH

@@ -2,8 +2,7 @@ package server
 
 import (
 	"context"
-	"os"
-	"path/filepath"
+	"io/fs"
 	"strings"
 
 	"caorushizi.cn/mediago/assets"
@@ -56,7 +55,6 @@ type Server struct {
 // Options holds optional configuration for the server.
 type Options struct {
 	EnableAuth          bool
-	StaticDir           string
 	FFmpegBin           string
 	VideoRoot           string
 	EnvPaths            handler.EnvPaths
@@ -152,68 +150,32 @@ func New(queue *core.TaskQueue, logs *tasklog.Manager, database *db.Database, co
 	srv.registerRoutes()
 	srv.setupQueueCallbacks()
 
-	// Static file serving for SPA (optional)
-	if opt.StaticDir != "" {
-		srv.serveStatic(opt.StaticDir)
-	}
-
 	// Serve embedded player UI at /player/
-	srv.engine.Use(newPlayerSPAHandler(playerSPAConfig{
+	srv.engine.Use(newEmbeddedSPAHandler(embeddedSPAConfig{
 		FS:         assets.PlayerFS,
 		Root:       "player",
 		PathPrefix: "/player",
 	}))
 
+	// Electron owns its renderer. Other runtimes serve the embedded main UI.
+	if shouldServeMainUI(opt.ElectronBridgeToken) {
+		srv.serveEmbeddedMainUI(assets.WebFS)
+	}
+
 	return srv
 }
 
-var pwaRootFiles = []string{
-	"manifest.json",
-	"service-worker.js",
-	"apple-touch-icon.png",
-	"icon-192.png",
-	"icon-512.png",
-	"icon-192-maskable.png",
-	"icon-512-maskable.png",
+func shouldServeMainUI(electronBridgeToken string) bool {
+	return strings.TrimSpace(electronBridgeToken) == ""
 }
 
-// serveStatic configures static assets, the PWA share target, and SPA fallback.
-func (s *Server) serveStatic(dir string) {
-	s.engine.Static("/assets", filepath.Join(dir, "assets"))
-	s.engine.StaticFile("/favicon.ico", filepath.Join(dir, "favicon.ico"))
-
-	for _, name := range pwaRootFiles {
-		filePath := filepath.Join(dir, name)
-		if _, err := os.Stat(filePath); err != nil {
-			continue
-		}
-
-		route := "/" + name
-		if name == "service-worker.js" {
-			s.engine.GET(route, func(c *gin.Context) {
-				c.Header("Cache-Control", "no-cache")
-				c.File(filePath)
-			})
-			continue
-		}
-		s.engine.StaticFile(route, filePath)
-	}
-
+func (s *Server) serveEmbeddedMainUI(files fs.FS) {
 	s.engine.POST("/share", handleWebShareTarget)
-
-	// SPA fallback: serve index.html only for unmatched navigation requests.
-	indexPath := filepath.Join(dir, "index.html")
-	s.engine.NoRoute(func(c *gin.Context) {
-		if c.Request.Method != "GET" && c.Request.Method != "HEAD" {
-			c.Status(404)
-			return
-		}
-		if _, err := os.Stat(indexPath); err == nil {
-			c.File(indexPath)
-			return
-		}
-		c.Status(404)
-	})
+	s.engine.NoRoute(newEmbeddedSPAHandler(embeddedSPAConfig{
+		FS:         files,
+		Root:       "web",
+		PathPrefix: "/",
+	}))
 }
 
 // Run starts the HTTP server on the given address.

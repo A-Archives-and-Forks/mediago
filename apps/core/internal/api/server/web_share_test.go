@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/gin-gonic/gin"
 )
@@ -71,27 +71,18 @@ func TestHandleWebShareTargetRejectsOversizedBodies(t *testing.T) {
 	}
 }
 
-func TestServeStaticExposesPwaResourcesAndFallback(t *testing.T) {
+func TestServeEmbeddedMainUIExposesPwaResourcesAndFallback(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	staticDir := t.TempDir()
-	for name, content := range map[string]string{
-		"index.html":        "<html>MediaGo</html>",
-		"manifest.json":     "{\"name\":\"MediaGo\"}",
-		"service-worker.js": "self.addEventListener('fetch', () => {});",
-	} {
-		if err := os.WriteFile(
-			staticDir+"/"+name,
-			[]byte(content),
-			0o644,
-		); err != nil {
-			t.Fatal(err)
-		}
+	files := fstest.MapFS{
+		"web/index.html":        {Data: []byte("<html>MediaGo</html>")},
+		"web/manifest.json":     {Data: []byte("{\"name\":\"MediaGo\"}")},
+		"web/service-worker.js": {Data: []byte("self.addEventListener('fetch', () => {});")},
 	}
 
 	engine := gin.New()
 	server := &Server{engine: engine}
-	server.serveStatic(staticDir)
+	server.serveEmbeddedMainUI(files)
 
 	manifestRequest := httptest.NewRequest(http.MethodGet, "/manifest.json", nil)
 	manifestRecorder := httptest.NewRecorder()
@@ -140,6 +131,27 @@ func TestServeStaticExposesPwaResourcesAndFallback(t *testing.T) {
 	}
 	if !strings.Contains(spaRecorder.Body.String(), "MediaGo") {
 		t.Fatalf("unexpected SPA fallback body: %q", spaRecorder.Body.String())
+	}
+	if contentType := spaRecorder.Header().Get("Content-Type"); strings.Count(contentType, "charset=") != 1 {
+		t.Fatalf("unexpected SPA content type: %q", contentType)
+	}
+}
+
+func TestElectronBridgeTokenSuppressesMainUI(t *testing.T) {
+	for _, testCase := range []struct {
+		name  string
+		token string
+		want  bool
+	}{
+		{name: "standalone", token: "", want: true},
+		{name: "whitespace", token: "  ", want: true},
+		{name: "electron", token: bridgeTestServerToken, want: false},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			if got := shouldServeMainUI(testCase.token); got != testCase.want {
+				t.Fatalf("shouldServeMainUI(%q) = %t, want %t", testCase.token, got, testCase.want)
+			}
+		})
 	}
 }
 

@@ -15,7 +15,11 @@ export const config = {
   DEPS_DIR: join("..", "..", ".deps"),
   TOOLS_BIN_DIR: join("..", "..", ".deps"),
   GO_LDFLAGS: "-s -w",
+  MAIN_UI_DIR: join("..", "ui"),
+  MAIN_UI_BUILD_DIR: join("..", "ui", "build", "server"),
+  MAIN_UI_ASSETS_DIR: join("assets", "web"),
   PLAYER_UI_DIR: join("..", "player-ui"),
+  PLAYER_UI_BUILD_DIR: join("..", "player-ui", "dist"),
   PLAYER_ASSETS_DIR: join("assets", "player"),
 };
 
@@ -30,7 +34,6 @@ export const devConfig = {
   log_level: "debug",
   log_dir: `${homeDir}/logs`,
   config_dir: `${homeDir}/data`,
-  schema_path: "./configs/config.json",
   deps_dir: `${config.DEPS_DIR}/${platformKey}`,
   max_runner: 3,
   local_dir: `${homeDir}/downloads`,

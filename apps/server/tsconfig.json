@@ -1,9 +1,0 @@
-{
-  "extends": "../../tsconfig.node.json",
-  "compilerOptions": {
-    "allowImportingTsExtensions": true,
-    "outDir": "build",
-    "rootDir": "../.."
-  },
-  "include": ["src", "tsdown.config.ts"]
-}

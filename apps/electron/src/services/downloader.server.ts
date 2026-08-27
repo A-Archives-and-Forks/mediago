@@ -97,7 +97,6 @@ export class DownloaderServer extends EventEmitter {
         extraArgs: [
           `-log-level=info`,
           `-log-dir=${opts.logDir}`,
-          `-schema-path=${core.coreConfig}`,
           `-deps-dir=${deps.depsDir}`,
           `-db-path=${opts.dbPath}`,
           `-config-dir=${path.dirname(opts.dbPath)}`,

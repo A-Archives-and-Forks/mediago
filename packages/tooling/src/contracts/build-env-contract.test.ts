@@ -15,7 +15,6 @@ const projectRoot = path.resolve(
 );
 
 const configPaths = {
-  server: path.join(projectRoot, "apps/server/tsdown.config.ts"),
   electron: path.join(projectRoot, "apps/electron/tsdown.config.ts"),
   ui: path.join(projectRoot, "apps/ui/vite.config.ts"),
 } as const;
@@ -217,24 +216,6 @@ describe("build environment contract", () => {
     expect(turbo.tasks?.dev?.passThroughEnv).toEqual(["OPEN_DEVTOOLS"]);
   });
 
-  it("limits server compile-time environment values to NODE_ENV and server target", () => {
-    const config = exportedConfig(configPaths.server);
-    const definitions = objectProperty(config, "define");
-
-    expect(config.properties.has("env")).toBe(false);
-    expect(definitionNames(definitions)).toEqual([
-      "process.env.APP_TARGET",
-      "process.env.NODE_ENV",
-    ]);
-    expect(initializerText(definitions, "process.env.APP_TARGET")).toBe(
-      'JSON.stringify("server")',
-    );
-    assertNoSecretDefinitions(definitionNames(definitions));
-    expect(
-      readSource(path.join(projectRoot, "apps/server/src/index.ts")),
-    ).toContain("process.env.APP_NAME");
-  });
-
   it("limits Electron compile-time environment values to its four-item allowlist", () => {
     const config = exportedConfig(configPaths.electron);
     const definitions = objectProperty(config, "define");
@@ -294,7 +275,7 @@ describe("build environment contract", () => {
     expect(process.env).toEqual(previousEnvironment);
   });
 
-  it.each([configPaths.server, configPaths.electron])(
+  it.each([configPaths.electron])(
     "loads the selected profile before deriving development mode in %s",
     (filename) => {
       const source = readSource(filename);
@@ -306,8 +287,6 @@ describe("build environment contract", () => {
 
   it("uses the shared profile loader in every Node-side environment consumer", () => {
     for (const filename of [
-      configPaths.server,
-      path.join(projectRoot, "apps/server/src/index.ts"),
       configPaths.electron,
       path.join(projectRoot, "packages/tooling/src/electron/build.ts"),
       configPaths.ui,

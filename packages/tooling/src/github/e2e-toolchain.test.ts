@@ -23,11 +23,9 @@ const expectedE2EScripts = {
     "tsx packages/tooling/src/runtime-deps/download.ts --tools aria2",
   "test:e2e:setup:browser": "playwright install chromium",
   "test:e2e:setup": "pnpm test:e2e:setup:deps && pnpm test:e2e:setup:browser",
-  "test:e2e:build:core":
-    "cd apps/core && go build -o bin/mediago-core ./cmd/server",
-  "test:e2e:build": "pnpm test:e2e:build:core && pnpm test:e2e:build:raw",
+  "test:e2e:build": "pnpm core:build && pnpm test:e2e:build:raw",
   "test:e2e:build:raw":
-    "cross-env APP_TARGET=electron NODE_ENV=production turbo run build -F @mediago/server -F @mediago/electron -F @mediago/electron-preload -F @mediago/extension",
+    "cross-env APP_TARGET=electron NODE_ENV=production turbo run build -F @mediago/electron -F @mediago/electron-preload -F @mediago/extension",
   "test:e2e": "task test:e2e",
   "test:e2e:raw": "playwright test",
   "test:e2e:web": "task test:e2e:web",

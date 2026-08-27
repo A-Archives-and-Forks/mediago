@@ -5,7 +5,7 @@ import {
   createCurrentPlatformBuildArgs,
   type CurrentPlatformBuildMode,
 } from "./build-args";
-import { replacePlayerAssets } from "./player-assets";
+import { replaceEmbeddedAssets } from "./embedded-assets";
 import { getExeExt, mkdir, runCommand } from "./utils";
 
 const appVersion = (
@@ -19,6 +19,7 @@ const appVersion = (
  */
 export async function dev() {
   console.log("🚀 Starting development server...");
+  await buildEmbeddedUIs();
   const args = [
     "run",
     "-tags",
@@ -28,7 +29,6 @@ export async function dev() {
     `-log-level=${devConfig.log_level}`,
     `-log-dir=${devConfig.log_dir}`,
     `-config-dir=${devConfig.config_dir}`,
-    `-schema-path=${devConfig.schema_path}`,
     `-max-runner=${devConfig.max_runner.toString()}`,
     `-local-dir=${devConfig.local_dir}`,
     `-delete-segments=${devConfig.delete_segments.toString()}`,
@@ -39,24 +39,46 @@ export async function dev() {
   await runCommand("go", args, { description: "Start development server" });
 }
 
-/**
- * Build player-ui and copy dist to core assets for embedding
- */
-export async function buildPlayerUI() {
-  console.log("🎬 Building Player UI...");
-  const playerUiDist = join(config.PLAYER_UI_DIR, "dist");
+async function buildEmbeddedUI(options: {
+  label: string;
+  projectDirectory: string;
+  buildDirectory: string;
+  targetDirectory: string;
+  env?: Record<string, string>;
+}) {
+  console.log(`🎨 Building ${options.label}...`);
+  await runCommand("pnpm", ["build"], {
+    cwd: options.projectDirectory,
+    env: { NODE_ENV: "production", ...options.env },
+  });
 
-  await runCommand("pnpm", ["build"], { cwd: config.PLAYER_UI_DIR });
-
-  if (!existsSync(playerUiDist)) {
+  if (!existsSync(options.buildDirectory)) {
     throw new Error(
-      `Expected player-ui build output at ${playerUiDist} but it was not found`,
+      `Expected ${options.label} build output at ${options.buildDirectory} but it was not found`,
     );
   }
 
-  replacePlayerAssets(playerUiDist, config.PLAYER_ASSETS_DIR);
+  replaceEmbeddedAssets(options.buildDirectory, options.targetDirectory);
+  console.log(`✅ ${options.label} copied to ${options.targetDirectory}`);
+}
 
-  console.log(`✅ Player UI copied to ${config.PLAYER_ASSETS_DIR}`);
+/** Build both browser surfaces and copy them into Core for go:embed. */
+export async function buildEmbeddedUIs() {
+  await Promise.all([
+    buildEmbeddedUI({
+      label: "main Web UI",
+      projectDirectory: config.MAIN_UI_DIR,
+      buildDirectory: config.MAIN_UI_BUILD_DIR,
+      targetDirectory: config.MAIN_UI_ASSETS_DIR,
+      env: { APP_TARGET: "server" },
+    }),
+    buildEmbeddedUI({
+      label: "Player UI",
+      projectDirectory: config.PLAYER_UI_DIR,
+      buildDirectory: config.PLAYER_UI_BUILD_DIR,
+      targetDirectory: config.PLAYER_ASSETS_DIR,
+    }),
+  ]);
 }
 
 async function buildCurrentPlatformBinary(
@@ -88,7 +110,7 @@ async function buildCurrentPlatformBinary(
 async function buildCurrentPlatform(mode: CurrentPlatformBuildMode) {
   console.log(`🔨 Compiling ${mode} build...`);
 
-  await buildPlayerUI();
+  await buildEmbeddedUIs();
   mkdir(config.BIN_DIR);
 
   const [serverOutput, cliOutput] = await Promise.all([

@@ -42,9 +42,8 @@ same Go Core backend:
 
 ```
 apps/
-  core/            Go backend (download orchestration, SSE, REST API)
+  core/            Go backend with embedded main and Player UIs
   electron/        Electron desktop main process
-  server/          Node.js launcher for the self-hosted web build
   ui/              Shared React 19 frontend (Electron + Web)
   player-ui/       React frontend embedded inside Go Core for playback
 packages/
@@ -73,11 +72,11 @@ task dev:all
 # Run the Electron desktop app in dev mode (HMR)
 task dev:electron
 
-# Run the self-hosted web server in dev mode; dev:server aliases dev:web
+# Run the Web Core and Vite UI in development mode
 task dev:web
 
-# Build the self-hosted server and web UI
-task build:server
+# Build the deployable Web product as a Docker image
+task build:docker
 
 # Build the Electron workspace without creating an installer
 task build:electron
@@ -101,9 +100,9 @@ package commands, Go commands, and modules under `packages/tooling/` are
 implementation leaves. Their `:raw` commands are kept
 for Task and CI composition rather than normal developer use.
 
-The self-hosted server ships through the Docker image published to GHCR. Its
-Node and web build outputs can also be produced locally with
-`task build:server`.
+The self-hosted Web product ships only through the Docker image. Task launches
+the Go Core binary directly for Web development; there is no Node.js server
+adapter. The Core binary embeds both the main Web UI and Player UI.
 
 ## Commit style
 

@@ -104,7 +104,6 @@ const publicTasks = [
   "deps:e2e",
   "dev:all",
   "dev:web",
-  "dev:server",
   "dev:electron",
   "dev:extension",
   "docs:dev",
@@ -117,8 +116,6 @@ const publicTasks = [
   "test:e2e:web",
   "test:e2e:electron",
   "test:e2e:extension",
-  "build:web",
-  "build:server",
   "build:electron",
   "build:extension",
   "build:docs",
@@ -180,8 +177,6 @@ const profileImplementations = {
   "internal:test:e2e:electron": "test",
   "internal:test:e2e:extension": "test",
   "internal:test:e2e:build": "test",
-  "internal:build:web": "production",
-  "internal:build:server:workspace": "production",
   "internal:build:electron:workspace": "production",
   "internal:production:build:electron:validated": "production",
   "internal:build:extension": "production",
@@ -226,7 +221,7 @@ const implementationGraph = {
       "internal:core:build",
       "internal:electron:prepare-development-runtime",
     ],
-    leaves: ["pnpm dev:all:raw"],
+    leaves: [],
   },
   "internal:electron:prepare-development-runtime": {
     deps: ["internal:deps:node"],
@@ -240,7 +235,7 @@ const implementationGraph = {
       "internal:deps:runtime",
       "internal:core:build",
     ],
-    leaves: ["pnpm dev:web:raw"],
+    leaves: [],
   },
   "internal:dev:electron": {
     deps: [
@@ -311,18 +306,6 @@ const implementationGraph = {
       "internal:test:e2e:chromium",
     ],
     leaves: ["pnpm test:e2e:extension:raw"],
-  },
-  "internal:build:web": {
-    deps: ["internal:deps:node"],
-    leaves: ["pnpm build:web:raw"],
-  },
-  "internal:build:server": {
-    deps: ["internal:core:build:production", "internal:build:server:workspace"],
-    leaves: [],
-  },
-  "internal:build:server:workspace": {
-    deps: ["internal:deps:node"],
-    leaves: ["pnpm build:server:raw"],
   },
   "internal:build:electron": {
     deps: [
@@ -549,6 +532,43 @@ const implementationGraph = {
 } as const;
 
 const prerequisiteGraph = {
+  "internal:dev:all:processes": {
+    deps: [
+      "internal:core:run:web",
+      "internal:electron:run",
+      "internal:ui:run:electron",
+      "internal:ui:run:web",
+    ],
+    leaves: [],
+  },
+  "internal:dev:web:processes": {
+    deps: ["internal:core:run:web", "internal:ui:run:web"],
+    leaves: [],
+  },
+  "internal:core:run:web": {
+    deps: [],
+    leaves: [
+      '"{{.ROOT_DIR}}/apps/core/bin/mediago-core{{.CORE_EXE_SUFFIX}}" --port=9900 --enable-auth --log-level=debug',
+    ],
+  },
+  "internal:electron:run": {
+    deps: [],
+    leaves: [
+      "pnpm exec cross-env APP_TARGET=electron turbo run dev -F @mediago/electron",
+    ],
+  },
+  "internal:ui:run:electron": {
+    deps: [],
+    leaves: [
+      "pnpm exec cross-env APP_TARGET=electron pnpm -F @mediago/ui run dev",
+    ],
+  },
+  "internal:ui:run:web": {
+    deps: [],
+    leaves: [
+      "pnpm exec cross-env APP_TARGET=server NODE_ENV=development pnpm -F @mediago/ui run dev",
+    ],
+  },
   "internal:core:build": {
     deps: ["internal:deps:node"],
     leaves: ["pnpm core:build"],
@@ -631,7 +651,6 @@ const metadataWorkflowTasks = [
 const wrapperScripts = {
   "dev:all": "task dev:all",
   "dev:web": "task dev:web",
-  "dev:server": "task dev:web",
   "dev:electron": "task dev:electron",
   "dev:extension": "task dev:extension",
   "docs:dev": "task docs:dev",
@@ -647,8 +666,6 @@ const wrapperScripts = {
   "test:e2e:electron": "task test:e2e:electron",
   "test:e2e:extension": "task test:e2e:extension",
   "test:ci": "task test",
-  "build:web": "task build:web",
-  "build:server": "task build:server",
   "build:electron": "task build:electron",
   "build:extension": "task build:extension",
   "build:docker": "task build:docker",
@@ -660,21 +677,15 @@ const wrapperScripts = {
 } as const;
 
 const rawScriptBodies = {
-  "dev:all:raw":
-    'concurrently --kill-others-on-fail --names backend,electron-ui,server-ui "cross-env APP_TARGET=electron turbo run dev -F @mediago/server -F @mediago/electron" "cross-env APP_TARGET=electron pnpm -F @mediago/ui run dev" "cross-env APP_TARGET=server pnpm -F @mediago/ui run dev"',
-  "dev:web:raw":
-    "cross-env APP_TARGET=server NODE_ENV=development turbo run dev -F @mediago/server -F @mediago/ui",
   "build:web:raw":
     "cross-env APP_TARGET=server NODE_ENV=production turbo run build -F @mediago/ui",
-  "build:server:raw":
-    "cross-env APP_TARGET=server NODE_ENV=production turbo run build -F @mediago/server -F @mediago/ui",
   "build:electron:raw":
     "cross-env APP_TARGET=electron NODE_ENV=production turbo run build -F @mediago/electron -F @mediago/ui -F @mediago/extension",
   "deps:download:raw": "tsx packages/tooling/src/runtime-deps/download.ts",
   "test:integration:media:run:raw":
     "vitest run --config vitest.integration.config.ts",
   "test:e2e:build:raw":
-    "cross-env APP_TARGET=electron NODE_ENV=production turbo run build -F @mediago/server -F @mediago/electron -F @mediago/electron-preload -F @mediago/extension",
+    "cross-env APP_TARGET=electron NODE_ENV=production turbo run build -F @mediago/electron -F @mediago/electron-preload -F @mediago/extension",
   "test:e2e:raw": "playwright test",
   "test:e2e:web:raw": "playwright test --project=web",
   "test:e2e:electron:raw": "playwright test --project=electron",
@@ -811,12 +822,12 @@ describe("root Taskfile public API", () => {
   it.each(publicTasks.filter((name) => name !== "doctor"))(
     "%s checks Task before invoking one private implementation",
     (name) => {
-      const implementation =
-        name === "dev:server"
-          ? "internal:dev:web"
-          : Object.hasOwn(productionEntryGraph, `internal:production:${name}`)
-            ? `internal:production:${name}`
-            : `internal:${name}`;
+      const implementation = Object.hasOwn(
+        productionEntryGraph,
+        `internal:production:${name}`,
+      )
+        ? `internal:production:${name}`
+        : `internal:${name}`;
       expect(taskCommands(name)).toEqual([
         { kind: "task", task: "internal:require-task-version" },
         { kind: "task", task: implementation },
@@ -1158,7 +1169,7 @@ describe("Task command leaves", () => {
         kind: "cmd",
         text: `node -e "console.log('MEDIAGO_DEV_PROCESSES_STARTING')"`,
       },
-      { kind: "cmd", text: "pnpm dev:all:raw" },
+      { kind: "task", task: "internal:dev:all:processes" },
     ]);
   });
 
@@ -1176,6 +1187,12 @@ describe("Task command leaves", () => {
           command.text,
           `${name} must not compose leaf commands`,
         ).not.toMatch(/(?:&&|\|\||[|]|\n)/);
+        if (name === "internal:core:run:web") {
+          expect(command.text).toBe(
+            prerequisiteGraph["internal:core:run:web"].leaves[0],
+          );
+          continue;
+        }
         expect(command.text, `${name} has an unsafe leaf command`).toMatch(
           /^(?:node\s+packages\/tooling\/src\/bootstrap\/task-(?:version-gate|doctor)\.ts|node packages\/tooling\/src\/github\/(?:desktop|docker|release)-workflow\.ts [\w-]+|node packages\/tooling\/src\/electron-artifacts\/cli\.ts electron-artifacts release-files "\$VERSION" "\$UPDATER_CHANNEL"|node -e "console\.log\('MEDIAGO_(?:RUNTIME_READY', process\.env\.MEDIAGO_DEPS_DIR|DEV_PROCESSES_STARTING')\)"|pnpm\s+[\w:-]+(?::raw)?(?:\s+[^;&|\n]+)?|pnpm\s+(?:-F|--filter)\s+\S+\s+run\s+\S+|pnpm\s+install(?:\s+[^;&|\n]+)?|pnpm\s+exec(?:\s+[^;&|\n]+)?|xvfb-run -a pnpm test:e2e:raw|go\s+[^;&|\n]+|docker\s+[^;&|\n]+)$/,
         );
@@ -1353,6 +1370,23 @@ describe("Docker repository command contract", () => {
     );
   });
 
+  it("embeds both browser surfaces in Core without a runtime static directory", () => {
+    expect(dockerfileSource).toContain(
+      "COPY --from=node-builder /src/apps/player-ui/dist apps/core/assets/player/",
+    );
+    expect(dockerfileSource).toContain(
+      "COPY --from=node-builder /src/apps/ui/build/server apps/core/assets/web/",
+    );
+    expect(dockerfileSource).not.toContain("apps/server");
+    expect(dockerfileSource).not.toContain("/app/static");
+
+    const entrypoint = fs.readFileSync(
+      path.join(repositoryRoot, "docker/docker-entrypoint.sh"),
+      "utf8",
+    );
+    expect(entrypoint).not.toContain("--static-dir");
+  });
+
   it("exposes wrapped Docker invocations instead of treating them as approved leaves", () => {
     expect(
       dockerRepositoryCommands(`
@@ -1433,7 +1467,7 @@ describe("normative documentation Task contract", () => {
         );
         expect(source).toContain("pnpm install");
         expect(source).toContain("BBDown");
-        expect(source).toContain("dev:server");
+        expect(source).toContain("dev:web");
         expect(source).toMatch(requirements.dependencyPolicy);
       }
     },

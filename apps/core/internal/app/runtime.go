@@ -192,7 +192,10 @@ func syncAppStoreToCfg(store *conf.Conf[AppStore], cfg *AppConfig) {
 func ensureDownloadDir(store *conf.Conf[AppStore], cfg *AppConfig) {
 	needDefault := cfg.LocalDir == "" || cfg.LocalDir == "./downloads"
 	if !needDefault {
-		if info, err := os.Stat(cfg.LocalDir); err != nil || !info.IsDir() {
+		if err := os.MkdirAll(cfg.LocalDir, 0o755); err != nil {
+			logger.Warnf("Failed to create configured download dir %q: %v", cfg.LocalDir, err)
+			needDefault = true
+		} else if info, err := os.Stat(cfg.LocalDir); err != nil || !info.IsDir() {
 			needDefault = true
 		}
 	}

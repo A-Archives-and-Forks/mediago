@@ -10,7 +10,6 @@ set -e
 
 exec mediago-core \
   --port=8899 \
-  --static-dir=/app/static \
   --enable-auth \
   --db-path=/app/mediago/data/mediago.db \
   --config-dir=/app/mediago/data \

@@ -4,6 +4,7 @@ package schema
 import (
 	"encoding/json"
 	"os"
+	"strings"
 
 	"caorushizi.cn/mediago/internal/logger"
 	"go.uber.org/zap"
@@ -75,7 +76,7 @@ func (sl SchemaList) GetByType(t string) (Schema, bool) {
 	return Schema{}, false
 }
 
-// DefaultSchemas returns the built-in default Schema configuration, kept in sync with the Node.js config.json.
+// DefaultSchemas returns the canonical built-in download configuration.
 func DefaultSchemas() SchemaList {
 	return SchemaList{
 		Schemas: []Schema{
@@ -173,6 +174,9 @@ func DefaultSchemas() SchemaList {
 // LoadSchemasFromJSON loads Schema configuration from a JSON file.
 // If the file does not exist, the built-in defaults are returned.
 func LoadSchemasFromJSON(path string) (SchemaList, error) {
+	if strings.TrimSpace(path) == "" {
+		return DefaultSchemas(), nil
+	}
 	logger.Debug("Loading schemas from file", zap.String("path", path))
 
 	raw, err := os.ReadFile(path)

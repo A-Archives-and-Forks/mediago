@@ -15,35 +15,28 @@ function getMonorepoRoot(): string {
 }
 
 /**
- * Resolves the mediago-core binary and config.json paths.
+ * Resolves the mediago-core binary path.
  *
  * Development: apps/core/bin/mediago-core (compiled by `pnpm core:build`)
  * Production: extraResources/bin/mediago-core (copied by electron-builder)
  *
  * Override with MEDIAGO_CORE_BIN env var.
  */
-export function resolveCoreBinaries(): {
-  coreBin: string;
-  coreConfig: string;
-} {
+export function resolveCoreBinaries(): { coreBin: string } {
   if (process.env.MEDIAGO_CORE_BIN) {
-    const coreBin = process.env.MEDIAGO_CORE_BIN;
-    const coreConfig = path.resolve(path.dirname(coreBin), "config.json");
-    return { coreBin, coreConfig };
+    return { coreBin: process.env.MEDIAGO_CORE_BIN };
   }
 
   if (isDev) {
     const coreDir = path.join(getMonorepoRoot(), "apps", "core");
     return {
       coreBin: path.join(coreDir, "bin", `mediago-core${ext}`),
-      coreConfig: path.join(coreDir, "configs", "config.json"),
     };
   }
 
   // Production: extraResources
   return {
     coreBin: path.join(process.resourcesPath, "bin", `mediago-core${ext}`),
-    coreConfig: path.join(process.resourcesPath, "bin", "config.json"),
   };
 }
 
@@ -86,31 +79,6 @@ export function resolveDepsBinaries(): { depsDir: string } {
   }
 
   return { depsDir };
-}
-
-/**
- * Resolves the mediago-player binary path.
- *
- * Development: apps/player/dist/mediago-player (compiled by `pnpm player:build`)
- * Production: extraResources/bin/mediago-player
- *
- * Override with MEDIAGO_PLAYER_BIN env var.
- */
-export function resolvePlayerBinary(): { playerBin: string } {
-  if (process.env.MEDIAGO_PLAYER_BIN) {
-    return { playerBin: process.env.MEDIAGO_PLAYER_BIN };
-  }
-
-  if (isDev) {
-    const playerDir = path.join(getMonorepoRoot(), "apps", "player");
-    return {
-      playerBin: path.join(playerDir, "dist", `mediago-player${ext}`),
-    };
-  }
-
-  return {
-    playerBin: path.join(process.resourcesPath, "bin", `mediago-player${ext}`),
-  };
 }
 
 /**

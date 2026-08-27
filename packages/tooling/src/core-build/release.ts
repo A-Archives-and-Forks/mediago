@@ -15,7 +15,7 @@ import {
   chmodExecutable,
   resolveReleasePath,
 } from "./utils";
-import { buildPlayerUI } from "./dev";
+import { buildEmbeddedUIs } from "./dev";
 
 const appVersion = (
   JSON.parse(
@@ -72,6 +72,7 @@ async function buildBinary(
  */
 export async function releaseBuild() {
   console.log("🔨 Building binaries for all platforms...");
+  await buildEmbeddedUIs();
   mkdir(config.BIN_DIR);
 
   await Promise.all(
@@ -172,7 +173,6 @@ export async function releaseClean() {
 }
 export async function releasePackageFull(): Promise<void> {
   await releaseClean();
-  await buildPlayerUI();
   await releaseBuild();
   await releasePackage();
 }

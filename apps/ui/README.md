@@ -52,8 +52,8 @@ task dev:web
 # Start Electron-only development
 task dev:electron
 
-# Build the web frontend
-task build:web
+# Build the deployable Web product
+task build:docker
 
 # Validate changes
 task check
@@ -65,6 +65,6 @@ task test
 The frontend is designed to work in two contexts:
 
 1. **Electron Renderer**: Loaded in Electron's BrowserWindow
-2. **Standalone Web**: Served by the webapi backend for browser access
+2. **Standalone Web**: Embedded in and served directly by Go Core in Docker
 
 It communicates with the backend services through Socket.io for real-time updates and HTTP APIs for data operations.

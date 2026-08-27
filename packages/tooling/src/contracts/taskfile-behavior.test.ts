@@ -384,7 +384,7 @@ test.each(productionEntries)(
 
 test.each([
   ["dev:electron", "pnpm start:electron"],
-  ["dev:all", "pnpm dev:all:raw"],
+  ["dev:all", "mediago-core"],
 ] as const)(
   "%s reaches its development leaf without production metadata",
   (task, leaf) => {

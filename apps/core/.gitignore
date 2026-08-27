@@ -34,8 +34,10 @@ files
 swagger.json
 swagger.yaml
 
-# Embedded player UI assets (populated by build)
+# Embedded UI assets (populated by build)
 assets/player/*
 !assets/player/placeholder.txt
+assets/web/*
+!assets/web/placeholder.txt
 
 /server

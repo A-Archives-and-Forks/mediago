@@ -149,6 +149,36 @@ func TestRuntimeLogsDoNotExposeProxyValues(t *testing.T) {
 	}
 }
 
+func TestEnsureDownloadDirCreatesConfiguredDirectory(t *testing.T) {
+	tempDir := t.TempDir()
+	configDir := filepath.Join(tempDir, "config")
+	store, err := conf.New(conf.Options[AppStore]{
+		CWD:      configDir,
+		Defaults: DefaultAppStore(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	localDir := filepath.Join(tempDir, "nested", "downloads")
+	cfg := &AppConfig{LocalDir: localDir}
+	ensureDownloadDir(store, cfg)
+
+	info, err := os.Stat(localDir)
+	if err != nil {
+		t.Fatalf("configured download directory was not created: %v", err)
+	}
+	if !info.IsDir() {
+		t.Fatalf("configured download path is not a directory: %s", localDir)
+	}
+	if cfg.LocalDir != localDir {
+		t.Fatalf("LocalDir = %q, want %q", cfg.LocalDir, localDir)
+	}
+	if got := store.Store().Local; got != localDir {
+		t.Fatalf("persisted local directory = %q, want %q", got, localDir)
+	}
+}
+
 func containsAnyRuntimeLogSecret(value string, secrets []string) bool {
 	for _, secret := range secrets {
 		containsSecret := strings.Contains(value, secret)

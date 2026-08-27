@@ -3,6 +3,7 @@ version: "3"
 vars:
   REQUIRED_TASK_VERSION: 3.51.1
   MEDIAGO_DEPS_ROOT: '{{default (printf "%s/.deps" .ROOT_DIR) .MEDIAGO_DEPS_ROOT}}'
+  MEDIAGO_WEB_RUNTIME_ROOT: '{{default (printf "%s/.task/web-core" .ROOT_DIR) .MEDIAGO_WEB_RUNTIME_ROOT}}'
 
 tasks:
   doctor:
@@ -55,13 +56,7 @@ tasks:
       - task: internal:dev:all
 
   dev:web:
-    desc: Start the server adapter and web UI
-    cmds:
-      - task: internal:require-task-version
-      - task: internal:dev:web
-
-  dev:server:
-    desc: Alias for dev:web
+    desc: Start the Web development Core and UI
     cmds:
       - task: internal:require-task-version
       - task: internal:dev:web
@@ -137,18 +132,6 @@ tasks:
     cmds:
       - task: internal:require-task-version
       - task: internal:test:e2e:extension
-
-  build:web:
-    desc: Build the web UI
-    cmds:
-      - task: internal:require-task-version
-      - task: internal:build:web
-
-  build:server:
-    desc: Build the server adapter and web UI
-    cmds:
-      - task: internal:require-task-version
-      - task: internal:build:server
 
   build:electron:
     desc: Build the Electron desktop application
@@ -504,7 +487,15 @@ tasks:
       - task: internal:electron:prepare-development-runtime
     cmds:
       - 'node -e "console.log(''MEDIAGO_DEV_PROCESSES_STARTING'')"'
-      - pnpm dev:all:raw
+      - task: internal:dev:all:processes
+
+  internal:dev:all:processes:
+    internal: true
+    deps:
+      - task: internal:core:run:web
+      - task: internal:electron:run
+      - task: internal:ui:run:electron
+      - task: internal:ui:run:web
 
   internal:electron:prepare-development-runtime:
     internal: true
@@ -529,7 +520,13 @@ tasks:
       - task: internal:deps:runtime
       - task: internal:core:build
     cmds:
-      - pnpm dev:web:raw
+      - task: internal:dev:web:processes
+
+  internal:dev:web:processes:
+    internal: true
+    deps:
+      - task: internal:core:run:web
+      - task: internal:ui:run:web
 
   internal:dev:electron:
     internal: true
@@ -544,6 +541,36 @@ tasks:
       - task: internal:electron:prepare-development-runtime
     cmds:
       - pnpm start:electron
+
+  internal:core:run:web:
+    internal: true
+    vars:
+      MEDIAGO_PLATFORM_KEY:
+        sh: node packages/tooling/src/runtime-deps/print-platform-key.ts
+      MEDIAGO_DEPS_DIR: '{{default (printf "%s/%s" .MEDIAGO_DEPS_ROOT .MEDIAGO_PLATFORM_KEY) .MEDIAGO_DEPS_DIR}}'
+      CORE_EXE_SUFFIX:
+        sh: >-
+          node -e "process.stdout.write(process.platform === 'win32' ? '.exe' : '')"
+    env:
+      MEDIAGO_DEPS_DIR: "{{.MEDIAGO_DEPS_DIR}}"
+      MEDIAGO_RUNTIME_ROOT: "{{.MEDIAGO_WEB_RUNTIME_ROOT}}"
+    cmds:
+      - '"{{.ROOT_DIR}}/apps/core/bin/mediago-core{{.CORE_EXE_SUFFIX}}" --port=9900 --enable-auth --log-level=debug'
+
+  internal:electron:run:
+    internal: true
+    cmds:
+      - pnpm exec cross-env APP_TARGET=electron turbo run dev -F @mediago/electron
+
+  internal:ui:run:electron:
+    internal: true
+    cmds:
+      - pnpm exec cross-env APP_TARGET=electron pnpm -F @mediago/ui run dev
+
+  internal:ui:run:web:
+    internal: true
+    cmds:
+      - pnpm exec cross-env APP_TARGET=server NODE_ENV=development pnpm -F @mediago/ui run dev
 
   internal:dev:extension:
     internal: true
@@ -708,35 +735,6 @@ tasks:
     cmds:
       - pnpm exec playwright install chromium
 
-  internal:build:web:
-    internal: true
-    vars: &production-profile-vars
-      MEDIAGO_PROFILE: '{{default "production" .MEDIAGO_PROFILE}}'
-    env: *profile-env
-    dotenv: *profile-dotenv
-    requires: *profile-requires
-    deps:
-      - task: internal:deps:node
-    cmds:
-      - pnpm build:web:raw
-
-  internal:build:server:
-    internal: true
-    deps:
-      - task: internal:core:build:production
-      - task: internal:build:server:workspace
-
-  internal:build:server:workspace:
-    internal: true
-    vars: *production-profile-vars
-    env: *profile-env
-    dotenv: *profile-dotenv
-    requires: *profile-requires
-    deps:
-      - task: internal:deps:node
-    cmds:
-      - pnpm build:server:raw
-
   internal:build:electron:
     internal: true
     deps:
@@ -745,7 +743,8 @@ tasks:
 
   internal:build:electron:workspace:
     internal: true
-    vars: *production-profile-vars
+    vars: &production-profile-vars
+      MEDIAGO_PROFILE: '{{default "production" .MEDIAGO_PROFILE}}'
     env: *profile-env
     dotenv: *profile-dotenv
     requires: *profile-requires

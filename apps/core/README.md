@@ -129,7 +129,7 @@ mediago discover download <discovery-id> --source source-1
 
 ```bash
 task dev:web                # 从仓库根目录启动 Web/Core 开发环境
-task build:server           # 构建 Core 与自托管 Web 服务
+task build:docker           # 构建包含 Core 与两套内嵌 UI 的 Web 镜像
 ```
 
 ### NPM 包构建
@@ -170,8 +170,8 @@ pnpm core:build:production  # 编译当前平台生产版本
 # 启动开发服务器
 task dev:web
 
-# 快速编译当前平台
-task build:server
+# 构建可部署的 Web 版本
+task build:docker
 ```
 
 ### 2. 构建 NPM 包

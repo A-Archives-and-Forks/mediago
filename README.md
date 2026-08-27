@@ -164,9 +164,9 @@ Use `task` as the single public entry point for development, builds, tests,
 and releases. Turbo, pnpm `:raw` scripts, Go commands, and utilities in
 `packages/tooling` are implementation details used by Task and CI.
 
-Use `task dev:web` for the web surface (`dev:server` is an alias for
-`dev:web`) or `task dev:electron` for desktop-only development. Before
-submitting changes, run:
+Use `task dev:web` for the web surface or `task dev:electron` for
+desktop-only development. The deployable Web product is the Docker image;
+there is no separate Node.js server package. Before submitting changes, run:
 
 ```shell
 task check
