@@ -4,7 +4,7 @@ import {
   isFreshShareIntent,
   normalizeShareIntent,
   type ShareIntent,
-} from "@mediago/shared-common";
+} from "@mediago/common";
 
 const STORAGE_KEY = "mediago.share-intents.v1";
 const MAX_PENDING_INTENTS = 20;

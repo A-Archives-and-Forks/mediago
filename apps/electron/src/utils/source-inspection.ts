@@ -1,5 +1,5 @@
 import type { SourceInspection } from "@mediago/core-sdk";
-import type { HLSMediaInfo } from "@mediago/shared-common";
+import type { HLSMediaInfo } from "@mediago/common";
 
 export function formattedHeadersToArray(headers?: string): string[] {
   if (!headers) return [];

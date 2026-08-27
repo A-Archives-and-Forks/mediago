@@ -7,10 +7,7 @@ import {
   startConversion as startApi,
   stopConversion as stopApi,
 } from "@/api/conversion";
-import type {
-  ConversionPagination,
-  ConversionResponse,
-} from "@mediago/shared-common";
+import type { ConversionPagination, ConversionResponse } from "@mediago/common";
 
 export function useConversions(pagination: ConversionPagination) {
   const { data, isLoading, error, mutate } = useSWR(

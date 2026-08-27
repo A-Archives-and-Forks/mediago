@@ -1,4 +1,4 @@
-import { DownloadType } from "@mediago/shared-common";
+import { DownloadType } from "@mediago/common";
 import i18next, { type i18n } from "i18next";
 import { readFileSync } from "node:fs";
 import { createElement } from "react";

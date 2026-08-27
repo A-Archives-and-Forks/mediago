@@ -2,7 +2,7 @@ import {
   ELECTRON_SHARE_PROTOCOLS,
   normalizeShareIntent,
   type ShareIntent,
-} from "@mediago/shared-common";
+} from "@mediago/common";
 
 export interface ParsedProtocolInvocation {
   handled: boolean;

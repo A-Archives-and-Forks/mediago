@@ -2,13 +2,13 @@ import { readFile } from "node:fs/promises";
 
 const declarationUrl = new URL("../build/site-adapters.d.ts", import.meta.url);
 const declaration = await readFile(declarationUrl, "utf8");
-const importsSharedDownloadType =
-  /import\s+(?:type\s+)?\{[^}]*\bDownloadType\b[^}]*\}\s+from\s+["']@mediago\/shared-common["']/.test(
+const importsCommonDownloadType =
+  /import\s+(?:type\s+)?\{[^}]*\bDownloadType\b[^}]*\}\s+from\s+["']@mediago\/common["']/.test(
     declaration,
   );
 
-if (!importsSharedDownloadType) {
+if (!importsCommonDownloadType) {
   throw new Error(
-    "Expected site-adapters.d.ts to import DownloadType from @mediago/shared-common",
+    "Expected site-adapters.d.ts to import DownloadType from @mediago/common",
   );
 }

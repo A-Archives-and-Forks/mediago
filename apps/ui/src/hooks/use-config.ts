@@ -7,7 +7,7 @@ import {
   setConfigValue,
   type GoEnvPath,
 } from "@/api/config";
-import type { AppStore } from "@mediago/shared-common";
+import type { AppStore } from "@mediago/common";
 
 export function useConfig() {
   const { data, isLoading, error, mutate } = useSWR(getConfigKey, getConfig);

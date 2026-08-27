@@ -1,12 +1,12 @@
 // @vitest-environment happy-dom
 
-import { DownloadType } from "@mediago/shared-common";
+import { DownloadType } from "@mediago/common";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { findPageAdapter } from "./registry";
+import { findPageAdapter } from "../registry";
 import {
   SHORT_VIDEO_PROCESSED_ATTRIBUTE,
   shortVideoPageAdapter,
-} from "./short-video";
+} from "./adapter";
 
 const cleanups: Array<() => void> = [];
 

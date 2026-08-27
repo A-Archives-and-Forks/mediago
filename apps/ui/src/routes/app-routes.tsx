@@ -1,4 +1,4 @@
-import { DownloadFilter } from "@mediago/shared-common";
+import { DownloadFilter } from "@mediago/common";
 import { lazy, Suspense } from "react";
 import { Route, Routes } from "react-router-dom";
 import { AppBootScreen } from "../components/app-boot-screen";

@@ -38,7 +38,7 @@ vi.mock("./core/i18n", () => ({
   i18n: i18nMocks,
 }));
 
-vi.mock("@mediago/shared-common", () => ({
+vi.mock("@mediago/common", () => ({
   IpcEvent: { app: { shareIntentAvailable: "share-intent-available" } },
   resolveAppLanguage: sharedMocks.resolveAppLanguage,
 }));

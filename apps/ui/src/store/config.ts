@@ -1,4 +1,4 @@
-import { DownloadType } from "@mediago/shared-common";
+import { DownloadType } from "@mediago/common";
 import localforage from "localforage";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";

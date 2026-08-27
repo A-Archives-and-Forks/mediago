@@ -1,4 +1,4 @@
-import type { PageAdapterLocation } from "./types";
+import type { PageAdapterLocation } from "../types";
 
 export function matchesBilibiliPageLocation(
   location: PageAdapterLocation,

@@ -5,7 +5,7 @@ import type {
   DownloadTaskPagination,
   DownloadTaskResponse,
   Video,
-} from "@mediago/shared-common";
+} from "@mediago/common";
 
 export const getDownloadTasksKey = "/api/downloads";
 export const getDownloadTasks = (

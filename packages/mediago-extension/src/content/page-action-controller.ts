@@ -4,7 +4,7 @@ import {
   type PageAdapter,
   type PageCandidate,
 } from "@mediago/browser-extension/site-adapters";
-import { matchPageUrl } from "@mediago/shared-common";
+import { matchPageUrl } from "@mediago/common";
 
 import { getPageActionCopy } from "./page-action-copy";
 import {

@@ -1,4 +1,4 @@
-import { DownloadType } from "@mediago/shared-common";
+import { DownloadType } from "@mediago/common";
 import { expect, test } from "vitest";
 import { parseShareIntentProtocolUrl } from "./share-intent-parser";
 

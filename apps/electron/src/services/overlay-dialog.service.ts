@@ -1,5 +1,5 @@
 import { provide } from "@inversifyjs/binding-decorators";
-import { type DownloadTask, IpcEvent } from "@mediago/shared-common";
+import { type DownloadTask, IpcEvent } from "@mediago/common";
 import { WebContentsView } from "electron";
 import isDev from "electron-is-dev";
 import { inject, injectable } from "inversify";

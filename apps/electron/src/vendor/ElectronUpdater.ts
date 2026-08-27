@@ -5,7 +5,7 @@ import {
   type UpdateCheckResult,
   type UpdateErrorPhase,
   type UpdateState,
-} from "@mediago/shared-common";
+} from "@mediago/common";
 import { app, shell } from "electron";
 import isDev from "electron-is-dev";
 import {

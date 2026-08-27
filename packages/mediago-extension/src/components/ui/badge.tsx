@@ -1,4 +1,4 @@
-import { DownloadType } from "@mediago/shared-common";
+import { DownloadType } from "@mediago/common";
 import { cva, type VariantProps } from "class-variance-authority";
 import * as React from "react";
 

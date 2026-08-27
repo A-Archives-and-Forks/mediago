@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { persist } from "zustand/middleware";
 import { migrateAppStore } from "./app-store-migration";
-import { AppLanguage, type AppStore, AppTheme } from "@mediago/shared-common";
+import { AppLanguage, type AppStore, AppTheme } from "@mediago/common";
 import { syncAppLanguage } from "../i18n/app-language";
 
 const initialState: AppStore = {

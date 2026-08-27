@@ -4,7 +4,7 @@ import {
   type DialogOpenOptions,
   type DialogSaveOptions,
   IPC,
-} from "@mediago/shared-common";
+} from "@mediago/common";
 import { handle } from "../core/decorators";
 import { i18n } from "../core/i18n";
 import { TYPES } from "../types/symbols";

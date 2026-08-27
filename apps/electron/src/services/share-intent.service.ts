@@ -1,5 +1,5 @@
 import { provide } from "@inversifyjs/binding-decorators";
-import { SHARE_INTENT_TTL_MS, type ShareIntent } from "@mediago/shared-common";
+import { SHARE_INTENT_TTL_MS, type ShareIntent } from "@mediago/common";
 import { injectable } from "inversify";
 import { defaultScheme } from "../constants";
 import { parseShareIntentProtocolUrl } from "./share-intent-parser";

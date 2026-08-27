@@ -1,7 +1,7 @@
 /** @vitest-environment happy-dom */
 
 import { beforeEach, describe, expect, it } from "vitest";
-import { AppTheme } from "@mediago/shared-common";
+import { AppTheme } from "@mediago/common";
 import {
   mergeWebAppearanceState,
   useWebAppearanceStore,

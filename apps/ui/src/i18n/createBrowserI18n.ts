@@ -2,7 +2,7 @@ import {
   BASE_I18N_OPTIONS,
   i18nResources,
   SUPPORTED_LANGUAGES,
-} from "@mediago/shared-common";
+} from "@mediago/common";
 import { createInstance, i18n, type InitOptions, type Resource } from "i18next";
 import LanguageDetector from "i18next-browser-languagedetector";
 import { initReactI18next } from "react-i18next";

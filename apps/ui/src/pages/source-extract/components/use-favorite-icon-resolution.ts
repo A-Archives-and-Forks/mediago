@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
-import type { Favorite } from "@mediago/shared-common";
+import type { Favorite } from "@mediago/common";
 
 const DEFAULT_RETRY_DELAYS_MS = [2_000, 5_000] as const;
 

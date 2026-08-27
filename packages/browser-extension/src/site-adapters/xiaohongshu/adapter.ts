@@ -1,6 +1,6 @@
-import { DownloadType } from "@mediago/shared-common";
-import type { PageAdapter, PageCandidate } from "./types";
-import { matchesXiaohongshuPageLocation } from "./xiaohongshu-match";
+import { DownloadType } from "@mediago/common";
+import type { PageAdapter, PageCandidate } from "../types";
+import { matchesXiaohongshuPageLocation } from "./match";
 
 export const XIAOHONGSHU_SELECTORS = {
   card: [

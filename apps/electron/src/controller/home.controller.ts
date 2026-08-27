@@ -5,7 +5,7 @@ import {
   type Controller,
   EnvPath,
   IPC,
-} from "@mediago/shared-common";
+} from "@mediago/common";
 import { handle } from "../core/decorators";
 import { DownloaderServer } from "../services/downloader.server";
 import { TYPES } from "../types/symbols";

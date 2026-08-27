@@ -1,4 +1,4 @@
-import type { DownloadFailedEvent } from "@mediago/shared-common";
+import type { DownloadFailedEvent } from "@mediago/common";
 
 const NOTIFICATION_FAILURE_WARNING = "Download failure notification failed";
 const REVALIDATION_FAILURE_WARNING = "Download task revalidation failed";

@@ -1,4 +1,4 @@
-import type { Conversion } from "@mediago/shared-common";
+import type { Conversion } from "@mediago/common";
 import { useMemoizedFn } from "ahooks";
 import { type DragEvent, useState } from "react";
 import { Plus } from "lucide-react";

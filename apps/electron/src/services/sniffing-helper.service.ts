@@ -10,7 +10,7 @@ import {
   matchPageUrl,
   matchRequestUrl,
   shouldSuppressRequestSource,
-} from "@mediago/shared-common";
+} from "@mediago/common";
 import { type OnSendHeadersListenerDetails, session } from "electron";
 import { inject, injectable } from "inversify";
 import { formatHeaders } from "../utils";

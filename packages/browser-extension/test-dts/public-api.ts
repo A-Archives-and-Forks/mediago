@@ -1,4 +1,4 @@
-import { DownloadType } from "@mediago/shared-common";
+import { DownloadType } from "@mediago/common";
 import type { PageCandidate } from "@mediago/browser-extension/site-adapters";
 import {
   matchesBilibiliPageLocation,

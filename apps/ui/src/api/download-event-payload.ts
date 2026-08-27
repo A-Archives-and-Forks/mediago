@@ -1,7 +1,4 @@
-import type {
-  DownloadFailedData,
-  DownloadFailedEvent,
-} from "@mediago/shared-common";
+import type { DownloadFailedData, DownloadFailedEvent } from "@mediago/common";
 
 const DOWNLOAD_ID_PATTERN = /^[1-9]\d*$/;
 const MAX_SAFE_DECIMAL_LENGTH = 16;

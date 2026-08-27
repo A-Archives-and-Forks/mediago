@@ -1,5 +1,5 @@
 {
-  "name": "@mediago/shared-common",
+  "name": "@mediago/common",
   "version": "1.0.0",
   "type": "module",
   "types": "./build/index.d.ts",

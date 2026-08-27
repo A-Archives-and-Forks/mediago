@@ -3,7 +3,7 @@ import {
   BASE_I18N_OPTIONS,
   i18nResources,
   SUPPORTED_LANGUAGES,
-} from "@mediago/shared-common";
+} from "@mediago/common";
 
 const nodeResources: Resource = SUPPORTED_LANGUAGES.reduce<Resource>(
   (resources, language) => {

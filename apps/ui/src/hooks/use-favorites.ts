@@ -6,7 +6,7 @@ import {
   removeFavorite as removeFavApi,
   resolveFavoriteIcon as resolveFavoriteIconApi,
 } from "@/api/favorite";
-import type { Favorite } from "@mediago/shared-common";
+import type { Favorite } from "@mediago/common";
 import { useMemoizedFn } from "ahooks";
 
 export function useFavorites() {

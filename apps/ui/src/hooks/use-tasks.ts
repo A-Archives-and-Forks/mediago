@@ -1,4 +1,4 @@
-import { DownloadFilter, type DownloadTask } from "@mediago/shared-common";
+import { DownloadFilter, type DownloadTask } from "@mediago/common";
 import { useCallback, useMemo } from "react";
 import useSWR from "swr";
 import { useDownloadStore } from "@/store/download";

@@ -3,7 +3,7 @@ import {
   MEDIAGO_EVENT,
   MEDIAGO_METHOD,
   type Controller,
-} from "@mediago/shared-common";
+} from "@mediago/common";
 
 export interface ControllerHandlerRegistration {
   controller: Controller;

@@ -1,15 +1,15 @@
-import { matchesBilibiliPageLocation } from "./bilibili-match";
+import { matchesBilibiliPageLocation } from "./bilibili/match";
+import { matchesShortVideoPageLocation } from "./short-video/match";
 import type { PageAdapterLocation } from "./types";
-import { matchesTwitterPageLocation } from "./twitter-match";
-import { matchesYoutubePageLocation } from "./youtube-match";
-import { matchesShortVideoPageLocation } from "./short-video-match";
-import { matchesXiaohongshuPageLocation } from "./xiaohongshu-match";
+import { matchesTwitterPageLocation } from "./twitter/match";
+import { matchesXiaohongshuPageLocation } from "./xiaohongshu/match";
+import { matchesYoutubePageLocation } from "./youtube/match";
 
-export { matchesBilibiliPageLocation } from "./bilibili-match";
-export { matchesTwitterPageLocation } from "./twitter-match";
-export { matchesShortVideoPageLocation } from "./short-video-match";
-export { matchesYoutubePageLocation } from "./youtube-match";
-export { matchesXiaohongshuPageLocation } from "./xiaohongshu-match";
+export { matchesBilibiliPageLocation } from "./bilibili/match";
+export { matchesShortVideoPageLocation } from "./short-video/match";
+export { matchesTwitterPageLocation } from "./twitter/match";
+export { matchesXiaohongshuPageLocation } from "./xiaohongshu/match";
+export { matchesYoutubePageLocation } from "./youtube/match";
 
 export function matchesPageAdapterLocation(
   location: PageAdapterLocation,

@@ -1,4 +1,4 @@
-import type { AppStore } from "@mediago/shared-common";
+import type { AppStore } from "@mediago/common";
 import { getConfig } from "../api/config";
 import { initGoEvents } from "../api/events";
 import { useAppStore } from "../store/app";

@@ -14,7 +14,7 @@ pnpm deps:download
 pnpm dev:electron
 ```
 
-1. Copy `packages/shared/common/src/i18n/resources/en.ts` to `<lang>.ts`,
+1. Copy `packages/common/src/i18n/resources/en.ts` to `<lang>.ts`,
    translate every value.
 2. Register the new locale in the shared resources, resolver, UI dropdown,
    and browser extension (see below).
@@ -25,7 +25,7 @@ pnpm dev:electron
 ## Where strings live
 
 - **Main app UI** (desktop + self-hosted web):
-  `packages/shared/common/src/i18n/resources/{en,it,zh}.ts`
+  `packages/common/src/i18n/resources/{en,it,zh}.ts`
 - **Browser extension** (separate, smaller catalog):
   `packages/mediago-extension/src/i18n/resources/{en,it,zh}.ts`
 
@@ -43,7 +43,7 @@ Copy `en.ts` to `fr.ts` in the same directory and translate every **value**.
 Leave all keys untouched:
 
 ```ts
-// packages/shared/common/src/i18n/resources/fr.ts
+// packages/common/src/i18n/resources/fr.ts
 export const fr = {
   // ...translated values...
   followSystem: "Système",
@@ -63,7 +63,7 @@ dropdown can render it in each language.
 
 Core app registration:
 
-**`packages/shared/common/src/i18n/resources/index.ts`** — import the new
+**`packages/common/src/i18n/resources/index.ts`** — import the new
 locale and add it to both exports:
 
 ```ts
@@ -74,7 +74,7 @@ export const SUPPORTED_LANGUAGES = ["en", "it", "zh", "fr"] as const;
 export { en, it, zh, fr };
 ```
 
-**`packages/shared/common/src/i18n/config.ts`** — widen the
+**`packages/common/src/i18n/config.ts`** — widen the
 `resolveAppLanguage` return type and the check inside:
 
 ```ts
@@ -99,7 +99,7 @@ export function resolveAppLanguage(
 If the new locale should follow the OS/browser locale automatically, add the
 matching `systemLocale` prefix check in the same function.
 
-**`packages/shared/common/src/types/index.ts`** — extend the `AppLanguage`
+**`packages/common/src/types/index.ts`** — extend the `AppLanguage`
 enum:
 
 ```ts

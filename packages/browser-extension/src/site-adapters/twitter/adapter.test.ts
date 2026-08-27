@@ -1,9 +1,9 @@
 // @vitest-environment happy-dom
 
-import { DownloadType } from "@mediago/shared-common";
+import { DownloadType } from "@mediago/common";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { findPageAdapter } from "./registry";
-import { TWITTER_PROCESSED_ATTRIBUTE, twitterPageAdapter } from "./twitter";
+import { findPageAdapter } from "../registry";
+import { TWITTER_PROCESSED_ATTRIBUTE, twitterPageAdapter } from "./adapter";
 
 const cleanups: Array<() => void> = [];
 

@@ -1,7 +1,39 @@
-import { DownloadTask } from "@mediago/shared-common";
+import type { DownloadTask } from "@mediago/common";
 import axios from "axios";
 import { useShallow } from "zustand/react/shallow";
 import { appStoreSelector, useAppStore } from "@/store/app";
+
+interface AddVideosToDockerOptions {
+  dockerUrl: string;
+  apiKey: string;
+  items: Omit<DownloadTask, "id">[];
+  immediate?: boolean;
+}
+
+export function postVideosToDocker({
+  dockerUrl,
+  apiKey,
+  items,
+  immediate = false,
+}: AddVideosToDockerOptions) {
+  const baseUrl = dockerUrl.trim().replace(/\/+$/, "");
+  const config = apiKey
+    ? {
+        headers: {
+          "X-API-Key": apiKey,
+        },
+      }
+    : undefined;
+
+  return axios.post(
+    `${baseUrl}/api/downloads`,
+    {
+      tasks: items,
+      startDownload: immediate,
+    },
+    config,
+  );
+}
 
 export function useDockerApi() {
   const { dockerUrl, apiKey } = useAppStore(useShallow(appStoreSelector));
@@ -13,10 +45,11 @@ export function useDockerApi() {
     items: Omit<DownloadTask, "id">[];
     immediate?: boolean;
   }) => {
-    return axios.post(`${dockerUrl}/api/add-download-items`, {
-      videos: items,
-      startDownload: immediate,
-      auth: apiKey,
+    return postVideosToDocker({
+      dockerUrl,
+      apiKey,
+      items,
+      immediate,
     });
   };
 

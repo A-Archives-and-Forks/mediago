@@ -1,5 +1,5 @@
 import { provide } from "@inversifyjs/binding-decorators";
-import type { AppStore } from "@mediago/shared-common";
+import type { AppStore } from "@mediago/common";
 import { injectable } from "inversify";
 
 type Listener = (newVal: unknown, oldVal: unknown) => void;

@@ -28,7 +28,7 @@ COPY packages/core-sdk/package.json packages/core-sdk/package.json
 COPY packages/electron-preload/package.json packages/electron-preload/package.json
 COPY packages/mediago-extension/package.json packages/mediago-extension/package.json
 COPY packages/node-service/package.json packages/node-service/package.json
-COPY packages/shared/common/package.json packages/shared/common/package.json
+COPY packages/common/package.json packages/common/package.json
 COPY packages/tooling/package.json packages/tooling/package.json
 RUN pnpm install --frozen-lockfile
 

@@ -1,7 +1,4 @@
-import {
-  DownloadStatus,
-  type DownloadTaskWithFile,
-} from "@mediago/shared-common";
+import { DownloadStatus, type DownloadTaskWithFile } from "@mediago/common";
 import {
   CirclePlay,
   Download,

@@ -1,5 +1,5 @@
 import { provide } from "@inversifyjs/binding-decorators";
-import { type Controller, IPC } from "@mediago/shared-common";
+import { type Controller, IPC } from "@mediago/common";
 import { handle } from "../core/decorators";
 import { TYPES } from "../types/symbols";
 import { type IpcMainEvent, shell } from "electron";

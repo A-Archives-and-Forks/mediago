@@ -1,4 +1,4 @@
-import type { BrowserTabsSnapshot, PlatformApi } from "@mediago/shared-common";
+import type { BrowserTabsSnapshot, PlatformApi } from "@mediago/common";
 import { electronTest as test, expect } from "../support/electron-app.ts";
 import { unwrapElectronIpcResult } from "../support/electron-ipc.ts";
 

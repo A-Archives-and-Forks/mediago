@@ -1,13 +1,13 @@
 // @vitest-environment happy-dom
 
-import { DownloadType } from "@mediago/shared-common";
+import { DownloadType } from "@mediago/common";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { startPageRuntime } from "../runtime";
-import { findPageAdapter } from "./registry";
+import { startPageRuntime } from "../../runtime";
+import { findPageAdapter } from "../registry";
 import {
   XIAOHONGSHU_PROCESSED_ATTRIBUTE,
   xiaohongshuPageAdapter,
-} from "./xiaohongshu";
+} from "./adapter";
 
 const NOTE_ID = "66f00abc1234567890abcdef";
 const NEXT_NOTE_ID = "77f00abc1234567890abcdef";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DownloadType } from "@mediago/shared-common";
+import { DownloadType } from "@mediago/common";
 import { generateUrl, urlDownloadType } from "./index";
 
 describe("generateUrl", () => {

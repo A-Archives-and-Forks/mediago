@@ -18,7 +18,7 @@ import {
   type HLSMediaInfo,
   IpcEvent,
   mergeSniffedSource,
-} from "@mediago/shared-common";
+} from "@mediago/common";
 import {
   app,
   type BrowserWindowConstructorOptions,

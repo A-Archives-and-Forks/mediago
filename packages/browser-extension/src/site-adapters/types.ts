@@ -1,4 +1,4 @@
-import type { DownloadType } from "@mediago/shared-common";
+import type { DownloadType } from "@mediago/common";
 
 export interface PageCandidate {
   name: string;

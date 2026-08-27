@@ -1,6 +1,6 @@
 import type { PageCandidate } from "@mediago/browser-extension/site-adapters";
 import { matchesPageAdapterLocation } from "@mediago/browser-extension/site-adapter-matches";
-import { matchPageUrl } from "@mediago/shared-common";
+import { matchPageUrl } from "@mediago/common";
 
 import type { PageActionErrorCode, PageActionResult } from "../shared/types";
 import type {

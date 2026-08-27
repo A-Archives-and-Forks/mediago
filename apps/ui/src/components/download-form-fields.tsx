@@ -1,4 +1,4 @@
-import { DownloadType } from "@mediago/shared-common";
+import { DownloadType } from "@mediago/common";
 import { ChevronDown } from "lucide-react";
 import type { ReactNode } from "react";
 import { Controller, type UseFormReturn, useWatch } from "react-hook-form";

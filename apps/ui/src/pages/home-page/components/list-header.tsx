@@ -1,4 +1,4 @@
-import { DownloadFilter } from "@mediago/shared-common";
+import { DownloadFilter } from "@mediago/common";
 import { useMemoizedFn } from "ahooks";
 import { Trans, useTranslation } from "react-i18next";
 import { toast } from "sonner";

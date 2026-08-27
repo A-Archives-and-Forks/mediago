@@ -1,4 +1,4 @@
-import type { DownloadFailedEvent } from "@mediago/shared-common";
+import type { DownloadFailedEvent } from "@mediago/common";
 import { describe, expect, test, vi } from "vitest";
 import { handleDownloadFailure } from "./download-failure-handler";
 

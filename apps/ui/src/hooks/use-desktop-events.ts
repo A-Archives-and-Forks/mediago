@@ -1,4 +1,4 @@
-import type { UpdateState } from "@mediago/shared-common";
+import type { UpdateState } from "@mediago/common";
 import { useEffect } from "react";
 import { useBrowserStore } from "../store/browser";
 import { useSessionStore } from "../store/session";

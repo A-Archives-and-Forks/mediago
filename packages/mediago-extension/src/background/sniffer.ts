@@ -3,7 +3,7 @@ import {
   matchPageUrl,
   matchRequestUrl,
   shouldSuppressRequestSource,
-} from "@mediago/shared-common";
+} from "@mediago/common";
 import type {
   DetectedSource,
   PageContextChangedMessage,

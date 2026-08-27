@@ -1,4 +1,4 @@
-import { IPC } from "@mediago/shared-common";
+import { IPC } from "@mediago/common";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const electronMocks = vi.hoisted(() => ({

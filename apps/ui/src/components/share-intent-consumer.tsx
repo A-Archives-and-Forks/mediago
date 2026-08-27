@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { IpcEvent } from "@mediago/shared-common";
+import { IpcEvent } from "@mediago/common";
 import { usePlatform } from "@/hooks/use-platform";
 import {
   consumeStartupShareError,

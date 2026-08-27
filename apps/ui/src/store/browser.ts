@@ -5,7 +5,7 @@ import {
   DownloadType,
   type HLSMediaInfo,
   mergeSniffedSource,
-} from "@mediago/shared-common";
+} from "@mediago/common";
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { subscribeWithSelector } from "zustand/middleware";

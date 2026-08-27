@@ -47,7 +47,7 @@ import { shouldApplyPersistedValue } from "@/services/config-write-coordinator";
 import { settingConfigWriter } from "@/services/setting-config-writer";
 import { useAppStore } from "@/store/app";
 import { cn } from "@/utils";
-import type { AppStore } from "@mediago/shared-common";
+import type { AppStore } from "@mediago/common";
 
 type Scalar = string | number | boolean;
 

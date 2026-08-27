@@ -89,9 +89,9 @@ importers:
       '@mediago/service-runner':
         specifier: workspace:*
         version: link:../../packages/node-service
-      '@mediago/shared-common':
+      '@mediago/common':
         specifier: workspace:*
-        version: link:../../packages/shared/common
+        version: link:../../packages/common
       axios:
         specifier: ^1.19.0
         version: 1.19.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
@@ -259,9 +259,9 @@ importers:
       '@mediago/core-sdk':
         specifier: workspace:*
         version: link:../../packages/core-sdk
-      '@mediago/shared-common':
+      '@mediago/common':
         specifier: workspace:*
-        version: link:../../packages/shared/common
+        version: link:../../packages/common
       '@radix-ui/react-avatar':
         specifier: ^1.2.6
         version: 1.2.6(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -462,9 +462,9 @@ importers:
 
   packages/browser-extension:
     dependencies:
-      '@mediago/shared-common':
+      '@mediago/common':
         specifier: workspace:*
-        version: link:../shared/common
+        version: link:../common
     devDependencies:
       '@types/node':
         specifier: ^26.3.0
@@ -509,9 +509,9 @@ importers:
 
   packages/electron-preload:
     dependencies:
-      '@mediago/shared-common':
+      '@mediago/common':
         specifier: workspace:*
-        version: link:../shared/common
+        version: link:../common
     devDependencies:
       '@types/node':
         specifier: ^26.3.0
@@ -543,9 +543,9 @@ importers:
       '@mediago/browser-extension':
         specifier: workspace:*
         version: link:../browser-extension
-      '@mediago/shared-common':
+      '@mediago/common':
         specifier: workspace:*
-        version: link:../shared/common
+        version: link:../common
       '@radix-ui/react-label':
         specifier: ^2.1.15
         version: 2.1.15(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -642,7 +642,7 @@ importers:
         specifier: ^4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.3.0)(@vitest/coverage-v8@4.1.11)(happy-dom@20.11.6)(vite@8.2.2(@types/node@26.3.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))
 
-  packages/shared/common:
+  packages/common:
     devDependencies:
       '@types/node':
         specifier: ^26.3.0

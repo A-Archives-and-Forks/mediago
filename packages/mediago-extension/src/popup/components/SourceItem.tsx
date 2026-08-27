@@ -1,4 +1,4 @@
-import { DownloadType } from "@mediago/shared-common";
+import { DownloadType } from "@mediago/common";
 import { ArrowUpRight, LoaderCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 

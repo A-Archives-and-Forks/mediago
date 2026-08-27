@@ -4,7 +4,7 @@ import {
   type CLIInstallStatus,
   type Controller,
   IPC,
-} from "@mediago/shared-common";
+} from "@mediago/common";
 import { inject, injectable } from "inversify";
 import { handle } from "../core/decorators";
 import { CLIInstaller } from "../services/cli-installer";

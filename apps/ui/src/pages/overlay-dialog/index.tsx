@@ -1,8 +1,4 @@
-import {
-  type DownloadTask,
-  DownloadType,
-  IpcEvent,
-} from "@mediago/shared-common";
+import { type DownloadTask, DownloadType, IpcEvent } from "@mediago/common";
 import { useEffect, useId, useState } from "react";
 import DownloadForm, {
   type DownloadFormItem,

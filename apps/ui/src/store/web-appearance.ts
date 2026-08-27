@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { AppTheme } from "@mediago/shared-common";
+import { AppTheme } from "@mediago/common";
 
 const WEB_APPEARANCE_STORAGE_KEY = "web-appearance-storage";
 const APP_THEMES = new Set<AppTheme>(Object.values(AppTheme));

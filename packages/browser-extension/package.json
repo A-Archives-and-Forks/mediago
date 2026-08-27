@@ -10,7 +10,7 @@
     "type:check": "tsc --noEmit"
   },
   "dependencies": {
-    "@mediago/shared-common": "workspace:*"
+    "@mediago/common": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^26.3.0",

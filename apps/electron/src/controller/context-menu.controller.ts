@@ -1,9 +1,5 @@
 import { provide } from "@inversifyjs/binding-decorators";
-import {
-  type ContextMenuItem,
-  type Controller,
-  IPC,
-} from "@mediago/shared-common";
+import { type ContextMenuItem, type Controller, IPC } from "@mediago/common";
 import { handle } from "../core/decorators";
 import { TYPES } from "../types/symbols";
 import {

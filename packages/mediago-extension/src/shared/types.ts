@@ -1,5 +1,5 @@
 import type { PageCandidate } from "@mediago/browser-extension/site-adapters";
-import type { DownloadType, HLSMediaInfo } from "@mediago/shared-common";
+import type { DownloadType, HLSMediaInfo } from "@mediago/common";
 
 /**
  * UI language choice persisted in extension settings.

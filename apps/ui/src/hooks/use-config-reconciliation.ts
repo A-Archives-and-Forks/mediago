@@ -1,4 +1,4 @@
-import type { AppStore } from "@mediago/shared-common";
+import type { AppStore } from "@mediago/common";
 import { useMemoizedFn } from "ahooks";
 import { useEffect, useRef } from "react";
 import { getConfig } from "../api/config";

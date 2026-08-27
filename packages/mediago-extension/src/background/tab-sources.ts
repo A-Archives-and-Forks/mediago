@@ -1,4 +1,4 @@
-import { mergeSniffedSource } from "@mediago/shared-common";
+import { mergeSniffedSource } from "@mediago/common";
 
 import type { DetectedSource } from "../shared/types";
 import { clearTabSources, loadTabSources, saveTabSources } from "./storage";

@@ -1,4 +1,4 @@
-import { DownloadType, type DownloadTask } from "@mediago/shared-common";
+import { DownloadType, type DownloadTask } from "@mediago/common";
 import { create } from "zustand";
 
 export interface DownloadFormItem {

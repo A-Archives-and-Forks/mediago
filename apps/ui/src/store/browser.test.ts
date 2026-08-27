@@ -1,4 +1,4 @@
-import { type BrowserTabSnapshot, DownloadType } from "@mediago/shared-common";
+import { type BrowserTabSnapshot, DownloadType } from "@mediago/common";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   activeTabSelector,

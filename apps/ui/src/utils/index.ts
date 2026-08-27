@@ -5,7 +5,7 @@ import "dayjs/locale/it";
 import "dayjs/locale/zh-cn";
 import { twMerge } from "tailwind-merge";
 import { isUrl } from "./url";
-import { DownloadType, inferDownloadType } from "@mediago/shared-common";
+import { DownloadType, inferDownloadType } from "@mediago/common";
 
 export { isWeb } from "../environment";
 

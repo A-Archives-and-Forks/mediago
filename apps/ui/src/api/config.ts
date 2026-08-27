@@ -1,5 +1,5 @@
 import { http } from "@/utils";
-import type { AppStore, MCPServerStatus } from "@mediago/shared-common";
+import type { AppStore, MCPServerStatus } from "@mediago/common";
 
 export interface GoEnvPath {
   configDir: string;

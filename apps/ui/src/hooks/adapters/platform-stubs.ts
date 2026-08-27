@@ -1,4 +1,4 @@
-import type { PlatformApi } from "@mediago/shared-common";
+import type { PlatformApi } from "@mediago/common";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const noop = async (..._args: unknown[]): Promise<any> => {};

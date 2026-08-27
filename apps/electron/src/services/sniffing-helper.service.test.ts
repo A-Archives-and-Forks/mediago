@@ -30,9 +30,8 @@ vi.mock("electron", () => ({
   session: { fromPartition: electronMocks.fromPartition },
 }));
 
-vi.mock("@mediago/shared-common", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("@mediago/shared-common")>();
+vi.mock("@mediago/common", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@mediago/common")>();
   return {
     ...actual,
     matchPageUrl: vi.fn(() => undefined),
@@ -59,7 +58,7 @@ vi.mock("./downloader.server", () => ({
   DownloaderServer: class DownloaderServer {},
 }));
 
-const { DownloadType } = await import("@mediago/shared-common");
+const { DownloadType } = await import("@mediago/common");
 const { AgentCollectionError, getCookieBackedType, SniffingHelper } =
   await import("./sniffing-helper.service");
 

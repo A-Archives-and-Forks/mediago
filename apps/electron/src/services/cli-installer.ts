@@ -5,10 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { provide } from "@inversifyjs/binding-decorators";
-import type {
-  CLIInstallOptions,
-  CLIInstallStatus,
-} from "@mediago/shared-common";
+import type { CLIInstallOptions, CLIInstallStatus } from "@mediago/common";
 import { injectable } from "inversify";
 import { resolveCLIBinary } from "../utils/binaryResolver";
 

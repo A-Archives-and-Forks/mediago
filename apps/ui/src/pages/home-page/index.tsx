@@ -1,4 +1,4 @@
-import { DownloadFilter } from "@mediago/shared-common";
+import { DownloadFilter } from "@mediago/common";
 import { useMemoizedFn } from "ahooks";
 import { FolderOpen, QrCodeIcon } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";

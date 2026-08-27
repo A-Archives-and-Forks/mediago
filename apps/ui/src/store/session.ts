@@ -1,4 +1,4 @@
-import type { UpdateState } from "@mediago/shared-common";
+import type { UpdateState } from "@mediago/common";
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 

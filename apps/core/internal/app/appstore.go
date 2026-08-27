@@ -2,7 +2,7 @@ package app
 
 // AppStore holds all user-facing configuration options.
 // Field names and defaults match the TypeScript AppStore interface
-// in @mediago/shared-common.
+// in @mediago/common.
 type AppStore struct {
 	Local               string `json:"local"`
 	PromptTone          bool   `json:"promptTone"`

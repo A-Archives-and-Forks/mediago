@@ -1,6 +1,6 @@
-import { DownloadType } from "@mediago/shared-common";
-import { matchesTwitterPageLocation } from "./twitter-match";
-import type { PageAdapter, PageCandidate } from "./types";
+import { DownloadType } from "@mediago/common";
+import type { PageAdapter, PageCandidate } from "../types";
+import { matchesTwitterPageLocation } from "./match";
 
 export const TWITTER_SELECTORS = {
   card: 'article[data-testid="tweet"]',

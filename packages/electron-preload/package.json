@@ -27,7 +27,7 @@
     "typescript": "^7.0.2"
   },
   "dependencies": {
-    "@mediago/shared-common": "workspace:*"
+    "@mediago/common": "workspace:*"
   },
   "module": "./build/index.js"
 }

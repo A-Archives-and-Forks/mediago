@@ -1,5 +1,5 @@
 import { http } from "@/utils";
-import type { Favorite } from "@mediago/shared-common";
+import type { Favorite } from "@mediago/common";
 
 export const getFavoritesKey = "/api/favorites";
 export const getFavorites = (): Promise<Favorite[]> =>

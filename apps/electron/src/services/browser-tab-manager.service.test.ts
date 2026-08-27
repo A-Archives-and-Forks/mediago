@@ -1,4 +1,4 @@
-import { DownloadType, IpcEvent } from "@mediago/shared-common";
+import { DownloadType, IpcEvent } from "@mediago/common";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentCollectionError } from "./sniffing-helper.service";
 

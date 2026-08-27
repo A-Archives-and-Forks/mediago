@@ -30,7 +30,7 @@ import BrowserWindowService from "./windows/browser.window";
 import MainWindow from "./windows/main.window";
 import "./controller";
 import ElectronLogger from "./vendor/ElectronLogger";
-import { AppTheme, IpcEvent, resolveAppLanguage } from "@mediago/shared-common";
+import { AppTheme, IpcEvent, resolveAppLanguage } from "@mediago/common";
 import { installApplicationMenu as installNativeApplicationMenu } from "./core/application-menu";
 import ShareIntentService from "./services/share-intent.service";
 import { getPreferredSystemLanguage } from "./core/system-language";

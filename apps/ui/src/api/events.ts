@@ -1,5 +1,5 @@
 // DOWNLOAD_EVENT_NAME is used as the channel name for dispatching download events
-import type { DownloadEvent } from "@mediago/shared-common";
+import type { DownloadEvent } from "@mediago/common";
 import { http, isWeb } from "@/utils";
 import { useDownloadStore } from "@/store/download";
 import { useAppStore } from "@/store/app";

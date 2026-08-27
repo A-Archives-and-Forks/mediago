@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import { MEDIAGO_EVENT, MEDIAGO_METHOD } from "@mediago/shared-common";
+import { MEDIAGO_EVENT, MEDIAGO_METHOD } from "@mediago/common";
 
 export const handle = (route: string) => {
   return (target: any, propertyName: string): void => {

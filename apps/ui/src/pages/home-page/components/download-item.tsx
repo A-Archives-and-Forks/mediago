@@ -3,7 +3,7 @@ import {
   DownloadStatus,
   type DownloadTask,
   type DownloadTaskWithFile,
-} from "@mediago/shared-common";
+} from "@mediago/common";
 import { useMemoizedFn } from "ahooks";
 import {
   CircleArrowDown,

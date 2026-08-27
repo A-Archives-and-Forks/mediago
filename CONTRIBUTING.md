@@ -47,7 +47,7 @@ apps/
   ui/              Shared React 19 frontend (Electron + Web)
   player-ui/       React frontend embedded inside Go Core for playback
 packages/
-  shared/common/   Cross-platform types, constants, i18n resources
+  common/   Cross-platform types, constants, i18n resources
   core-sdk/        TypeScript SDK for the Go Core REST API
   electron-preload/
   mediago-extension/  Browser extension (Chrome / Edge)

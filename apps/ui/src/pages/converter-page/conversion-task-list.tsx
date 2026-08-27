@@ -1,4 +1,4 @@
-import type { Conversion, ConversionResponse } from "@mediago/shared-common";
+import type { Conversion, ConversionResponse } from "@mediago/common";
 import {
   CircleAlert,
   FolderOpen,

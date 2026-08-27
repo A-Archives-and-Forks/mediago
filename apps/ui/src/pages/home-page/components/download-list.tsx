@@ -1,4 +1,4 @@
-import { DownloadFilter, type DownloadTask } from "@mediago/shared-common";
+import { DownloadFilter, type DownloadTask } from "@mediago/common";
 import { useMemoizedFn } from "ahooks";
 import { Plus } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";

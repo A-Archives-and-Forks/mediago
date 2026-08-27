@@ -1,4 +1,4 @@
-import { DownloadType } from "@mediago/shared-common";
+import { DownloadType } from "@mediago/common";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import type {

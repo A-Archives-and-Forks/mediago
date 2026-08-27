@@ -23,7 +23,7 @@ import {
 } from "@/store/browser";
 import { usePlatform } from "@/hooks/use-platform";
 import { createDownloadTasks } from "@/api/download-task";
-import type { DownloadTask } from "@mediago/shared-common";
+import type { DownloadTask } from "@mediago/common";
 import { filterSources } from "./source-filter";
 import { sourceTypeLabel } from "./source-type-label";
 

@@ -17,7 +17,7 @@ import {
   type BrowserSourceDetectedPayload,
   type BrowserTabsSnapshot,
   IpcEvent,
-} from "@mediago/shared-common";
+} from "@mediago/common";
 import { type FC, useEffect } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { BrowserTabStrip } from "./components/browser-tab-strip";

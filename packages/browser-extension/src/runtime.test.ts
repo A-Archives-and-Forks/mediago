@@ -1,9 +1,9 @@
 // @vitest-environment happy-dom
 
-import { DownloadType } from "@mediago/shared-common";
+import { DownloadType } from "@mediago/common";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { startPageRuntime } from "../runtime";
-import { bilibiliPageAdapter } from "./bilibili";
+import { startPageRuntime } from "./runtime";
+import { bilibiliPageAdapter } from "./site-adapters/bilibili/adapter";
 
 const cleanups: Array<() => void> = [];
 

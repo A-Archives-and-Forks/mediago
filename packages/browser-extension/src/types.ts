@@ -1,4 +1,4 @@
-import type { PlatformApi } from "@mediago/shared-common";
+import type { PlatformApi } from "@mediago/common";
 
 declare global {
   interface Window {

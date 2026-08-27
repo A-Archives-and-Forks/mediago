@@ -11,7 +11,7 @@ import {
   type DialogSaveOptions,
   type ContextMenuItem,
   type CLIInstallOptions,
-} from "@mediago/shared-common";
+} from "@mediago/common";
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 
 const apiKey = "electron";

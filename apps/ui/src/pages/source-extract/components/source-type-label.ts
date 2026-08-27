@@ -1,4 +1,4 @@
-import { DownloadType } from "@mediago/shared-common";
+import { DownloadType } from "@mediago/common";
 
 export function sourceTypeLabel(source: {
   type: DownloadType;

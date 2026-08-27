@@ -31,3 +31,4 @@ docs/.vitepress/private/
 design-qa.md
 *.tsbuildinfo
 .superpowers
+.pnpm-store/

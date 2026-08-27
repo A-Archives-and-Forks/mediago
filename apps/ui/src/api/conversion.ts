@@ -3,7 +3,7 @@ import type {
   Conversion,
   ConversionPagination,
   ConversionResponse,
-} from "@mediago/shared-common";
+} from "@mediago/common";
 
 export const getConversionsKey = "/api/conversions";
 export const getConversions = (

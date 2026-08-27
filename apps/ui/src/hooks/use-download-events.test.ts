@@ -4,7 +4,7 @@ import {
   type DownloadEvent,
   type DownloadFailedEvent,
   type DownloadProgress,
-} from "@mediago/shared-common";
+} from "@mediago/common";
 import { describe, expect, test, vi } from "vitest";
 import {
   applyProgressToTaskCache,

@@ -4,7 +4,7 @@ import {
   platformEventListener,
   type IpcListener,
 } from "./adapters";
-import type { PlatformApi } from "@mediago/shared-common";
+import type { PlatformApi } from "@mediago/common";
 
 /**
  * Unwrap IPC response: { code, data, msg } → data

@@ -1,4 +1,4 @@
-import { isFreshShareIntent, type ShareIntent } from "@mediago/shared-common";
+import { isFreshShareIntent, type ShareIntent } from "@mediago/common";
 import { create } from "zustand";
 
 const MAX_PENDING_INTENTS = 20;

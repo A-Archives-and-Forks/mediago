@@ -1,4 +1,4 @@
-import { DownloadType } from "@mediago/shared-common";
+import { DownloadType } from "@mediago/common";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../services/browser-tab-manager.service", () => ({

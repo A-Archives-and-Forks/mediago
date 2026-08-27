@@ -1,6 +1,6 @@
-import { DownloadType, matchPageUrl } from "@mediago/shared-common";
-import type { PageAdapter, PageCandidate } from "./types";
-import { matchesYoutubePageLocation } from "./youtube-match";
+import { DownloadType, matchPageUrl } from "@mediago/common";
+import type { PageAdapter, PageCandidate } from "../types";
+import { matchesYoutubePageLocation } from "./match";
 
 export const YOUTUBE_SELECTORS = {
   card: [

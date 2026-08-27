@@ -1,9 +1,9 @@
-import { bilibiliPageAdapter } from "./bilibili";
+import { bilibiliPageAdapter } from "./bilibili/adapter";
 import type { PageAdapter, PageAdapterLocation } from "./types";
-import { shortVideoPageAdapter } from "./short-video";
-import { twitterPageAdapter } from "./twitter";
-import { youtubePageAdapter } from "./youtube";
-import { xiaohongshuPageAdapter } from "./xiaohongshu";
+import { shortVideoPageAdapter } from "./short-video/adapter";
+import { twitterPageAdapter } from "./twitter/adapter";
+import { xiaohongshuPageAdapter } from "./xiaohongshu/adapter";
+import { youtubePageAdapter } from "./youtube/adapter";
 
 export const PAGE_ADAPTERS: readonly PageAdapter[] = [
   bilibiliPageAdapter,

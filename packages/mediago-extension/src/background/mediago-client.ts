@@ -9,7 +9,7 @@ import type {
   HLSMediaInfo,
   HLSPlaylistType,
   HLSVariantInfo,
-} from "@mediago/shared-common";
+} from "@mediago/common";
 import { resolveLanguage } from "../i18n/language";
 import { validateDownloadImportResponse } from "./mediago-response";
 

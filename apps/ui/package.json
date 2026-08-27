@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@mediago/core-sdk": "workspace:*",
-    "@mediago/shared-common": "workspace:*",
+    "@mediago/common": "workspace:*",
     "@radix-ui/react-avatar": "^1.2.6",
     "@radix-ui/react-checkbox": "^1.3.11",
     "@radix-ui/react-dialog": "^1.1.23",

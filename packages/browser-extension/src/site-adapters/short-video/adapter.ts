@@ -1,6 +1,6 @@
-import { DownloadType } from "@mediago/shared-common";
-import { matchesShortVideoPageLocation } from "./short-video-match";
-import type { PageAdapter, PageCandidate } from "./types";
+import { DownloadType } from "@mediago/common";
+import type { PageAdapter, PageCandidate } from "../types";
+import { matchesShortVideoPageLocation } from "./match";
 
 export const SHORT_VIDEO_SELECTORS = {
   card: [

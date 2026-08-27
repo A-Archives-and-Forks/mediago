@@ -7,7 +7,7 @@ import {
   type CreateBrowserTabInput,
   type DownloadTask,
   IPC,
-} from "@mediago/shared-common";
+} from "@mediago/common";
 import { handle } from "../core/decorators";
 import OverlayDialogService from "../services/overlay-dialog.service";
 import { TYPES } from "../types/symbols";

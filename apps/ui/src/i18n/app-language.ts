@@ -1,7 +1,4 @@
-import {
-  resolveAppLanguage,
-  type ResolvedAppLanguage,
-} from "@mediago/shared-common";
+import { resolveAppLanguage, type ResolvedAppLanguage } from "@mediago/common";
 import { platformApi } from "../hooks/adapters";
 import i18n from ".";
 

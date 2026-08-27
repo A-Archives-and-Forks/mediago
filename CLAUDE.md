@@ -59,7 +59,7 @@ Commits use Conventional Commits format (e.g. `feat(electron): add queue UI`).
 
 **Packages:**
 
-- **`packages/shared/common/`** — Platform-agnostic shared types, constants, and utilities
+- **`packages/common/`** — Platform-agnostic shared types, constants, and utilities
 - **`packages/core-sdk/`** — TypeScript SDK for Go Core REST API (Axios, SSE via eventsource)
 - **`packages/electron-preload/`** — Electron preload scripts for IPC bridge
 - **`packages/browser-extension/`** — Browser extension (Lit web components)

@@ -2,7 +2,7 @@ import {
   BASE_I18N_OPTIONS,
   i18nResources,
   type ResolvedAppLanguage,
-} from "@mediago/shared-common";
+} from "@mediago/common";
 import { createInstance } from "i18next";
 import { describe, expect, it } from "vitest";
 import { buildMCPAgentConfig, buildMCPEndpoint } from "./mcp-config";

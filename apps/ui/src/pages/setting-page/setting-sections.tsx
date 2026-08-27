@@ -47,7 +47,7 @@ import {
   type AppStore,
   AppTheme,
   type CLIInstallStatus,
-} from "@mediago/shared-common";
+} from "@mediago/common";
 
 const version = import.meta.env.APP_VERSION;
 const EXTENSION_GUIDE_URL = "https://downloader.caorushizi.cn/extension.html";

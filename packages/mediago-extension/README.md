@@ -6,7 +6,7 @@ ones to your MediaGo server in one click — works with both the
 **Desktop** build (auto-detected) and the self-hosted **Docker**
 build (filled in manually).
 
-Detection rules live in `@mediago/shared-common` and are shared with
+Detection rules live in `@mediago/common` and are shared with
 the Electron sniffing helper, so the set of URLs detected in the
 browser matches what the desktop in-app browser would see.
 

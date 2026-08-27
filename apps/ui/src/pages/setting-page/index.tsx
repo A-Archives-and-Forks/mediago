@@ -1,5 +1,5 @@
 import { useMemoizedFn } from "ahooks";
-import type { UpdateErrorPhase } from "@mediago/shared-common";
+import type { UpdateErrorPhase } from "@mediago/common";
 import { Copy, FolderOpen } from "lucide-react";
 import { memo, startTransition, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";

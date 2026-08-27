@@ -1,4 +1,4 @@
-import { AppTheme } from "@mediago/shared-common";
+import { AppTheme } from "@mediago/common";
 import { expect, test } from "vitest";
 import { resolveAppTheme } from "./app-theme";
 

@@ -2,7 +2,7 @@ import type {
   BrowserTabSnapshot,
   BrowserTabsSnapshot,
   PlatformApi,
-} from "@mediago/shared-common";
+} from "@mediago/common";
 import { electronTest as test, expect } from "../support/electron-app.ts";
 import { unwrapElectronIpcResult } from "../support/electron-ipc.ts";
 

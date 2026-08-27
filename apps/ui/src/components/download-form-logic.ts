@@ -1,4 +1,4 @@
-import { DownloadType, type DownloadTask } from "@mediago/shared-common";
+import { DownloadType, type DownloadTask } from "@mediago/common";
 import type { DownloadFormItem } from "@/store/download-dialog";
 
 export const DOWNLOAD_URL_RE = /^(?:(?:file|https?):\/\/.+|magnet:\?.+)/i;

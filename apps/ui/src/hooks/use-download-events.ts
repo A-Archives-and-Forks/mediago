@@ -7,7 +7,7 @@ import {
   type DownloadStoppedEvent,
   type DownloadSuccessEvent,
   type DownloadTaskResponse,
-} from "@mediago/shared-common";
+} from "@mediago/common";
 import { useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";

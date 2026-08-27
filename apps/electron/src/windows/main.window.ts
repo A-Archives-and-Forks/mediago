@@ -7,7 +7,7 @@ import {
   type DownloadStoppedEvent,
   type DownloadSuccessEvent,
   type DownloadTask,
-} from "@mediago/shared-common";
+} from "@mediago/common";
 import { i18n } from "../core/i18n";
 import { DownloaderServer } from "../services/downloader.server";
 import { app, nativeTheme } from "electron";

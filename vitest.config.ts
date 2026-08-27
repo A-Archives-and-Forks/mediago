@@ -22,10 +22,10 @@ export default defineConfig({
         ),
       },
       {
-        find: "@mediago/shared-common",
+        find: "@mediago/common",
         replacement: path.resolve(
           repositoryRoot,
-          "packages/shared/common/src/index.ts",
+          "packages/common/src/index.ts",
         ),
       },
       {

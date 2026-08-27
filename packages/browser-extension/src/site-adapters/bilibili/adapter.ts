@@ -1,6 +1,6 @@
-import { DownloadType } from "@mediago/shared-common";
-import { matchesBilibiliPageLocation } from "./bilibili-match";
-import type { PageAdapter, PageCandidate } from "./types";
+import { DownloadType } from "@mediago/common";
+import type { PageAdapter, PageCandidate } from "../types";
+import { matchesBilibiliPageLocation } from "./match";
 
 export const BILIBILI_SELECTORS = {
   ad: ".bili-video-card__info--ad",

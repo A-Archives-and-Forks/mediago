@@ -10,7 +10,7 @@ const sharedConfig = {
   deps: {
     alwaysBundle: [/.*/],
     dts: {
-      neverBundle: ["@mediago/shared-common"],
+      neverBundle: ["@mediago/common"],
     },
     onlyBundle: false,
   },

@@ -1,5 +1,5 @@
 import { beforeEach, expect, test, vi } from "vitest";
-import { AppLanguage } from "@mediago/shared-common";
+import { AppLanguage } from "@mediago/common";
 
 const languageMocks = vi.hoisted(() => ({
   syncAppLanguage: vi.fn(async () => undefined),

@@ -14,7 +14,7 @@ import {
   DownloadProgress,
   DownloadStatus,
   type DownloadType,
-} from "@mediago/shared-common";
+} from "@mediago/common";
 import { inject, injectable } from "inversify";
 import {
   resolveCoreBinaries,

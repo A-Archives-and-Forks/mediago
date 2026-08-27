@@ -8,7 +8,7 @@
     "moduleResolution": "Bundler",
     "paths": {
       "@mediago/core-sdk": ["./packages/core-sdk/src/index.ts"],
-      "@mediago/shared-common": ["./packages/shared/common/src/index.ts"]
+      "@mediago/common": ["./packages/common/src/index.ts"]
     },
     "types": ["node", "@playwright/test"]
   },

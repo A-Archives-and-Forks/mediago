@@ -3,7 +3,7 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { AppTheme } from "@mediago/shared-common";
+import { AppTheme } from "@mediago/common";
 import { useAppStore } from "../store/app";
 import { useSessionStore } from "../store/session";
 import { useWebAppearanceStore } from "../store/web-appearance";
