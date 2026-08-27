@@ -1,16 +1,6 @@
 name: Deploy MediaGo Docs
 
 on:
-  push:
-    paths:
-      - "docs/**"
-      - ".github/workflows/build-docs.yml"
-      - "package.json"
-      - "pnpm-lock.yaml"
-      - "pnpm-workspace.yaml"
-      - "Taskfile.yml"
-    branches: ["master"]
-
   workflow_dispatch:
 
 permissions:

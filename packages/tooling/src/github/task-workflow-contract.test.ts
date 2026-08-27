@@ -489,6 +489,10 @@ describe("ci.yml Task workflow contract", () => {
 describe("build-docs.yml Task workflow contract", () => {
   const workflow = loadWorkflow("build-docs.yml");
 
+  it("runs only when manually dispatched", () => {
+    expect(workflow.definition.on).toEqual({ workflow_dispatch: null });
+  });
+
   it("routes the documentation build through its exact public Task entry", () => {
     expectTaskEntries(workflow, { build: "task ci:docs:build" });
   });
