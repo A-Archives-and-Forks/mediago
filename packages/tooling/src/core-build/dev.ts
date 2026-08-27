@@ -8,11 +8,13 @@ import {
 import { replaceEmbeddedAssets } from "./embedded-assets";
 import { getExeExt, mkdir, runCommand } from "./utils";
 
-const appVersion = (
-  JSON.parse(
-    readFileSync(join("..", "electron", "app", "package.json"), "utf8"),
-  ) as { version: string }
-).version;
+function readAppVersion(): string {
+  return (
+    JSON.parse(
+      readFileSync(join("..", "electron", "app", "package.json"), "utf8"),
+    ) as { version: string }
+  ).version;
+}
 
 /**
  * Start the development server
@@ -39,17 +41,38 @@ export async function dev() {
   await runCommand("go", args, { description: "Start development server" });
 }
 
-async function buildEmbeddedUI(options: {
+export interface EmbeddedUiBuildPlan {
   label: string;
-  projectDirectory: string;
+  command: string[];
+  commandDirectory: string;
   buildDirectory: string;
   targetDirectory: string;
-  env?: Record<string, string>;
-}) {
+}
+
+export function createEmbeddedUiBuildPlans(): EmbeddedUiBuildPlan[] {
+  return [
+    {
+      label: "main Web UI",
+      command: ["build:web:raw"],
+      commandDirectory: config.WORKSPACE_DIR,
+      buildDirectory: config.MAIN_UI_BUILD_DIR,
+      targetDirectory: config.MAIN_UI_ASSETS_DIR,
+    },
+    {
+      label: "Player UI",
+      command: ["build"],
+      commandDirectory: config.PLAYER_UI_DIR,
+      buildDirectory: config.PLAYER_UI_BUILD_DIR,
+      targetDirectory: config.PLAYER_ASSETS_DIR,
+    },
+  ];
+}
+
+async function buildEmbeddedUI(options: EmbeddedUiBuildPlan) {
   console.log(`🎨 Building ${options.label}...`);
-  await runCommand("pnpm", ["build"], {
-    cwd: options.projectDirectory,
-    env: { NODE_ENV: "production", ...options.env },
+  await runCommand("pnpm", options.command, {
+    cwd: options.commandDirectory,
+    env: { NODE_ENV: "production" },
   });
 
   if (!existsSync(options.buildDirectory)) {
@@ -64,21 +87,7 @@ async function buildEmbeddedUI(options: {
 
 /** Build both browser surfaces and copy them into Core for go:embed. */
 export async function buildEmbeddedUIs() {
-  await Promise.all([
-    buildEmbeddedUI({
-      label: "main Web UI",
-      projectDirectory: config.MAIN_UI_DIR,
-      buildDirectory: config.MAIN_UI_BUILD_DIR,
-      targetDirectory: config.MAIN_UI_ASSETS_DIR,
-      env: { APP_TARGET: "server" },
-    }),
-    buildEmbeddedUI({
-      label: "Player UI",
-      projectDirectory: config.PLAYER_UI_DIR,
-      buildDirectory: config.PLAYER_UI_BUILD_DIR,
-      targetDirectory: config.PLAYER_ASSETS_DIR,
-    }),
-  ]);
+  await Promise.all(createEmbeddedUiBuildPlans().map(buildEmbeddedUI));
 }
 
 async function buildCurrentPlatformBinary(
@@ -123,7 +132,7 @@ async function buildCurrentPlatform(mode: CurrentPlatformBuildMode) {
     buildCurrentPlatformBinary(
       config.CLI_APP_NAME,
       config.CLI_CMD_PATH,
-      `${config.GO_LDFLAGS} -X main.version=${appVersion}`,
+      `${config.GO_LDFLAGS} -X main.version=${readAppVersion()}`,
       mode,
     ),
   ]);

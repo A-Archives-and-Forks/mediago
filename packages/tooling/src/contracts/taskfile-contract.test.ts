@@ -308,14 +308,11 @@ const implementationGraph = {
     leaves: ["pnpm test:e2e:extension:raw"],
   },
   "internal:build:electron": {
-    deps: [
-      "internal:core:build:production",
-      "internal:build:electron:workspace",
-    ],
+    deps: ["internal:build:electron:workspace"],
     leaves: [],
   },
   "internal:build:electron:workspace": {
-    deps: ["internal:deps:node"],
+    deps: ["internal:deps:node", "internal:core:build:production"],
     leaves: ["pnpm build:electron:raw"],
   },
   "internal:build:extension": {
@@ -1335,6 +1332,15 @@ describe("Docker repository command contract", () => {
     expect(dockerfileSource).not.toMatch(
       /(?:COPY\s+Taskfile\.yml|go-task|RUN\s+task(?:\.exe)?\s)/i,
     );
+  });
+
+  it("copies remote promotion assets before building the web UI", () => {
+    const assetCopy = "COPY remote-config/assets/ remote-config/assets/";
+    const assetCopyIndex = dockerfileSource.indexOf(assetCopy);
+    const webBuildIndex = dockerfileSource.indexOf("RUN pnpm build:web:raw");
+
+    expect(assetCopyIndex).toBeGreaterThanOrEqual(0);
+    expect(webBuildIndex).toBeGreaterThan(assetCopyIndex);
   });
 
   it("preserves the build-platform dependency mapping", () => {

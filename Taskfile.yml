@@ -738,7 +738,6 @@ tasks:
   internal:build:electron:
     internal: true
     deps:
-      - task: internal:core:build:production
       - task: internal:build:electron:workspace
 
   internal:build:electron:workspace:
@@ -750,6 +749,7 @@ tasks:
     requires: *profile-requires
     deps:
       - task: internal:deps:node
+      - task: internal:core:build:production
     cmds:
       - pnpm build:electron:raw
 

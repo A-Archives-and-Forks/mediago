@@ -38,6 +38,7 @@ COPY apps/ui/ apps/ui/
 COPY apps/player-ui/ apps/player-ui/
 COPY apps/electron/app/package.json apps/electron/app/package.json
 COPY packages/ packages/
+COPY remote-config/assets/ remote-config/assets/
 
 # Build player-ui (will be embedded in Go core binary)
 RUN pnpm --filter @mediago/player-ui run build
