@@ -20,7 +20,21 @@ const (
 	inspectCacheTTL      = 5 * time.Minute
 	inspectCacheCapacity = 500
 	maxManifestBytes     = 2 * 1024 * 1024
+	maxProbeBytes        = 64 * 1024
 	maxInspectWorkers    = 4
+)
+
+const (
+	InspectionErrorInvalidURL = "invalid_url"
+	InspectionErrorNotHLS     = "not_hls"
+	InspectionErrorFetch      = "fetch_failed"
+	InspectionErrorTooLarge   = "response_too_large"
+)
+
+var (
+	errInspectionInvalidURL = errors.New("source URL must use HTTP or HTTPS")
+	errInspectionNotHLS     = errors.New("response is not an M3U8 playlist")
+	errInspectionTooLarge   = errors.New("playlist exceeds inspection size limit")
 )
 
 var ignoredInspectHeaders = map[string]struct{}{
@@ -62,7 +76,13 @@ type SourceInspection struct {
 	PlaylistType string       `json:"playlistType"`
 	MaxQuality   string       `json:"maxQuality,omitempty"`
 	Variants     []HLSVariant `json:"variants"`
+	ErrorCode    string       `json:"errorCode,omitempty"`
 	Error        string       `json:"error,omitempty"`
+}
+
+type fetchedManifest struct {
+	body     []byte
+	finalURL string
 }
 
 type inspectionCacheEntry struct {
@@ -131,12 +151,14 @@ func (i *M3U8Inspector) Inspect(ctx context.Context, input InspectSourceInput) S
 
 	manifest, err := i.fetch(ctx, input.URL, input.Headers)
 	if err != nil {
+		base.ErrorCode = inspectionErrorCode(err)
 		base.Error = err.Error()
 		return base
 	}
 
-	parsed, err := parseM3U8(input.URL, manifest)
+	parsed, err := parseM3U8(manifest.finalURL, manifest.body)
 	if err != nil {
+		base.ErrorCode = inspectionErrorCode(err)
 		base.Error = err.Error()
 		return base
 	}
@@ -146,17 +168,17 @@ func (i *M3U8Inspector) Inspect(ctx context.Context, input InspectSourceInput) S
 	return parsed
 }
 
-func (i *M3U8Inspector) fetch(ctx context.Context, rawURL string, headers []string) ([]byte, error) {
+func (i *M3U8Inspector) fetch(ctx context.Context, rawURL string, headers []string) (fetchedManifest, error) {
 	parsedURL, err := url.Parse(rawURL)
 	if err != nil || (parsedURL.Scheme != "http" && parsedURL.Scheme != "https") {
-		return nil, errors.New("source URL must use HTTP or HTTPS")
+		return fetchedManifest{}, errInspectionInvalidURL
 	}
 
 	requestContext, cancel := context.WithTimeout(ctx, inspectTimeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(requestContext, http.MethodGet, rawURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("create playlist request: %w", err)
+		return fetchedManifest{}, fmt.Errorf("create playlist request: %w", err)
 	}
 	applyInspectHeaders(req, headers)
 
@@ -169,7 +191,7 @@ func (i *M3U8Inspector) fetch(ctx context.Context, rawURL string, headers []stri
 			}
 			proxyURL, err := url.Parse(proxyValue)
 			if err != nil {
-				return nil, fmt.Errorf("parse configured proxy: %w", err)
+				return fetchedManifest{}, fmt.Errorf("parse configured proxy: %w", err)
 			}
 			transport.Proxy = http.ProxyURL(proxyURL)
 		}
@@ -190,21 +212,61 @@ func (i *M3U8Inspector) fetch(ctx context.Context, rawURL string, headers []stri
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("fetch playlist: %w", err)
+		return fetchedManifest{}, fmt.Errorf("fetch playlist: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return nil, fmt.Errorf("fetch playlist: HTTP %d", resp.StatusCode)
+		return fetchedManifest{}, fmt.Errorf("fetch playlist: HTTP %d", resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxManifestBytes+1))
+	body, err := readM3U8Manifest(resp.Body)
+	if err != nil {
+		return fetchedManifest{}, err
+	}
+	return fetchedManifest{body: body, finalURL: resp.Request.URL.String()}, nil
+}
+
+func readM3U8Manifest(reader io.Reader) ([]byte, error) {
+	prefix, err := io.ReadAll(io.LimitReader(reader, maxProbeBytes))
+	if err != nil {
+		return nil, fmt.Errorf("read playlist probe: %w", err)
+	}
+	if !hasM3U8Header(prefix) {
+		return nil, errInspectionNotHLS
+	}
+
+	remainingLimit := int64(maxManifestBytes-len(prefix)) + 1
+	remainder, err := io.ReadAll(io.LimitReader(reader, remainingLimit))
 	if err != nil {
 		return nil, fmt.Errorf("read playlist: %w", err)
 	}
-	if len(body) > maxManifestBytes {
-		return nil, errors.New("playlist exceeds inspection size limit")
+	if len(prefix)+len(remainder) > maxManifestBytes {
+		return nil, errInspectionTooLarge
 	}
-	return body, nil
+	return append(prefix, remainder...), nil
+}
+
+func hasM3U8Header(contents []byte) bool {
+	text := strings.TrimPrefix(string(contents), "\ufeff")
+	for _, line := range strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n") {
+		if line = strings.TrimSpace(line); line != "" {
+			return line == "#EXTM3U"
+		}
+	}
+	return false
+}
+
+func inspectionErrorCode(err error) string {
+	switch {
+	case errors.Is(err, errInspectionInvalidURL):
+		return InspectionErrorInvalidURL
+	case errors.Is(err, errInspectionNotHLS):
+		return InspectionErrorNotHLS
+	case errors.Is(err, errInspectionTooLarge):
+		return InspectionErrorTooLarge
+	default:
+		return InspectionErrorFetch
+	}
 }
 
 func applyInspectHeaders(req *http.Request, headers []string) {
@@ -236,7 +298,7 @@ func parseM3U8(rawURL string, manifest []byte) (SourceInspection, error) {
 		}
 	}
 	if firstContent != "#EXTM3U" {
-		return result, errors.New("response is not an M3U8 playlist")
+		return result, errInspectionNotHLS
 	}
 
 	baseURL, err := url.Parse(rawURL)

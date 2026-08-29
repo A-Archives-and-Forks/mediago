@@ -14,6 +14,17 @@ import { useShallow } from "zustand/react/shallow";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  formatSmartStreamVariant,
+  selectableSmartStreamVariants,
+} from "@/components/smart-stream-submit-logic";
 import { appStoreSelector, useAppStore } from "@/store/app";
 import {
   browserActionsSelector,
@@ -44,6 +55,36 @@ const SourceItem = memo(function SourceItem({
 }: SourceItemProps) {
   const { t } = useTranslation();
   const inspecting = item.mediaInfo?.status === "inspecting";
+  const variants = useMemo(
+    () =>
+      selectableSmartStreamVariants({
+        id: String(item.id),
+        url: item.url,
+        variants: item.mediaInfo?.variants,
+      }),
+    [item.id, item.mediaInfo?.variants, item.url],
+  );
+  const [selectedURL, setSelectedURL] = useState(item.url);
+
+  useEffect(() => {
+    setSelectedURL((current) =>
+      current === item.url ||
+      variants.some((variant) => variant.url === current)
+        ? current
+        : item.url,
+    );
+  }, [item.url, variants]);
+
+  const selectedItem = useMemo(
+    () => (selectedURL === item.url ? item : { ...item, url: selectedURL }),
+    [item, selectedURL],
+  );
+  const selectedVariant = variants.find(
+    (variant) => variant.url === selectedURL,
+  );
+  const selectedQuality =
+    selectedVariant?.quality?.trim() ||
+    (selectedVariant?.height ? `${selectedVariant.height}p` : undefined);
 
   return (
     <div className="flex flex-col gap-2 border-b px-1 py-3 last:border-b-0">
@@ -63,9 +104,15 @@ const SourceItem = memo(function SourceItem({
         ) : null}
         {item.mediaInfo?.status !== "inspecting" &&
         item.mediaInfo?.playlistType === "master" ? (
-          <Badge variant="secondary">{t("hlsAutoBest")}</Badge>
+          <Badge variant="secondary">
+            {selectedVariant
+              ? selectedQuality || t("hlsQualityUnknown")
+              : t("hlsAutoBest")}
+          </Badge>
         ) : null}
-        {item.mediaInfo?.status !== "inspecting" && item.mediaInfo ? (
+        {item.mediaInfo?.status !== "inspecting" &&
+        item.mediaInfo &&
+        !selectedVariant ? (
           <Badge
             variant="outline"
             title={
@@ -80,6 +127,37 @@ const SourceItem = memo(function SourceItem({
           </Badge>
         ) : null}
       </div>
+      {variants.length > 0 ? (
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="shrink-0 text-xs text-muted-foreground">
+            {t("streamQuality")}
+          </span>
+          <Select value={selectedURL} onValueChange={setSelectedURL}>
+            <SelectTrigger
+              size="sm"
+              className="min-w-0 flex-1"
+              aria-label={`${t("streamQuality")}: ${item.name}`}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent
+              position="popper"
+              className="max-w-[min(520px,calc(100vw-3rem))]"
+            >
+              <SelectItem value={item.url}>
+                {item.mediaInfo?.maxQuality
+                  ? `${t("hlsAutoBest")} · ${t("hlsHighestAvailable", { quality: item.mediaInfo.maxQuality })}`
+                  : t("hlsAutoBest")}
+              </SelectItem>
+              {variants.map((variant) => (
+                <SelectItem key={variant.url} value={variant.url}>
+                  {formatSmartStreamVariant(variant) || t("hlsQualityUnknown")}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      ) : null}
       <div className="flex flex-row items-center justify-between gap-3">
         <div className="flex flex-row items-center gap-2">
           <Button
@@ -100,7 +178,7 @@ const SourceItem = memo(function SourceItem({
             className="size-6 p-0"
             title={t("edit")}
             aria-label={t("edit")}
-            onClick={() => onEdit([item])}
+            onClick={() => onEdit([selectedItem])}
           >
             <Pencil className="size-4" />
           </Button>
@@ -112,7 +190,7 @@ const SourceItem = memo(function SourceItem({
               className="size-6 p-0"
               title={t("edit")}
               aria-label={t("edit")}
-              onClick={() => onEdit([item])}
+              onClick={() => onEdit([selectedItem])}
             >
               <Container className="size-4" />
             </Button>
@@ -122,7 +200,7 @@ const SourceItem = memo(function SourceItem({
           type="button"
           size="sm"
           disabled={inspecting}
-          onClick={() => onDownload(item)}
+          onClick={() => onDownload(selectedItem)}
         >
           {t("downloadNow")}
         </Button>

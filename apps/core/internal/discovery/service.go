@@ -291,9 +291,6 @@ func normalizeInput(input CreateDiscoveryInput) (CreateDiscoveryInput, *url.URL,
 	}
 
 	isHLS := strings.HasSuffix(strings.ToLower(parsedURL.Path), ".m3u8")
-	if input.Mode == ModeInspect && !isHLS {
-		return CreateDiscoveryInput{}, nil, "", ErrInvalidInspectURL
-	}
 	if input.Mode == ModeInspect || (input.Mode == ModeAuto && isHLS) {
 		return input, parsedURL, ExecutionInspect, nil
 	}

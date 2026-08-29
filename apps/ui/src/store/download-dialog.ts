@@ -1,15 +1,27 @@
-import { DownloadType, type DownloadTask } from "@mediago/common";
+import {
+  DownloadType,
+  type DownloadTask,
+  type TaskOrigin,
+} from "@mediago/common";
 import { create } from "zustand";
+
+/**
+ * Form-only selection. It is resolved to an existing Core DownloadType before
+ * any task is created, so neither the local nor Docker Core receives "smart".
+ */
+export const SMART_DOWNLOAD_TYPE = "smart" as const;
+export type DownloadFormType = DownloadType | typeof SMART_DOWNLOAD_TYPE;
 
 export interface DownloadFormItem {
   batch?: boolean;
   batchList?: string;
   name?: string;
-  type?: DownloadType;
+  type?: DownloadFormType;
   headers?: string;
   url?: string;
   id?: number;
   folder?: string;
+  origin?: TaskOrigin;
 }
 
 type DownloadDialogMode = "new" | "edit";
@@ -20,7 +32,7 @@ interface DownloadDialogState {
   requestId: number;
   values: DownloadFormItem;
   openNew: (values?: DownloadFormItem) => void;
-  openEdit: (task: DownloadTask) => void;
+  openEdit: (task: DownloadTask & { origin?: TaskOrigin }) => void;
   close: () => void;
 }
 
@@ -49,6 +61,7 @@ export const useDownloadDialogStore = create<DownloadDialogState>((set) => ({
         headers: task.headers,
         type: task.type,
         folder: task.folder,
+        origin: task.origin,
       },
     })),
   close: () => set({ open: false }),

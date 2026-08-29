@@ -288,10 +288,10 @@ export const en = {
   playList: "Playlist",
   pleaseEnterCorrectBatchList: "Enter a valid batch list",
   streamMedia: "Stream media (m3u8)",
+  smartDownload: "Smart download (auto-detect)",
   bilibiliMedia: "Bilibili",
   mediagoMedia: "MediaGo download",
-  youtubeMedia: "yt-dlp (YouTube / X / TikTok / Douyin)",
-  xiaohongshuMedia: "Xiaohongshu (yt-dlp)",
+  youtubeMedia: "yt-dlp (YouTube / X / TikTok / Douyin / Xiaohongshu)",
   checkUpdate: "Check for updates",
   viewReleases: "View Releases",
   allowBetaVersion: "Include beta versions",
@@ -500,4 +500,31 @@ If you cannot modify the settings directly, return the exact configuration snipp
   shareIntentInvalid: "No valid downloadable link was found",
   shareIntentLegacyAutomaticActionDisabled:
     "For safety, silent or immediate-download flags in this legacy link were ignored. Please review the form to continue.",
+  streamDiscoveryInProgress: "Discovering media",
+  probingStreamSource: "Checking the stream URL…",
+  discoveringStreamSources: "Discovering downloadable media on the page…",
+  selectDiscoveredSources: "Select media to download",
+  selectDiscoveredSourcesDescription:
+    "Review the discovered resources and confirm their names.",
+  streamQuality: "Quality",
+  discoveryPartialResults:
+    "Discovery timed out, so these results may be incomplete.",
+  downloadAlreadyExists: "Already in the download list",
+  creatingDownloadTasks: "Creating…",
+  confirmDownloadSources: "Confirm and create",
+  streamDiscoveryNoSources: "No downloadable media found",
+  streamDiscoveryOpenSourceExtractHint:
+    "Open this URL in Material Extraction, complete any sign-in or page interaction, then choose a resource.",
+  streamDiscoveryWebUnavailableHint:
+    "Web-page discovery is unavailable in this environment. Try a direct stream URL instead.",
+  openSourceExtract: "Open Material Extraction",
+  m3u8ValidationFailed: "No m3u8 stream detected",
+  m3u8ValidationFailedDescription:
+    "This URL does not contain a valid m3u8 playlist. Use Smart Download to continue discovering downloadable media on the page.",
+  useSmartDownload: "Use Smart Download",
+  dockerSource: "Docker",
+  dockerOffline: "Docker offline",
+  dockerLastSynced: "Last synced: {{time}}",
+  batchDeleteResult: "Deleted {{success}} tasks; {{failed}} failed",
+  batchDownloadResult: "Started {{success}} tasks; {{failed}} failed",
 };

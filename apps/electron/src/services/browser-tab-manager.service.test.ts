@@ -804,6 +804,10 @@ describe("BrowserTabManagerService", () => {
     );
 
     await vi.waitFor(() => expect(sniffingHelper.register).toHaveBeenCalled());
+    expect(sniffingHelper.collectAgent).toHaveBeenCalledWith(
+      "agent-job-hidden",
+      expect.objectContaining({ timeoutMs: 19_750 }),
+    );
     const registration = sniffingHelper.register.mock.calls[0][0];
     expect(registration.kind).toBe("agent");
     expect(registration.partition).toBe("agent-job-hidden");

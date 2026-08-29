@@ -13,6 +13,7 @@ import (
 	"caorushizi.cn/mediago/internal/db"
 	"caorushizi.cn/mediago/internal/db/repo"
 	"caorushizi.cn/mediago/internal/discovery"
+	dockerproxy "caorushizi.cn/mediago/internal/docker"
 	"caorushizi.cn/mediago/internal/i18n"
 	"caorushizi.cn/mediago/internal/service"
 	"caorushizi.cn/mediago/internal/tasklog"
@@ -37,6 +38,7 @@ type Server struct {
 	sourceHandler          *handler.SourceHandler
 	discoveryBridgeHandler *handler.DiscoveryBridgeHandler
 	discoveryHandler       *handler.DiscoveryHandler
+	dockerHandler          *handler.DockerHandler
 	discoveryService       *discovery.Service
 	discoveryBroker        *discovery.Broker
 
@@ -118,6 +120,7 @@ func New(queue *core.TaskQueue, logs *tasklog.Manager, database *db.Database, co
 		utilHandler:            handler.NewUtilHandler(opt.EnvPaths),
 		sourceHandler:          handler.NewSourceHandler(sourceInspector),
 		discoveryBridgeHandler: handler.NewDiscoveryBridgeHandler(opt.ElectronBridgeToken, discoveryBroker, discoveryService),
+		dockerHandler:          handler.NewDockerHandler(dockerproxy.NewClient(confStore), discoveryService),
 		discoveryService:       discoveryService,
 		discoveryBroker:        discoveryBroker,
 	}

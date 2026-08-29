@@ -1,80 +1,199 @@
-import { DownloadFilter, type DownloadTask } from "@mediago/common";
+import {
+  DownloadFilter,
+  DownloadStatus,
+  type DownloadTaskResponse,
+  type UnifiedDownloadTask,
+} from "@mediago/common";
 import { useCallback, useMemo } from "react";
 import useSWR from "swr";
-import { useDownloadStore } from "@/store/download";
+import { getDockerTasks } from "@/api/docker-download-task";
 import { getDownloadTasks as fetchDownloadTasks } from "@/api/download-task";
+import { useAppStore } from "@/store/app";
+import { useDockerDownloadStore } from "@/store/docker-downloads";
+import { useDownloadStore } from "@/store/download";
 import { useHomeStore } from "@/store/home";
 
-/**
- * Extended Download Task with real-time details
- */
-export interface DownloadTaskDetails extends DownloadTask {
+/** Extended unified task with real-time details. */
+export interface DownloadTaskDetails extends UnifiedDownloadTask {
   percent: string;
   speed: string;
   recordingStartedAt?: string;
-  exists?: boolean;
-  file?: string;
-  files?: string[];
+}
+
+function createdTimestamp(task: UnifiedDownloadTask): number {
+  if (!task.createdDate) return 0;
+  const value = new Date(task.createdDate).getTime();
+  return Number.isFinite(value) ? value : 0;
+}
+
+export function taskRefKey(task: Pick<UnifiedDownloadTask, "id" | "origin">) {
+  return `${task.origin}:${task.id}`;
+}
+
+export function mergeUnifiedTaskPage(
+  local: DownloadTaskResponse | undefined,
+  remote: DownloadTaskResponse | undefined,
+  page: number,
+  pageSize: number,
+  remoteOffline: boolean,
+  remoteLastSyncedAt?: string,
+): { list: UnifiedDownloadTask[]; total: number } {
+  const localTasks: UnifiedDownloadTask[] = (local?.list ?? []).map((task) =>
+    Object.assign({}, task, { origin: "local" as const }),
+  );
+  const remoteTasks: UnifiedDownloadTask[] = (remote?.list ?? []).map((task) =>
+    Object.assign({}, task, {
+      origin: "docker" as const,
+      remoteOffline,
+      remoteLastSyncedAt,
+    }),
+  );
+  const offset = Math.max(0, page - 1) * pageSize;
+  const combined = [...localTasks, ...remoteTasks];
+  /* oxlint-disable unicorn/no-array-sort -- This is a fresh merged array; ES2023 toSorted is outside the UI target. */
+  const list = combined
+    .sort(
+      (a, b) =>
+        createdTimestamp(b) - createdTimestamp(a) ||
+        taskRefKey(b).localeCompare(taskRefKey(a)),
+    )
+    .slice(offset, offset + pageSize);
+  /* oxlint-enable unicorn/no-array-sort */
+
+  return {
+    list,
+    total: (local?.total ?? 0) + (remote?.total ?? 0),
+  };
 }
 
 export function useTasks(filter: DownloadFilter = DownloadFilter.list) {
   const eventsMap = useDownloadStore((state) => state.eventsMap);
+  const enableDocker = useAppStore((state) => state.enableDocker);
   const page = useHomeStore((state) => state.pages[filter]);
   const pageSize = useHomeStore((state) => state.pageSize);
   const setStorePage = useHomeStore((state) => state.setPage);
   const setPageSize = useHomeStore((state) => state.setPageSize);
+  const snapshot = useDockerDownloadStore((state) => state.snapshots[filter]);
+  const replaceSnapshot = useDockerDownloadStore(
+    (state) => state.replaceSnapshot,
+  );
   const setPage = useCallback(
     (nextPage: number) => setStorePage(filter, nextPage),
     [filter, setStorePage],
   );
+  const fetchSize = Math.max(1, page) * pageSize;
 
-  const { data, error, isLoading, mutate } = useSWR(
+  const {
+    data: localData,
+    error: localError,
+    isLoading: localLoading,
+    mutate: mutateLocal,
+  } = useSWR(
     {
-      key: "api/tasks",
-      args: {
-        current: page,
-        pageSize,
-        filter,
-      },
+      key: "api/tasks/local",
+      args: { current: 1, pageSize: fetchSize, filter },
     },
-    ({ args }) => {
-      return fetchDownloadTasks(args);
-    },
+    ({ args }) => fetchDownloadTasks(args),
     { keepPreviousData: true },
   );
 
-  const detail: DownloadTaskDetails[] = useMemo(() => {
-    return (data?.list || []).map((item) => {
-      const eventItem = eventsMap.get(String(item.id));
+  const {
+    data: dockerData,
+    error: dockerError,
+    isLoading: dockerLoading,
+    mutate: mutateDocker,
+  } = useSWR(
+    enableDocker
+      ? {
+          key: "api/tasks/docker",
+          args: { current: 1, pageSize: fetchSize, filter },
+        }
+      : null,
+    ({ args }) => getDockerTasks(args),
+    {
+      keepPreviousData: true,
+      refreshWhenHidden: false,
+      refreshInterval: (latest) =>
+        latest?.list.some((task) => task.status === DownloadStatus.Downloading)
+          ? 1_000
+          : 12_000,
+      onSuccess: (response) =>
+        replaceSnapshot(filter, response.list, response.total),
+    },
+  );
 
-      if (!eventItem) {
+  const dockerOffline = enableDocker && Boolean(dockerError);
+  const remoteData: DownloadTaskResponse | undefined = dockerOffline
+    ? {
+        list: snapshot.list.map((task) => ({
+          ...task,
+          createdDate: task.createdDate
+            ? new Date(task.createdDate)
+            : undefined,
+        })),
+        total: snapshot.total,
+      }
+    : dockerData;
+
+  const merged = useMemo(
+    () =>
+      mergeUnifiedTaskPage(
+        localData,
+        enableDocker ? remoteData : undefined,
+        page,
+        pageSize,
+        dockerOffline,
+        dockerOffline ? snapshot.syncedAt : undefined,
+      ),
+    [
+      dockerOffline,
+      enableDocker,
+      localData,
+      page,
+      pageSize,
+      remoteData,
+      snapshot.syncedAt,
+    ],
+  );
+
+  const detail: DownloadTaskDetails[] = useMemo(
+    () =>
+      merged.list.map((item) => {
+        const eventItem =
+          item.origin === "local" ? eventsMap.get(String(item.id)) : undefined;
+
         return {
           ...item,
-          percent: "0",
-          speed: "0 B/s",
+          percent: eventItem?.percent || "0",
+          speed: eventItem?.speed || "0 B/s",
+          isLive: item.isLive === true || eventItem?.isLive,
+          recordingStartedAt: eventItem?.startedAt,
         };
-      }
+      }),
+    [eventsMap, merged.list],
+  );
 
-      return {
-        ...item,
-        percent: eventItem.percent || "0",
-        speed: eventItem.speed || "0 B/s",
-        isLive: item.isLive === true || eventItem.isLive,
-        recordingStartedAt: eventItem.startedAt,
-      };
-    });
-  }, [data, eventsMap]);
+  const mutate = useCallback(async () => {
+    const requests: Promise<unknown>[] = [mutateLocal()];
+    if (enableDocker) requests.push(mutateDocker());
+    await Promise.allSettled(requests);
+  }, [enableDocker, mutateDocker, mutateLocal]);
 
   return {
     data: detail,
-    total: data?.total ?? 0,
-    isLoading,
-    error,
+    total: merged.total,
+    isLoading:
+      localLoading ||
+      (enableDocker &&
+        dockerLoading &&
+        !dockerData &&
+        snapshot.list.length === 0),
+    error: localError,
+    dockerError,
+    dockerOffline,
+    dockerLastSyncedAt: dockerOffline ? snapshot.syncedAt : undefined,
     mutate,
-    pagination: {
-      page,
-      pageSize,
-    },
+    pagination: { page, pageSize },
     setPage,
     setPageSize,
   };

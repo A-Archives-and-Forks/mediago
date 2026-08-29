@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"caorushizi.cn/mediago/internal/service"
@@ -30,7 +31,7 @@ video-1080.m3u8
 	engine.POST("/api/sources/inspect", handler.Inspect)
 	body, err := json.Marshal(map[string]any{
 		"sources": []map[string]any{{
-			"id": "source-1", "url": playlistServer.URL + "/master.m3u8",
+			"id": "source-1", "url": playlistServer.URL + "/signed/play?id=1",
 		}},
 	})
 	if err != nil {
@@ -54,5 +55,20 @@ video-1080.m3u8
 	}
 	if len(response.Data.Sources) != 1 || response.Data.Sources[0].MaxQuality != "1080p" {
 		t.Fatalf("unexpected response: %+v", response)
+	}
+}
+
+func TestSourceHandlerRejectsOversizedInspectionBody(t *testing.T) {
+	handler := NewSourceHandler(service.NewM3U8Inspector(sourceHandlerTestConfig{}))
+	engine := gin.New()
+	engine.POST("/api/sources/inspect", handler.Inspect)
+	body := `{"sources":[{"id":"source-1","url":"https://example.com/play","headers":["X-Large: ` + strings.Repeat("x", maxInspectRequestBodyBytes) + `"]}]}`
+	request := httptest.NewRequest(http.MethodPost, "/api/sources/inspect", strings.NewReader(body))
+	request.Header.Set("Content-Type", "application/json")
+	recorder := httptest.NewRecorder()
+	engine.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, body = %s", recorder.Code, recorder.Body.String())
 	}
 }

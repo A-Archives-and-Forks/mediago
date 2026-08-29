@@ -6,6 +6,7 @@ import {
   expect,
   test as base,
   type BrowserContext,
+  type Page,
   type TestInfo,
 } from "@playwright/test";
 import { attachBoundedProcessLogs } from "../support/artifacts.ts";
@@ -257,6 +258,15 @@ const test = base.extend<{ webRuntime: WebRuntime }>({
   ],
 });
 
+async function completeFirstRun(page: Page, baseURL: string): Promise<void> {
+  await page.goto(baseURL);
+  await expect(page).toHaveURL(/\/signin$/);
+  await page.getByLabel("Create an admin password").fill(PASSWORD);
+  await page.getByLabel("Confirm password").fill(PASSWORD);
+  await page.getByRole("button", { name: "Set up" }).click();
+  await expect(page).toHaveURL(/\/$/);
+}
+
 test("downloads a direct MP4 after first-run authentication", async ({
   page,
   webRuntime,
@@ -283,7 +293,6 @@ test("downloads a direct MP4 after first-run authentication", async ({
   await page.getByLabel("Create an admin password").fill(PASSWORD);
   await page.getByLabel("Confirm password").fill(PASSWORD);
   await page.getByRole("button", { name: "Set up" }).click();
-
   await expect(page).toHaveURL(/\/$/);
   await page.getByRole("button", { name: "New download" }).first().click();
   await page.getByRole("button", { name: "Download now" }).click();
@@ -305,4 +314,30 @@ test("downloads a direct MP4 after first-run authentication", async ({
   });
 
   await verifyFixtureCopy(path.join(webRuntime.runtimeRoot, "downloads"));
+});
+
+test("offers Smart Download when a manual m3u8 URL is not HLS", async ({
+  page,
+  webRuntime,
+}) => {
+  await completeFirstRun(page, webRuntime.ui.baseURL);
+  await page.getByRole("button", { name: "New download" }).first().click();
+
+  const downloadType = page.getByRole("combobox", { name: "Download type" });
+  await expect(downloadType).toContainText("Smart download");
+  await downloadType.click();
+  await page.getByRole("option", { name: "Stream media (m3u8)" }).click();
+  await page.getByLabel("Video name").fill("m3u8-validation-fixture");
+  await page.getByLabel("Video link").fill(webRuntime.media.noResourcePageURL);
+  await page.getByRole("button", { name: "Add to list" }).click();
+
+  await expect(
+    page.getByRole("heading", { name: "No m3u8 stream detected" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Use Smart Download" }).click();
+  await expect(
+    page.getByRole("heading", { name: "No downloadable media found" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Close" }).click();
+  await expect(downloadType).toContainText("Smart download");
 });

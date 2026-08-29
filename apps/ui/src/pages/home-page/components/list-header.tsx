@@ -16,9 +16,9 @@ import { isWeb } from "@/utils";
 interface Props {
   onSelectAll: (checked: boolean) => void;
   checked: boolean | "indeterminate";
-  selected: number[];
-  onDeleteItems: (id: number[]) => void;
-  onDownloadItems: (id: number[]) => void;
+  selected: string[];
+  onDeleteItems: (ids: string[]) => void;
+  onDownloadItems: (ids: string[]) => void;
   onCancelItems: () => void;
   filter: DownloadFilter;
 }

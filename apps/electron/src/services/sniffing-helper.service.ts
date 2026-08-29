@@ -7,11 +7,17 @@ import type {
 import {
   DownloadType,
   type HLSMediaInfo,
+  isHLSContentType,
   matchPageUrl,
   matchRequestUrl,
   shouldSuppressRequestSource,
 } from "@mediago/common";
-import { type OnSendHeadersListenerDetails, session } from "electron";
+import {
+  type OnHeadersReceivedListenerDetails,
+  type OnSendHeadersListenerDetails,
+  session,
+  type Session,
+} from "electron";
 import { inject, injectable } from "inversify";
 import { formatHeaders } from "../utils";
 import ElectronLogger from "../vendor/ElectronLogger";
@@ -59,6 +65,14 @@ interface PendingInspection {
   generation: number;
   id: string;
   item: SourceParams;
+  requireContentVerification: boolean;
+}
+
+interface PendingRequest {
+  documentURL: string;
+  generation: number;
+  headers: string;
+  name: string;
 }
 
 interface AgentCollector {
@@ -84,6 +98,7 @@ interface SniffingContext {
   pageInfo: PageInfo;
   partition: string;
   pendingInspections: Map<string, PendingInspection>;
+  pendingRequests: Map<number, PendingRequest>;
   sourceSequence: number;
   tabId: string;
   useSessionCookies: boolean;
@@ -107,6 +122,7 @@ const PREPARE_DELAY_MS = 1_000;
 const INSPECT_DELAY_MS = 150;
 const NETWORK_QUIET_MS = 1_500;
 const MAX_AGENT_SOURCES = 200;
+const MAX_PENDING_REQUESTS = 500;
 
 @injectable()
 @provide()
@@ -114,6 +130,7 @@ export class SniffingHelper extends EventEmitter {
   private readonly contexts = new Map<string, SniffingContext>();
   private readonly contextsByWebContents = new Map<number, SniffingContext>();
   private readonly listenedPartitions = new Set<string>();
+  private readonly listenedSessions = new Map<string, Session>();
 
   constructor(
     @inject(ElectronLogger)
@@ -143,6 +160,7 @@ export class SniffingHelper extends EventEmitter {
       pageInfo: options.initialPageInfo ?? { title: "", url: "" },
       partition: options.partition,
       pendingInspections: new Map(),
+      pendingRequests: new Map(),
       sourceSequence: 0,
       tabId: options.tabId,
       useSessionCookies: options.useSessionCookies === true,
@@ -166,6 +184,7 @@ export class SniffingHelper extends EventEmitter {
     context.generation += 1;
     context.domReady = false;
     context.pendingInspections.clear();
+    context.pendingRequests.clear();
     context.agentSources.clear();
     this.contexts.delete(tabId);
     if (this.contextsByWebContents.get(context.webContentsId) === context) {
@@ -175,6 +194,12 @@ export class SniffingHelper extends EventEmitter {
 
   close(): void {
     for (const tabId of this.contexts.keys()) this.unregister(tabId);
+    for (const viewSession of this.listenedSessions.values()) {
+      viewSession.webRequest.onSendHeaders(null);
+      viewSession.webRequest.onHeadersReceived(null);
+    }
+    this.listenedSessions.clear();
+    this.listenedPartitions.clear();
     this.removeAllListeners();
   }
 
@@ -196,6 +221,7 @@ export class SniffingHelper extends EventEmitter {
 
     context.generation += 1;
     context.pendingInspections.clear();
+    context.pendingRequests.clear();
     context.agentSources.clear();
     context.pageHeaders.clear();
     context.dedup.clear();
@@ -232,6 +258,14 @@ export class SniffingHelper extends EventEmitter {
   }
 
   send(tabId: string, item: SourceParams): void {
+    this.sendCandidate(tabId, item, false);
+  }
+
+  private sendCandidate(
+    tabId: string,
+    item: SourceParams,
+    requireContentVerification: boolean,
+  ): void {
     const context = this.contexts.get(tabId);
     if (!context) return;
     const cacheKey = `${item.type}:${item.url}`;
@@ -244,7 +278,7 @@ export class SniffingHelper extends EventEmitter {
     }
 
     const id = `hls-${context.webContentsId}-${++context.inspectSequence}`;
-    if (context.kind === "user") {
+    if (context.kind === "user" && !requireContentVerification) {
       this.emitSource(context, {
         ...item,
         mediaInfo: {
@@ -258,6 +292,8 @@ export class SniffingHelper extends EventEmitter {
       generation: context.generation,
       id,
       item,
+      requireContentVerification:
+        requireContentVerification || context.kind === "agent",
     });
     this.clearQuietTimer(context);
     if (!context.inspectTimer) {
@@ -287,13 +323,17 @@ export class SniffingHelper extends EventEmitter {
     return new Promise((resolve, reject) => {
       const hardTimer = setTimeout(
         () => {
-          this.rejectCollector(
-            context,
-            new AgentCollectionError(
-              "discovery_timeout",
-              "browser discovery timed out",
-            ),
-          );
+          if (context.agentSources.size > 0) {
+            this.resolveCollector(context, true);
+          } else {
+            this.rejectCollector(
+              context,
+              new AgentCollectionError(
+                "discovery_timeout",
+                "browser discovery timed out",
+              ),
+            );
+          }
         },
         Math.max(1, options.timeoutMs),
       );
@@ -344,6 +384,8 @@ export class SniffingHelper extends EventEmitter {
     if (this.listenedPartitions.has(partition)) return;
     const viewSession = session.fromPartition(partition);
     viewSession.webRequest.onSendHeaders(this.onSendHeaders);
+    viewSession.webRequest.onHeadersReceived(this.onHeadersReceived);
+    this.listenedSessions.set(partition, viewSession);
     this.listenedPartitions.add(partition);
   }
 
@@ -356,6 +398,19 @@ export class SniffingHelper extends EventEmitter {
     const { url, requestHeaders } = details;
     const { title, url: documentURL } = context.pageInfo;
     const headers = formatHeaders(requestHeaders);
+
+    if (typeof details.id === "number") {
+      if (context.pendingRequests.size >= MAX_PENDING_REQUESTS) {
+        const oldest = context.pendingRequests.keys().next().value;
+        if (typeof oldest === "number") context.pendingRequests.delete(oldest);
+      }
+      context.pendingRequests.set(details.id, {
+        documentURL,
+        generation: context.generation,
+        headers,
+        name: title,
+      });
+    }
 
     const cookieBackedType = getCookieBackedType(url);
     if (cookieBackedType && hasHeader(requestHeaders, "cookie")) {
@@ -371,6 +426,37 @@ export class SniffingHelper extends EventEmitter {
         type: filter.type,
         headers,
       });
+    }
+  };
+
+  private readonly onHeadersReceived = (
+    details: OnHeadersReceivedListenerDetails,
+    callback: (response: Electron.HeadersReceivedResponse) => void,
+  ): void => {
+    try {
+      if (typeof details.webContentsId !== "number") return;
+      const context = this.contextsByWebContents.get(details.webContentsId);
+      if (!context) return;
+      const pending = context.pendingRequests.get(details.id);
+      context.pendingRequests.delete(details.id);
+      if (pending && pending.generation !== context.generation) return;
+      if (!responseHasHLSContentType(details.responseHeaders)) return;
+
+      const documentURL = pending?.documentURL ?? context.pageInfo.url;
+      if (shouldSuppressRequestSource(documentURL, DownloadType.m3u8)) return;
+      this.sendCandidate(
+        context.tabId,
+        {
+          url: details.url,
+          documentURL,
+          name: pending?.name ?? context.pageInfo.title,
+          type: DownloadType.m3u8,
+          headers: pending?.headers,
+        },
+        true,
+      );
+    } finally {
+      callback({});
     }
   };
 
@@ -442,9 +528,16 @@ export class SniffingHelper extends EventEmitter {
       if (!this.isCurrentContext(context, generation)) return;
       for (const pendingItem of pending) {
         if (pendingItem.generation !== generation) continue;
+        const inspection = inspections.get(pendingItem.id);
+        if (
+          pendingItem.requireContentVerification &&
+          inspection?.errorCode === "not_hls"
+        ) {
+          continue;
+        }
         this.emitSource(context, {
           ...pendingItem.item,
-          mediaInfo: inspectionToMediaInfo(inspections.get(pendingItem.id)),
+          mediaInfo: inspectionToMediaInfo(inspection),
         });
       }
     } catch {
@@ -477,7 +570,7 @@ export class SniffingHelper extends EventEmitter {
     }, NETWORK_QUIET_MS);
   }
 
-  private resolveCollector(context: SniffingContext): void {
+  private resolveCollector(context: SniffingContext, partial = false): void {
     const collector = context.collector;
     if (!collector || collector.settled) return;
     collector.settled = true;
@@ -487,7 +580,7 @@ export class SniffingHelper extends EventEmitter {
     context.collector = null;
     collector.resolve({
       sources: [...context.agentSources.values()],
-      partial: false,
+      partial,
     });
   }
 
@@ -533,6 +626,17 @@ export class SniffingHelper extends EventEmitter {
     if (timer) clearTimeout(timer);
     context[key] = null;
   }
+}
+
+function responseHasHLSContentType(
+  headers?: Record<string, string[]>,
+): boolean {
+  if (!headers) return false;
+  for (const [name, values] of Object.entries(headers)) {
+    if (name.toLowerCase() !== "content-type") continue;
+    return values.some(isHLSContentType);
+  }
+  return false;
 }
 
 export function hasHeader(

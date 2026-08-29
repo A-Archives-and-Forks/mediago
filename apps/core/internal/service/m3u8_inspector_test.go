@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 type inspectorTestConfig struct {
@@ -75,7 +76,7 @@ func TestM3U8InspectorParsesMasterPlaylistAndForwardsHeaders(t *testing.T) {
 
 func TestM3U8InspectorIdentifiesMediaPlaylist(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(`#EXTM3U
+		_, _ = w.Write([]byte("\ufeff\n  \n#EXTM3U\n" + `
 #EXT-X-TARGETDURATION:6
 #EXTINF:6.0,
 segment-1.ts
@@ -84,10 +85,83 @@ segment-1.ts
 	defer server.Close()
 
 	inspector := NewM3U8Inspector(inspectorTestConfig{values: map[string]any{}})
-	result := inspector.Inspect(context.Background(), InspectSourceInput{ID: "media", URL: server.URL + "/video.m3u8"})
+	result := inspector.Inspect(context.Background(), InspectSourceInput{ID: "media", URL: server.URL + "/signed/play?id=1"})
 	if result.Error != "" || result.PlaylistType != "media" || result.MaxQuality != "" {
 		t.Fatalf("unexpected inspection: %+v", result)
 	}
+}
+
+func TestM3U8InspectorUsesFinalRedirectURLForRelativeVariants(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/start", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/cdn/master/index", http.StatusFound)
+	})
+	mux.HandleFunc("/cdn/master/index", func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("#EXTM3U\n#EXT-X-STREAM-INF:RESOLUTION=1280x720\nvariants/720\n"))
+	})
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	inspector := NewM3U8Inspector(inspectorTestConfig{values: map[string]any{}})
+	result := inspector.Inspect(context.Background(), InspectSourceInput{ID: "redirect", URL: server.URL + "/start"})
+	if result.Error != "" || len(result.Variants) != 1 {
+		t.Fatalf("unexpected inspection: %+v", result)
+	}
+	if got, want := result.Variants[0].URL, server.URL+"/cdn/master/variants/720"; got != want {
+		t.Fatalf("variant URL = %q, want %q", got, want)
+	}
+}
+
+func TestM3U8InspectorClassifiesNonHLSAndBoundedFailures(t *testing.T) {
+	t.Run("not hls", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/vnd.apple.mpegurl")
+			_, _ = w.Write([]byte("<html>not a playlist</html>"))
+		}))
+		defer server.Close()
+
+		result := NewM3U8Inspector(inspectorTestConfig{values: map[string]any{}}).Inspect(
+			context.Background(),
+			InspectSourceInput{ID: "html", URL: server.URL + "/play"},
+		)
+		if result.ErrorCode != InspectionErrorNotHLS || result.Error == "" {
+			t.Fatalf("unexpected result: %+v", result)
+		}
+	})
+
+	t.Run("too large", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = w.Write([]byte("#EXTM3U\n"))
+			_, _ = w.Write([]byte(strings.Repeat("#", maxManifestBytes)))
+		}))
+		defer server.Close()
+
+		result := NewM3U8Inspector(inspectorTestConfig{values: map[string]any{}}).Inspect(
+			context.Background(),
+			InspectSourceInput{ID: "large", URL: server.URL + "/play"},
+		)
+		if result.ErrorCode != InspectionErrorTooLarge {
+			t.Fatalf("unexpected result: %+v", result)
+		}
+	})
+
+	t.Run("cancelled request", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			time.Sleep(100 * time.Millisecond)
+			_, _ = w.Write([]byte("#EXTM3U\n"))
+		}))
+		defer server.Close()
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+		defer cancel()
+		result := NewM3U8Inspector(inspectorTestConfig{values: map[string]any{}}).Inspect(
+			ctx,
+			InspectSourceInput{ID: "timeout", URL: server.URL + "/play"},
+		)
+		if result.ErrorCode != InspectionErrorFetch {
+			t.Fatalf("unexpected result: %+v", result)
+		}
+	})
 }
 
 func TestM3U8InspectorReturnsPerSourceErrors(t *testing.T) {

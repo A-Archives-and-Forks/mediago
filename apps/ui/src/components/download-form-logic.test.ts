@@ -6,8 +6,11 @@ import {
   createDownloadFormValues,
   DOWNLOAD_URL_RE,
   parseBatchDownloadRows,
+  resolveSmartSubmitMode,
   resolveEditTaskId,
+  resolveDownloadTaskType,
 } from "./download-form-logic";
+import { SMART_DOWNLOAD_TYPE } from "@/store/download-dialog";
 
 test("accepts supported download URL schemes", () => {
   expect(DOWNLOAD_URL_RE.test("https://example.com/video.m3u8")).toBe(true);
@@ -23,9 +26,48 @@ test("fills form defaults without replacing supplied values", () => {
     folder: "",
     headers: "",
     name: "episode",
-    type: DownloadType.m3u8,
+    type: SMART_DOWNLOAD_TYPE,
     url: "",
   });
+});
+
+test("resolves smart download to the best task type for non-discovery submissions", () => {
+  expect(
+    resolveDownloadTaskType(
+      SMART_DOWNLOAD_TYPE,
+      "https://www.bilibili.com/video/BV1example",
+    ),
+  ).toBe(DownloadType.bilibili);
+  expect(
+    resolveDownloadTaskType(
+      SMART_DOWNLOAD_TYPE,
+      "https://cdn.example.com/video.mp4",
+    ),
+  ).toBe(DownloadType.direct);
+});
+
+test("maps the legacy Xiaohongshu form value to the unified yt-dlp option", () => {
+  expect(
+    createDownloadFormValues({
+      type: DownloadType.xiaohongshu,
+      url: "https://www.xiaohongshu.com/explore/note-id",
+    }).type,
+  ).toBe(DownloadType.youtube);
+});
+
+test("resolves the unified yt-dlp option to the URL-specific internal type", () => {
+  expect(
+    resolveDownloadTaskType(
+      DownloadType.youtube,
+      "https://www.xiaohongshu.com/explore/note-id?xsec_token=token",
+    ),
+  ).toBe(DownloadType.xiaohongshu);
+  expect(
+    resolveDownloadTaskType(
+      DownloadType.youtube,
+      "https://www.youtube.com/watch?v=video-id",
+    ),
+  ).toBe(DownloadType.youtube);
 });
 
 test("ignores blank lines and accepts repeated whitespace", () => {
@@ -73,6 +115,32 @@ test("builds tasks without leaking preview-only fields", () => {
   ]);
 });
 
+test("infers each URL independently for a mixed yt-dlp batch", () => {
+  const rows = parseBatchDownloadRows(
+    "https://www.youtube.com/watch?v=one youtube\nhttps://www.xiaohongshu.com/explore/note-id?xsec_token=token xhs",
+  );
+
+  expect(
+    buildBatchDownloadTasks(rows, DownloadType.youtube).map(
+      (task) => task.type,
+    ),
+  ).toStrictEqual([DownloadType.youtube, DownloadType.xiaohongshu]);
+});
+
+test("infers each URL independently for a smart batch", () => {
+  const rows = parseBatchDownloadRows(
+    "https://www.bilibili.com/video/BV1example bili\nhttps://www.xiaohongshu.com/explore/note-id?xsec_token=token xhs\nhttps://cdn.example.com/video.mp4 direct",
+  );
+
+  expect(
+    buildBatchDownloadTasks(rows, SMART_DOWNLOAD_TYPE).map((task) => task.type),
+  ).toStrictEqual([
+    DownloadType.bilibili,
+    DownloadType.xiaohongshu,
+    DownloadType.direct,
+  ]);
+});
+
 test("builds one task from single-download form values", () => {
   expect(
     buildDownloadTasks({
@@ -96,4 +164,53 @@ test("treats NaN or missing ids as new tasks instead of edit targets", () => {
   expect(resolveEditTaskId(42)).toBe(42);
   expect(resolveEditTaskId(Number.NaN)).toBeUndefined();
   expect(resolveEditTaskId(undefined)).toBeUndefined();
+});
+
+test("selects the submit inspection mode for new single HTTP URLs", () => {
+  expect(
+    resolveSmartSubmitMode(
+      {
+        batch: false,
+        type: DownloadType.m3u8,
+        url: "https://example.com/watch",
+      },
+      false,
+    ),
+  ).toBe("hls-only");
+  expect(
+    resolveSmartSubmitMode(
+      {
+        batch: false,
+        type: SMART_DOWNLOAD_TYPE,
+        url: "https://example.com/watch",
+      },
+      false,
+    ),
+  ).toBe("smart");
+  expect(
+    resolveSmartSubmitMode(
+      {
+        batch: true,
+        type: SMART_DOWNLOAD_TYPE,
+        url: "https://example.com/watch",
+      },
+      false,
+    ),
+  ).toBeUndefined();
+  expect(
+    resolveSmartSubmitMode(
+      {
+        batch: false,
+        type: DownloadType.direct,
+        url: "https://example.com/video",
+      },
+      false,
+    ),
+  ).toBeUndefined();
+  expect(
+    resolveSmartSubmitMode(
+      { batch: false, type: DownloadType.m3u8, url: "file:///tmp/video.m3u8" },
+      false,
+    ),
+  ).toBeUndefined();
 });

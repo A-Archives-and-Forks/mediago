@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -119,6 +120,21 @@ func TestDiscoveryHandlerCompletesInspectSynchronously(t *testing.T) {
 	}
 }
 
+func TestSelectedDiscoverySourceURLRejectsUnadvertisedVariant(t *testing.T) {
+	source := discovery.DiscoverySource{
+		ID:       "source-1",
+		URL:      "https://cdn.example.com/master.m3u8",
+		Variants: []discovery.HLSVariant{{URL: "https://cdn.example.com/720.m3u8"}},
+	}
+
+	selected, err := selectedDiscoverySourceURL(source, map[string]string{
+		"source-1": "https://attacker.example/steal-credentials.m3u8",
+	})
+	if !errors.Is(err, ErrDiscoveryDownloadInvalid) || selected != "" {
+		t.Fatalf("selected URL/error = %q, %v", selected, err)
+	}
+}
+
 type discoveryDownloadCapture struct {
 	params chan core.DownloadParams
 }
@@ -161,11 +177,16 @@ func TestDiscoveryHandlerCreatesDownloadWithRuntimeOnlyCredentials(t *testing.T)
 	}
 	completed, err := discoverySvc.Complete(context.Background(), job.ID, []discovery.PrivateSource{{
 		DiscoverySource: discovery.DiscoverySource{
-			ID:         "source-1",
-			URL:        "https://cdn.example.com/master.m3u8",
-			PageURL:    "https://example.com/watch",
-			Title:      "Example",
-			Type:       discovery.SourceTypeM3U8,
+			ID:           "source-1",
+			URL:          "https://cdn.example.com/master.m3u8",
+			PageURL:      "https://example.com/watch",
+			Title:        "Example",
+			Type:         discovery.SourceTypeM3U8,
+			PlaylistType: discovery.PlaylistTypeMaster,
+			Variants: []discovery.HLSVariant{
+				{URL: "https://cdn.example.com/1080.m3u8", Quality: "1080p"},
+				{URL: "https://cdn.example.com/720.m3u8", Quality: "720p"},
+			},
 			DetectedAt: time.Now().UTC(),
 		},
 		Headers: []string{
@@ -181,6 +202,7 @@ func TestDiscoveryHandlerCreatesDownloadWithRuntimeOnlyCredentials(t *testing.T)
 	router := newDiscoveryHandlerTestRouter(discoverySvc, downloadSvc, newDiscoveryHandlerConfig())
 	response := performDiscoveryRequest(t, router, http.MethodPost, "/api/discoveries/"+job.ID+"/downloads", map[string]any{
 		"sourceIds":     []string{"source-1"},
+		"variantUrls":   map[string]string{"source-1": "https://cdn.example.com/720.m3u8"},
 		"startDownload": true,
 	})
 	if response.Code != http.StatusOK {
@@ -192,6 +214,9 @@ func TestDiscoveryHandlerCreatesDownloadWithRuntimeOnlyCredentials(t *testing.T)
 
 	select {
 	case params := <-downloadCapture.params:
+		if params.URL != "https://cdn.example.com/720.m3u8" {
+			t.Fatalf("runtime queue URL = %s", params.URL)
+		}
 		joined := strings.Join(params.Headers, "\n")
 		if !strings.Contains(joined, "sentinel-cookie") || !strings.Contains(joined, "sentinel-authorization") {
 			t.Fatalf("runtime queue headers = %s", joined)
@@ -203,10 +228,69 @@ func TestDiscoveryHandlerCreatesDownloadWithRuntimeOnlyCredentials(t *testing.T)
 	if err != nil || len(videos.List) != 1 {
 		t.Fatalf("stored downloads = %+v, %v", videos, err)
 	}
+	if videos.List[0].URL != "https://cdn.example.com/720.m3u8" {
+		t.Fatalf("persisted URL = %s", videos.List[0].URL)
+	}
 	if videos.List[0].Headers == nil || strings.Contains(*videos.List[0].Headers, "sentinel-") || !strings.Contains(*videos.List[0].Headers, "Referer") {
 		t.Fatalf("persisted headers = %v", videos.List[0].Headers)
 	}
 	waitForDiscoveryDownloadQueue(t, queue)
+}
+
+func TestDiscoveryHandlerSkipsExistingSourceWithoutFailingRemainingSources(t *testing.T) {
+	previousLogger, previousSugar := logger.Logger, logger.Sugar
+	logger.Logger = zap.NewNop()
+	logger.Sugar = logger.Logger.Sugar()
+	t.Cleanup(func() {
+		logger.Logger = previousLogger
+		logger.Sugar = previousSugar
+	})
+
+	database, err := db.New(filepath.Join(t.TempDir(), "downloads.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+	downloadSvc := service.NewDownloadTaskService(repo.NewVideoRepository(database), nil, nil)
+	if _, err := downloadSvc.AddDownloadTask(&service.AddDownloadTaskInput{
+		Name: "Existing",
+		Type: "m3u8",
+		URL:  "https://cdn.example.com/existing.m3u8",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	discoverySvc := discovery.NewService(discovery.NewStore(discovery.StoreOptions{}), nil, &discoveryHandlerExecutor{available: true})
+	job, err := discoverySvc.Create(context.Background(), discovery.CreateDiscoveryInput{
+		URL:  "https://example.com/watch",
+		Mode: discovery.ModeBrowser,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := discoverySvc.MarkRunning(job.ID); err != nil {
+		t.Fatal(err)
+	}
+	completed, err := discoverySvc.Complete(context.Background(), job.ID, []discovery.PrivateSource{
+		{DiscoverySource: discovery.DiscoverySource{ID: "existing", URL: "https://cdn.example.com/existing.m3u8", Title: "Existing", Type: discovery.SourceTypeM3U8}},
+		{DiscoverySource: discovery.DiscoverySource{ID: "new", URL: "https://cdn.example.com/new.m3u8", Title: "New", Type: discovery.SourceTypeM3U8}},
+	}, false)
+	if err != nil || completed.Status != discovery.StatusCompleted {
+		t.Fatalf("complete = %+v, %v", completed, err)
+	}
+
+	router := newDiscoveryHandlerTestRouter(discoverySvc, downloadSvc, newDiscoveryHandlerConfig())
+	response := performDiscoveryRequest(t, router, http.MethodPost, "/api/discoveries/"+job.ID+"/downloads", map[string]any{
+		"sourceIds":     []string{"existing", "new"},
+		"startDownload": false,
+	})
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "https://cdn.example.com/new.m3u8") {
+		t.Fatalf("download response = %d %s", response.Code, response.Body.String())
+	}
+	videos, err := downloadSvc.GetDownloadTasks(1, 20, "", "")
+	if err != nil || videos.Total != 2 {
+		t.Fatalf("stored downloads = %+v, %v", videos, err)
+	}
 }
 
 func waitForDiscoveryDownloadQueue(t *testing.T, queue *core.TaskQueue) {

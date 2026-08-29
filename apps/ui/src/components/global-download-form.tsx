@@ -28,7 +28,8 @@ export function GlobalDownloadForm() {
         typeof key === "object" &&
         key !== null &&
         "key" in key &&
-        key.key === "api/tasks",
+        typeof key.key === "string" &&
+        key.key.startsWith("api/tasks/"),
     );
 
   return (

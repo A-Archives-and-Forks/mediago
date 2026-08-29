@@ -4,7 +4,16 @@ const electronMocks = vi.hoisted(() => {
   const listeners = new Map<string, (details: unknown) => void>();
   const sessions = new Map<
     string,
-    { webRequest: { onSendHeaders: ReturnType<typeof vi.fn> } }
+    {
+      webRequest: {
+        onHeadersReceived: ReturnType<typeof vi.fn>;
+        onSendHeaders: ReturnType<typeof vi.fn>;
+      };
+    }
+  >();
+  const responseListeners = new Map<
+    string,
+    (details: unknown, callback: (response: object) => void) => void
   >();
   return {
     fromPartition: vi.fn((partition: string) => {
@@ -12,9 +21,25 @@ const electronMocks = vi.hoisted(() => {
       if (!value) {
         value = {
           webRequest: {
-            onSendHeaders: vi.fn((listener: (details: unknown) => void) => {
-              listeners.set(partition, listener);
-            }),
+            onHeadersReceived: vi.fn(
+              (
+                listener:
+                  | ((
+                      details: unknown,
+                      callback: (response: object) => void,
+                    ) => void)
+                  | null,
+              ) => {
+                if (listener) responseListeners.set(partition, listener);
+                else responseListeners.delete(partition);
+              },
+            ),
+            onSendHeaders: vi.fn(
+              (listener: ((details: unknown) => void) | null) => {
+                if (listener) listeners.set(partition, listener);
+                else listeners.delete(partition);
+              },
+            ),
           },
         };
         sessions.set(partition, value);
@@ -22,6 +47,7 @@ const electronMocks = vi.hoisted(() => {
       return value;
     }),
     listeners,
+    responseListeners,
     sessions,
   };
 });
@@ -108,6 +134,7 @@ describe("SniffingHelper tab isolation", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     electronMocks.listeners.clear();
+    electronMocks.responseListeners.clear();
     electronMocks.sessions.clear();
     electronMocks.fromPartition.mockClear();
   });
@@ -174,6 +201,52 @@ describe("SniffingHelper tab isolation", () => {
       ),
     ).toBe(true);
   });
+
+  it.each([
+    "application/vnd.apple.mpegurl",
+    "application/x-mpegURL",
+    "audio/mpegurl",
+  ])(
+    "inspects a suffixless HLS response identified by %s",
+    async (contentType) => {
+      const { helper, inspectSources } = createHelper();
+      const events: Array<{ source: { type: DownloadType; url: string } }> = [];
+      helper.on("source", (event) => events.push(event));
+      register(helper, "tab-hls", 808);
+
+      electronMocks.listeners.get("persist:webview")?.({
+        id: 44,
+        requestHeaders: { Referer: "https://example.com/tab-hls" },
+        url: "https://cdn.example.com/signed/play?id=1",
+        webContentsId: 808,
+      });
+      const callback = vi.fn();
+      electronMocks.responseListeners.get("persist:webview")?.(
+        {
+          id: 44,
+          responseHeaders: { "Content-Type": [contentType] },
+          url: "https://cdn.example.com/signed/play?id=1",
+          webContentsId: 808,
+        },
+        callback,
+      );
+
+      expect(callback).toHaveBeenCalledWith({});
+      expect(events).toHaveLength(0);
+      await vi.advanceTimersByTimeAsync(150);
+      expect(events[0]?.source).toMatchObject({
+        type: DownloadType.m3u8,
+        url: "https://cdn.example.com/signed/play?id=1",
+      });
+      expect(inspectSources).toHaveBeenCalledWith({
+        sources: [
+          expect.objectContaining({
+            url: "https://cdn.example.com/signed/play?id=1",
+          }),
+        ],
+      });
+    },
+  );
 
   it("rejects late HLS inspection results after navigation", async () => {
     let resolveInspection!: (value: unknown) => void;
@@ -300,6 +373,7 @@ describe("SniffingHelper Agent collection", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     electronMocks.listeners.clear();
+    electronMocks.responseListeners.clear();
     electronMocks.sessions.clear();
   });
 
@@ -401,5 +475,119 @@ describe("SniffingHelper Agent collection", () => {
       expect(cancelled).rejects.toBeInstanceOf(AgentCollectionError);
     controller.abort();
     await cancelAssertion;
+  });
+
+  it("returns collected sources as partial when the hard timeout expires", async () => {
+    const { helper } = createHelper();
+    register(helper, "agent-partial", 909, "agent");
+    const result = helper.collectAgent("agent-partial", { timeoutMs: 3_000 });
+    helper.send("agent-partial", {
+      documentURL: "https://example.com/watch",
+      name: "Partial result",
+      type: DownloadType.direct,
+      url: "https://cdn.example.com/video.mp4",
+    });
+
+    await vi.advanceTimersByTimeAsync(3_000);
+
+    await expect(result).resolves.toMatchObject({
+      partial: true,
+      sources: [
+        expect.objectContaining({
+          url: "https://cdn.example.com/video.mp4",
+        }),
+      ],
+    });
+  });
+
+  it("removes session listeners when the helper closes", () => {
+    const { helper } = createHelper();
+    register(helper, "tab-close", 818);
+    const webRequest =
+      electronMocks.sessions.get("persist:webview")?.webRequest;
+
+    helper.close();
+
+    expect(webRequest?.onSendHeaders).toHaveBeenLastCalledWith(null);
+    expect(webRequest?.onHeadersReceived).toHaveBeenLastCalledWith(null);
+    expect(electronMocks.listeners.has("persist:webview")).toBe(false);
+    expect(electronMocks.responseListeners.has("persist:webview")).toBe(false);
+  });
+
+  it("drops a MIME-only HLS candidate when Core says the content is not HLS", async () => {
+    const { helper, inspectSources } = createHelper();
+    inspectSources.mockResolvedValue({
+      data: {
+        sources: [
+          {
+            error: "response is not an M3U8 playlist",
+            errorCode: "not_hls",
+            id: "hls-1001-1",
+            playlistType: "unknown",
+            url: "https://cdn.example.com/play",
+            variants: [],
+          },
+        ],
+      },
+    });
+    register(helper, "agent-mime-conflict", 1001, "agent");
+    const result = helper.collectAgent("agent-mime-conflict", {
+      timeoutMs: 20_000,
+    });
+    electronMocks.listeners.get("persist:webview")?.({
+      id: 55,
+      requestHeaders: {},
+      url: "https://cdn.example.com/play",
+      webContentsId: 1001,
+    });
+    electronMocks.responseListeners.get("persist:webview")?.(
+      {
+        id: 55,
+        responseHeaders: {
+          "content-type": ["application/vnd.apple.mpegurl"],
+        },
+        url: "https://cdn.example.com/play",
+        webContentsId: 1001,
+      },
+      vi.fn(),
+    );
+    helper.markDomReady("agent-mime-conflict");
+
+    await vi.advanceTimersByTimeAsync(150 + 1_500);
+
+    await expect(result).resolves.toEqual({ partial: false, sources: [] });
+  });
+
+  it("drops an HLS-looking URL in Agent mode when its content is not HLS", async () => {
+    const { helper, inspectSources } = createHelper();
+    inspectSources.mockResolvedValue({
+      data: {
+        sources: [
+          {
+            error: "response is not an M3U8 playlist",
+            errorCode: "not_hls",
+            id: "hls-1101-1",
+            playlistType: "unknown",
+            url: "https://cdn.example.com/fake.m3u8",
+            variants: [],
+          },
+        ],
+      },
+    });
+    register(helper, "agent-url-conflict", 1101, "agent");
+    const result = helper.collectAgent("agent-url-conflict", {
+      timeoutMs: 20_000,
+    });
+    helper.send("agent-url-conflict", {
+      documentURL: "https://example.com/watch",
+      name: "Fake playlist",
+      type: DownloadType.m3u8,
+      url: "https://cdn.example.com/fake.m3u8",
+    });
+    helper.markDomReady("agent-url-conflict");
+
+    await vi.advanceTimersByTimeAsync(150 + 1_500);
+
+    await expect(result).resolves.toEqual({ partial: false, sources: [] });
   });
 });

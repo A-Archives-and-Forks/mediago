@@ -1,6 +1,6 @@
 import { DownloadType, type DownloadTask } from "@mediago/common";
-import axios from "axios";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { http } from "@/utils";
 import { postVideosToDocker } from "./use-docker-api";
 
 const tasks: Omit<DownloadTask, "id">[] = [
@@ -17,49 +17,33 @@ afterEach(() => {
 });
 
 describe("postVideosToDocker", () => {
-  it("uses the current download endpoint and sends the API key as a header", async () => {
-    const response = { data: { success: true } };
-    const post = vi.spyOn(axios, "post").mockResolvedValue(response);
+  it("submits the unchanged task form through the local Core proxy", async () => {
+    const response = [{ id: 7 }];
+    const post = vi.spyOn(http, "post").mockResolvedValue(response);
 
     await expect(
       postVideosToDocker({
-        dockerUrl: "https://docker.example.com/",
-        apiKey: "docker-api-key",
         items: tasks,
         immediate: true,
       }),
     ).resolves.toBe(response);
 
-    expect(post).toHaveBeenCalledWith(
-      "https://docker.example.com/api/downloads",
-      {
-        tasks,
-        startDownload: true,
-      },
-      {
-        headers: {
-          "X-API-Key": "docker-api-key",
-        },
-      },
-    );
+    expect(post).toHaveBeenCalledWith("/api/docker/downloads", {
+      tasks,
+      startDownload: true,
+    });
   });
 
-  it("omits the authentication header when no API key is configured", async () => {
-    const post = vi.spyOn(axios, "post").mockResolvedValue({ data: {} });
+  it("keeps add-to-list as the default Docker behavior", async () => {
+    const post = vi.spyOn(http, "post").mockResolvedValue([]);
 
     await postVideosToDocker({
-      dockerUrl: "https://docker.example.com",
-      apiKey: "",
       items: tasks,
     });
 
-    expect(post).toHaveBeenCalledWith(
-      "https://docker.example.com/api/downloads",
-      {
-        tasks,
-        startDownload: false,
-      },
-      undefined,
-    );
+    expect(post).toHaveBeenCalledWith("/api/docker/downloads", {
+      tasks,
+      startDownload: false,
+    });
   });
 });

@@ -27,7 +27,11 @@ interface FileSummary {
 
 export interface MediaFixture {
   baseURL: string;
+  embeddedHLSPageURL: string;
+  noResourcePageURL: string;
+  redirectNoResourcePageURL: string;
   sampleURL: string;
+  suffixlessHLSURL: string;
   sample: { size: number; sha256: string };
   close(): Promise<void>;
 }
@@ -58,7 +62,11 @@ export async function loadMediaFixture(): Promise<MediaFixture> {
   const server = await startMediaServer();
   return {
     baseURL: server.baseURL,
+    embeddedHLSPageURL: `${server.baseURL}/pages/embedded-hls`,
+    noResourcePageURL: `${server.baseURL}/pages/no-resource`,
+    redirectNoResourcePageURL: `${server.baseURL}/pages/redirect-no-resource`,
     sampleURL: `${server.baseURL}/sample.mp4`,
+    suffixlessHLSURL: `${server.baseURL}/streams/signed?token=fixture`,
     sample,
     close: server.close,
   };

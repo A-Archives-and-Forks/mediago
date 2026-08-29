@@ -10,6 +10,7 @@ import {
   useBrowserStore,
 } from "@/store/browser";
 import { cn } from "@/utils";
+import { useSourceExtractIntentStore } from "@/store/source-extract-intent";
 import { useAsyncEffect, useMemoizedFn } from "ahooks";
 import {
   type BrowserNavigationFailurePayload,
@@ -52,6 +53,8 @@ const SourceExtract: FC<SourceExtractProps> = ({ page = false }) => {
     if (snapshotResult.status === "fulfilled") {
       hydrateSnapshot(snapshotResult.value);
     }
+    const pendingURL = useSourceExtractIntentStore.getState().consume();
+    if (pendingURL) await createTab(pendingURL);
   }, []);
 
   const onTabsChanged = useMemoizedFn((...args: unknown[]) => {

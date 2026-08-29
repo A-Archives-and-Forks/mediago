@@ -1,5 +1,13 @@
-import { DownloadType, type DownloadTask } from "@mediago/common";
-import type { DownloadFormItem } from "@/store/download-dialog";
+import {
+  DownloadType,
+  inferDownloadType,
+  type DownloadTask,
+} from "@mediago/common";
+import {
+  SMART_DOWNLOAD_TYPE,
+  type DownloadFormItem,
+  type DownloadFormType,
+} from "@/store/download-dialog";
 
 export const DOWNLOAD_URL_RE = /^(?:(?:file|https?):\/\/.+|magnet:\?.+)/i;
 
@@ -9,7 +17,7 @@ export const DEFAULT_DOWNLOAD_FORM_VALUES: DownloadFormItem = {
   folder: "",
   headers: "",
   name: "",
-  type: DownloadType.m3u8,
+  type: SMART_DOWNLOAD_TYPE,
   url: "",
 };
 
@@ -24,7 +32,33 @@ export interface BatchDownloadRow {
 export function createDownloadFormValues(
   values: DownloadFormItem = {},
 ): DownloadFormItem {
-  return { ...DEFAULT_DOWNLOAD_FORM_VALUES, ...values };
+  const merged = { ...DEFAULT_DOWNLOAD_FORM_VALUES, ...values };
+  return {
+    ...merged,
+    // Xiaohongshu remains an internal compatibility type, but the form has a
+    // single user-facing yt-dlp option. The concrete type is restored from the
+    // submitted URL by resolveDownloadTaskType.
+    type:
+      merged.type === DownloadType.xiaohongshu
+        ? DownloadType.youtube
+        : merged.type,
+  };
+}
+
+export function resolveDownloadTaskType(
+  selectedType: DownloadFormType,
+  url: string,
+): DownloadType {
+  if (selectedType === SMART_DOWNLOAD_TYPE) return inferDownloadType(url);
+  if (
+    selectedType !== DownloadType.youtube &&
+    selectedType !== DownloadType.xiaohongshu
+  ) {
+    return selectedType;
+  }
+  return inferDownloadType(url) === DownloadType.xiaohongshu
+    ? DownloadType.xiaohongshu
+    : DownloadType.youtube;
 }
 
 // The hidden id input registers with `valueAsNumber`, so react-hook-form turns
@@ -55,14 +89,14 @@ export function parseBatchDownloadRows(text: string): BatchDownloadRow[] {
 
 export function buildBatchDownloadTasks(
   rows: BatchDownloadRow[],
-  type: DownloadType,
+  type: DownloadFormType,
   headers?: string,
 ): Omit<DownloadTask, "id">[] {
   return rows.map(({ folder, name, url }) => ({
     url,
     name: name || "",
     headers: headers || undefined,
-    type,
+    type: resolveDownloadTaskType(type, url),
     folder: folder || undefined,
   }));
 }
@@ -73,7 +107,7 @@ export function buildDownloadTasks(
   if (values.batch) {
     return buildBatchDownloadTasks(
       parseBatchDownloadRows(values.batchList ?? ""),
-      values.type ?? DownloadType.m3u8,
+      values.type ?? SMART_DOWNLOAD_TYPE,
       values.headers,
     );
   }
@@ -82,8 +116,34 @@ export function buildDownloadTasks(
     name = "",
     url = "",
     headers,
-    type = DownloadType.m3u8,
+    type = SMART_DOWNLOAD_TYPE,
     folder,
   } = values;
-  return [{ name, url, headers, type, folder }];
+  return [
+    {
+      name,
+      url,
+      headers,
+      type: resolveDownloadTaskType(type, url),
+      folder,
+    },
+  ];
+}
+
+export type SmartSubmitMode = "smart" | "hls-only";
+
+export function resolveSmartSubmitMode(
+  values: DownloadFormItem,
+  isEdit: boolean,
+): SmartSubmitMode | undefined {
+  if (
+    isEdit ||
+    values.batch === true ||
+    !/^https?:\/\//i.test(values.url?.trim() ?? "")
+  ) {
+    return undefined;
+  }
+  if (values.type === SMART_DOWNLOAD_TYPE) return "smart";
+  if (values.type === DownloadType.m3u8) return "hls-only";
+  return undefined;
 }

@@ -50,6 +50,7 @@ function task(
     isLive: true,
     percent: "20",
     speed: "1 MB/s",
+    origin: "local",
     ...overrides,
   };
 }
@@ -74,7 +75,9 @@ describe("DownloadTaskItem live recording actions", () => {
 
   async function renderItem(
     value: DownloadTaskDetails,
-    onStopDownload = vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    onStopDownload = vi
+      .fn<(task: DownloadTaskDetails) => Promise<void>>()
+      .mockResolvedValue(undefined),
   ) {
     await act(async () => {
       root.render(
@@ -116,7 +119,9 @@ describe("DownloadTaskItem live recording actions", () => {
     );
     await act(async () => confirm?.click());
 
-    expect(onStopDownload).toHaveBeenCalledExactlyOnceWith(1);
+    expect(onStopDownload).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ id: 1, origin: "local" }),
+    );
     const endingButton = container.querySelector<HTMLButtonElement>(
       'button[aria-label="endingRecording"]',
     );
@@ -152,7 +157,9 @@ describe("DownloadTaskItem live recording actions", () => {
         ?.click();
     });
 
-    expect(onStopDownload).toHaveBeenCalledExactlyOnceWith(1);
+    expect(onStopDownload).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ id: 1, origin: "local" }),
+    );
     expect(document.body.textContent).not.toContain(
       "endLiveRecordingDescription",
     );
@@ -188,5 +195,32 @@ describe("DownloadTaskItem live recording actions", () => {
 
     expect(container.querySelector('[data-slot="progress"]')).not.toBeNull();
     expect(container.textContent).toContain("42%");
+  });
+
+  it("keeps an offline Docker task visible while disabling its actions", async () => {
+    await renderItem(
+      task({
+        origin: "docker",
+        remoteOffline: true,
+        remoteLastSyncedAt: "2026-08-29T10:00:00.000Z",
+        status: DownloadStatus.Ready,
+        isLive: false,
+      }),
+    );
+
+    expect(container.textContent).toContain("dockerOffline");
+    expect(
+      container.querySelector<HTMLInputElement>('button[role="checkbox"]')
+        ?.disabled,
+    ).toBe(true);
+    expect(
+      container.querySelector<HTMLButtonElement>('button[aria-label="edit"]')
+        ?.disabled,
+    ).toBe(true);
+    expect(
+      container.querySelector<HTMLButtonElement>(
+        'button[aria-label="download"]',
+      )?.disabled,
+    ).toBe(true);
   });
 });

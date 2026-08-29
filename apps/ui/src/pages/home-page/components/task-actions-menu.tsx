@@ -30,6 +30,8 @@ interface Props {
   onStop: () => void;
   isStoppingRecording?: boolean;
   task: DownloadTaskWithFile;
+  disabled?: boolean;
+  disablePlay?: boolean;
 }
 
 export function TaskActionsMenu({
@@ -42,6 +44,8 @@ export function TaskActionsMenu({
   onStop,
   isStoppingRecording = false,
   task,
+  disabled = false,
+  disablePlay = false,
 }: Props) {
   const { t } = useTranslation();
   const canRestart =
@@ -53,7 +57,7 @@ export function TaskActionsMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button type="button" variant="outline" size="sm">
+        <Button type="button" variant="outline" size="sm" disabled={disabled}>
           <MoreHorizontal />
           {t("actions")}
         </Button>
@@ -89,7 +93,10 @@ export function TaskActionsMenu({
           </DropdownMenuItem>
         ) : null}
         {task.status === DownloadStatus.Success ? (
-          <DropdownMenuItem disabled={!task.exists} onSelect={onPlay}>
+          <DropdownMenuItem
+            disabled={disablePlay || !task.exists}
+            onSelect={onPlay}
+          >
             <CirclePlay />
             {t("playVideo")}
           </DropdownMenuItem>

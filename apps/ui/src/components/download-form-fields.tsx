@@ -15,16 +15,20 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { downloadFormSelector, useConfigStore } from "@/store/config";
-import type { DownloadFormItem } from "@/store/download-dialog";
+import {
+  SMART_DOWNLOAD_TYPE,
+  type DownloadFormItem,
+  type DownloadFormType,
+} from "@/store/download-dialog";
 import { cn } from "@/utils";
 import { BatchDownloadField } from "./batch-download-field";
 import { DOWNLOAD_URL_RE } from "./download-form-logic";
 
 const DOWNLOAD_TYPE_OPTIONS = [
+  { value: SMART_DOWNLOAD_TYPE, labelKey: "smartDownload" },
   { value: DownloadType.m3u8, labelKey: "streamMedia" },
   { value: DownloadType.bilibili, labelKey: "bilibiliMedia" },
   { value: DownloadType.youtube, labelKey: "youtubeMedia" },
-  { value: DownloadType.xiaohongshu, labelKey: "xiaohongshuMedia" },
   { value: DownloadType.direct, labelKey: "direct" },
   { value: DownloadType.mediago, labelKey: "mediagoMedia" },
 ] as const;
@@ -165,7 +169,7 @@ export function DownloadFormFields({
               value={field.value}
               disabled={isEdit}
               onValueChange={(value) => {
-                const type = value as DownloadType;
+                const type = value as DownloadFormType;
                 field.onChange(type);
                 setLastDownloadTypes(type);
               }}
@@ -193,34 +197,6 @@ export function DownloadFormFields({
           )}
         />
       </FormRow>
-
-      {!isBatch ? (
-        <FormRow
-          errorId={`${formId}-name-error`}
-          htmlFor={`${formId}-name`}
-          label={t("videoName")}
-          required={selectedType !== DownloadType.bilibili}
-          error={form.formState.errors.name?.message}
-        >
-          <Input
-            id={`${formId}-name`}
-            placeholder={t("pleaseEnterVideoName")}
-            onContextMenu={onShowTextMenu}
-            aria-invalid={Boolean(form.formState.errors.name)}
-            aria-describedby={
-              form.formState.errors.name ? `${formId}-name-error` : undefined
-            }
-            {...form.register("name", {
-              validate: (value) =>
-                isBatch ||
-                selectedType === DownloadType.bilibili ||
-                value?.trim()
-                  ? true
-                  : t("pleaseEnterCorrectFormInfo"),
-            })}
-          />
-        </FormRow>
-      ) : null}
 
       {isBatch && !isEdit ? (
         <FormRow
@@ -277,6 +253,38 @@ export function DownloadFormFields({
         </FormRow>
       ) : null}
 
+      {!isBatch ? (
+        <FormRow
+          errorId={`${formId}-name-error`}
+          htmlFor={`${formId}-name`}
+          label={t("videoName")}
+          required={
+            selectedType !== DownloadType.bilibili &&
+            selectedType !== SMART_DOWNLOAD_TYPE
+          }
+          error={form.formState.errors.name?.message}
+        >
+          <Input
+            id={`${formId}-name`}
+            placeholder={t("pleaseEnterVideoName")}
+            onContextMenu={onShowTextMenu}
+            aria-invalid={Boolean(form.formState.errors.name)}
+            aria-describedby={
+              form.formState.errors.name ? `${formId}-name-error` : undefined
+            }
+            {...form.register("name", {
+              validate: (value) =>
+                isBatch ||
+                selectedType === DownloadType.bilibili ||
+                selectedType === SMART_DOWNLOAD_TYPE ||
+                value?.trim()
+                  ? true
+                  : t("pleaseEnterCorrectFormInfo"),
+            })}
+          />
+        </FormRow>
+      ) : null}
+
       <details
         open={advancedOpen}
         onToggle={(event) => onAdvancedOpenChange(event.currentTarget.open)}
@@ -305,6 +313,7 @@ export function DownloadFormFields({
 
           {selectedType === DownloadType.m3u8 ||
           selectedType === DownloadType.mediago ||
+          selectedType === SMART_DOWNLOAD_TYPE ||
           isBatch ? (
             <FormRow
               htmlFor={`${formId}-headers`}

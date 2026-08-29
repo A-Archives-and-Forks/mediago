@@ -98,7 +98,7 @@ func (h *DiscoveryHandler) Downloads(c *gin.Context) {
 		return
 	}
 	startDownload := req.StartDownload == nil || *req.StartDownload
-	videos, err := h.CreateDownloads(c.Request.Context(), c.Param("id"), req.SourceIDs, req.Folder, startDownload)
+	videos, err := h.createDownloads(c.Request.Context(), c.Param("id"), req.SourceIDs, req.Folder, req.Names, req.VariantURLs, startDownload)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrDiscoveryDownloadUnavailable):
@@ -125,6 +125,10 @@ func (h *DiscoveryHandler) Downloads(c *gin.Context) {
 // and MCP. Sensitive browser credentials stay in memory and are only supplied
 // to active queue workers; persisted records receive the safe header subset.
 func (h *DiscoveryHandler) CreateDownloads(_ context.Context, jobID string, sourceIDs []string, folderName string, startDownload bool) ([]*db.Video, error) {
+	return h.createDownloads(context.Background(), jobID, sourceIDs, folderName, nil, nil, startDownload)
+}
+
+func (h *DiscoveryHandler) createDownloads(_ context.Context, jobID string, sourceIDs []string, folderName string, names, variantURLs map[string]string, startDownload bool) ([]*db.Video, error) {
 	if h.downloadSvc == nil {
 		return nil, ErrDiscoveryDownloadUnavailable
 	}
@@ -156,6 +160,10 @@ func (h *DiscoveryHandler) CreateDownloads(_ context.Context, jobID string, sour
 			return nil, ErrDiscoveryDownloadInvalid
 		}
 		seen[sourceID] = struct{}{}
+		selectedURL, err := selectedDiscoverySourceURL(source, variantURLs)
+		if err != nil {
+			return nil, err
+		}
 		headers, _ := h.discoverySvc.PrivateHeaders(job.ID, sourceID)
 		var folder *string
 		if folderName != "" {
@@ -163,24 +171,36 @@ func (h *DiscoveryHandler) CreateDownloads(_ context.Context, jobID string, sour
 			folder = &value
 		}
 		inputs = append(inputs, &service.AddDownloadTaskInput{
-			Name:    source.Title,
+			Name:    discoverySourceName(source, names),
 			Type:    string(source.Type),
-			URL:     source.URL,
+			URL:     selectedURL,
 			Headers: service.PersistentDiscoveryHeaders(headers),
 			Folder:  folder,
 		})
 		runtimeHeaders = append(runtimeHeaders, headers)
 	}
 
-	videos, err := h.downloadSvc.AddDownloadTasks(inputs)
-	if err != nil {
-		return nil, err
+	videos := make([]*db.Video, 0, len(inputs))
+	createdRuntimeHeaders := make([][]string, 0, len(inputs))
+	for index, input := range inputs {
+		video, err := h.downloadSvc.AddDownloadTask(input)
+		if errors.Is(err, service.ErrDownloadURLAlreadyExists) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		videos = append(videos, video)
+		createdRuntimeHeaders = append(createdRuntimeHeaders, runtimeHeaders[index])
+	}
+	if len(videos) == 0 {
+		return nil, service.ErrDownloadURLAlreadyExists
 	}
 	if startDownload {
 		localPath, _ := h.conf.Get("local").(string)
 		deleteSegments, _ := h.conf.Get("deleteSegments").(bool)
 		for index, video := range videos {
-			if err := h.downloadSvc.StartDownloadWithRuntimeHeaders(video.ID, localPath, deleteSegments, runtimeHeaders[index]); err != nil {
+			if err := h.downloadSvc.StartDownloadWithRuntimeHeaders(video.ID, localPath, deleteSegments, createdRuntimeHeaders[index]); err != nil {
 				return nil, err
 			}
 		}
@@ -193,6 +213,29 @@ func (h *DiscoveryHandler) CreateDownloads(_ context.Context, jobID string, sour
 		h.hub.Broadcast("download-create", map[string]any{"ids": ids, "count": len(ids)})
 	}
 	return videos, nil
+}
+
+// selectedDiscoverySourceURL only accepts a URL advertised by the inspected
+// master playlist. This prevents a public request from attaching private
+// discovery credentials to an arbitrary destination.
+func selectedDiscoverySourceURL(source discovery.DiscoverySource, variantURLs map[string]string) (string, error) {
+	selectedURL := strings.TrimSpace(variantURLs[source.ID])
+	if selectedURL == "" || selectedURL == source.URL {
+		return source.URL, nil
+	}
+	for _, variant := range source.Variants {
+		if selectedURL == variant.URL {
+			return selectedURL, nil
+		}
+	}
+	return "", ErrDiscoveryDownloadInvalid
+}
+
+func discoverySourceName(source discovery.DiscoverySource, names map[string]string) string {
+	if name := strings.TrimSpace(names[source.ID]); name != "" {
+		return name
+	}
+	return source.Title
 }
 
 func limitDiscoveryBody(c *gin.Context) {

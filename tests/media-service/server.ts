@@ -29,7 +29,15 @@ const FILE_ROUTES = new Map([
   ],
   ["/v1/hls/init.mp4", { path: "v1/hls/init.mp4", contentType: "video/mp4" }],
   [
+    "/v1/streams/init.mp4",
+    { path: "v1/hls/init.mp4", contentType: "video/mp4" },
+  ],
+  [
     "/v1/hls/segment-0.m4s",
+    { path: "v1/hls/segment-0.m4s", contentType: "video/mp4" },
+  ],
+  [
+    "/v1/streams/segment-0.m4s",
     { path: "v1/hls/segment-0.m4s", contentType: "video/mp4" },
   ],
 ]);
@@ -67,6 +75,19 @@ function sendText(
     "Content-Type": "text/plain; charset=utf-8",
     "Content-Length": String(contents.length),
     ...headers,
+  });
+  response.end(request.method === "HEAD" ? undefined : contents);
+}
+
+function sendHTML(
+  request: IncomingMessage,
+  response: ServerResponse,
+  body: string,
+): void {
+  const contents = Buffer.from(body);
+  response.writeHead(200, {
+    "Content-Type": "text/html; charset=utf-8",
+    "Content-Length": String(contents.length),
   });
   response.end(request.method === "HEAD" ? undefined : contents);
 }
@@ -149,9 +170,72 @@ function handleRequest(
     return;
   }
 
-  const pathname = new URL(request.url ?? "/", "http://127.0.0.1").pathname;
+  const requestURL = new URL(request.url ?? "/", "http://127.0.0.1");
+  const pathname = requestURL.pathname;
   if (pathname === "/healthz") {
     sendText(request, response, 200, "ok\n");
+    return;
+  }
+
+  if (pathname === "/v1/streams/signed") {
+    const query = requestURL.search;
+    sendText(
+      request,
+      response,
+      200,
+      `#EXTM3U
+#EXT-X-STREAM-INF:BANDWIDTH=5000000,RESOLUTION=1920x1080,CODECS="avc1.640028,mp4a.40.2"
+1080${query}
+#EXT-X-STREAM-INF:BANDWIDTH=2800000,RESOLUTION=1280x720,CODECS="avc1.4d401f,mp4a.40.2"
+720${query}
+`,
+      { "Content-Type": "application/vnd.apple.mpegurl" },
+    );
+    return;
+  }
+  if (pathname === "/v1/streams/1080" || pathname === "/v1/streams/720") {
+    const playlist = assets.get("/v1/hls/index.m3u8");
+    if (!playlist) {
+      sendText(request, response, 500, "Fixture unavailable\n");
+      return;
+    }
+    sendAsset(request, response, playlist);
+    return;
+  }
+  if (pathname === "/v1/pages/embedded-hls") {
+    sendHTML(
+      request,
+      response,
+      `<!doctype html><html><head><title>Embedded HLS Fixture</title></head><body><h1>Embedded HLS Fixture</h1><script>fetch("/v1/streams/signed?fixture=embedded").then((response) => response.text()).then(() => { document.body.dataset.loaded = "true"; });</script></body></html>`,
+    );
+    return;
+  }
+  if (pathname === "/v1/pages/no-resource") {
+    sendHTML(
+      request,
+      response,
+      "<!doctype html><html><head><title>No Resource Fixture</title></head><body><h1>No downloadable media</h1></body></html>",
+    );
+    return;
+  }
+  if (pathname === "/v1/pages/redirect-no-resource") {
+    response.writeHead(302, {
+      Location: "/v1/pages/no-resource",
+      "Content-Length": "0",
+    });
+    response.end();
+    return;
+  }
+  if (pathname === "/v1/pages/slow") {
+    setTimeout(
+      () =>
+        sendHTML(
+          request,
+          response,
+          "<!doctype html><html><head><title>Slow Fixture</title></head><body>slow</body></html>",
+        ),
+      250,
+    );
     return;
   }
 

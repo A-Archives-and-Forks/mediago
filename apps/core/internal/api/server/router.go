@@ -51,6 +51,22 @@ func (s *Server) registerRoutes() {
 		api.POST("/discoveries/:id/cancel", s.discoveryHandler.Cancel)
 		api.POST("/discoveries/:id/downloads", s.discoveryHandler.Downloads)
 		api.GET("/discovery-executor/status", s.discoveryHandler.ExecutorStatus)
+
+		docker := api.Group("/docker")
+		{
+			docker.GET("/status", s.dockerHandler.Status)
+			docker.POST("/discoveries/:id/downloads", s.dockerHandler.DiscoveryDownloads)
+			docker.GET("/downloads", s.dockerHandler.List)
+			docker.POST("/downloads", s.dockerHandler.Create)
+			docker.GET("/downloads/active", s.dockerHandler.Active)
+			docker.GET("/downloads/:id", s.dockerHandler.Get)
+			docker.PUT("/downloads/:id", s.dockerHandler.Update)
+			docker.DELETE("/downloads/:id", s.dockerHandler.Delete)
+			docker.POST("/downloads/:id/start", s.dockerHandler.Start)
+			docker.POST("/downloads/:id/stop", s.dockerHandler.Stop)
+			docker.PUT("/downloads/:id/live", s.dockerHandler.UpdateLive)
+			docker.GET("/downloads/:id/logs", s.dockerHandler.Logs)
+		}
 	}
 
 	// Database persistence routes (only registered when database is available)

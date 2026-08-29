@@ -1,6 +1,28 @@
 import { describe, expect, it } from "vitest";
 import { DownloadType } from "../types";
-import { matchPageUrl, shouldSuppressRequestSource } from "./filter-rules";
+import {
+  isHLSContentType,
+  matchPageUrl,
+  shouldSuppressRequestSource,
+} from "./filter-rules";
+
+describe("isHLSContentType", () => {
+  it.each([
+    "application/vnd.apple.mpegurl",
+    "application/x-mpegURL",
+    "audio/mpegurl",
+    "audio/x-mpegurl; charset=utf-8",
+  ])("recognizes HLS response MIME type: %s", (contentType) => {
+    expect(isHLSContentType(contentType)).toBe(true);
+  });
+
+  it.each(["text/html", "application/json", "video/mp4", ""])(
+    "rejects unrelated response MIME type: %s",
+    (contentType) => {
+      expect(isHLSContentType(contentType)).toBe(false);
+    },
+  );
+});
 
 describe("matchPageUrl", () => {
   it.each([

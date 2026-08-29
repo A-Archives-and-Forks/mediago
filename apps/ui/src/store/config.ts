@@ -1,17 +1,17 @@
-import { DownloadType } from "@mediago/common";
 import localforage from "localforage";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
+import { SMART_DOWNLOAD_TYPE, type DownloadFormType } from "./download-dialog";
 
 type State = {
   // Last download type
   lastIsBatch: boolean;
-  lastDownloadTypes: DownloadType;
+  lastDownloadTypes: DownloadFormType;
 };
 
 type Actions = {
-  setLastDownloadTypes: (type: DownloadType) => void;
+  setLastDownloadTypes: (type: DownloadFormType) => void;
   setLastIsBatch: (isBatch: boolean) => void;
 };
 
@@ -19,7 +19,7 @@ export const useConfigStore = create<State & Actions>()(
   persist(
     immer((set) => ({
       lastIsBatch: false,
-      lastDownloadTypes: DownloadType.m3u8,
+      lastDownloadTypes: SMART_DOWNLOAD_TYPE,
       setLastDownloadTypes: (type) => {
         set((state) => {
           state.lastDownloadTypes = type;

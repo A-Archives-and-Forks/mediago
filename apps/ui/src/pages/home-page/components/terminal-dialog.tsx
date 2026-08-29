@@ -1,4 +1,5 @@
 import { X } from "lucide-react";
+import type { TaskOrigin } from "@mediago/common";
 import type React from "react";
 import { useTranslation } from "react-i18next";
 import { useMemoizedFn } from "ahooks";
@@ -16,10 +17,17 @@ interface Props {
   trigger: React.ReactNode;
   title: string;
   id: number;
+  origin?: TaskOrigin;
   asChild?: boolean;
 }
 
-export function TerminalDialog({ trigger, title, id, asChild }: Props) {
+export function TerminalDialog({
+  trigger,
+  title,
+  id,
+  origin = "local",
+  asChild,
+}: Props) {
   const { t } = useTranslation();
   const stopContextPropagation = useMemoizedFn(
     (event: React.MouseEvent<HTMLDivElement>) => event.stopPropagation(),
@@ -54,7 +62,11 @@ export function TerminalDialog({ trigger, title, id, asChild }: Props) {
             </button>
           </DialogClose>
         </div>
-        <Terminal id={id} className="h-[min(58vh,400px)] w-full p-3" />
+        <Terminal
+          id={id}
+          origin={origin}
+          className="h-[min(58vh,400px)] w-full p-3"
+        />
       </DialogContent>
     </Dialog>
   );

@@ -79,6 +79,25 @@ func TestServiceRoutesDirectHLSIntoExistingInspector(t *testing.T) {
 	}
 }
 
+func TestServiceInspectModeAcceptsSuffixlessHTTPURL(t *testing.T) {
+	inspector := &fakeInspector{result: coreservice.SourceInspection{
+		PlaylistType: "media",
+		Variants:     []coreservice.HLSVariant{},
+	}}
+	svc := NewService(NewStore(StoreOptions{Capacity: 20}), inspector, nil)
+
+	job, err := svc.Create(context.Background(), CreateDiscoveryInput{
+		URL:  "https://cdn.example.com/signed/play?id=1",
+		Mode: ModeInspect,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if inspector.calls != 1 || job.Status != StatusCompleted {
+		t.Fatalf("inspector calls = %d, job = %+v", inspector.calls, job)
+	}
+}
+
 func TestServiceRequiresExecutorForBrowserDiscoveryAndSerializesDispatch(t *testing.T) {
 	store := NewStore(StoreOptions{Capacity: 20})
 	executor := &fakeExecutor{}
@@ -134,7 +153,7 @@ func TestServiceAutoRoutesM3U8WithoutBrowserExecutor(t *testing.T) {
 	}
 }
 
-func TestServiceValidatesModesTimeoutsAndHLSInspectURLs(t *testing.T) {
+func TestServiceValidatesModesAndTimeouts(t *testing.T) {
 	executor := &fakeExecutor{available: true}
 	svc := NewService(NewStore(StoreOptions{Capacity: 20}), nil, executor)
 
@@ -146,7 +165,6 @@ func TestServiceValidatesModesTimeoutsAndHLSInspectURLs(t *testing.T) {
 		{name: "scheme", input: CreateDiscoveryInput{URL: "file:///tmp/video.m3u8"}, want: ErrInvalidURL},
 		{name: "missing host", input: CreateDiscoveryInput{URL: "https:///video.m3u8"}, want: ErrInvalidURL},
 		{name: "mode", input: CreateDiscoveryInput{URL: "https://example.com", Mode: "headless"}, want: ErrInvalidMode},
-		{name: "inspect non hls", input: CreateDiscoveryInput{URL: "https://example.com/video.mp4", Mode: ModeInspect}, want: ErrInvalidInspectURL},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

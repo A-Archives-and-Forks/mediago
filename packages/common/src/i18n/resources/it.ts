@@ -292,10 +292,10 @@ export const it = {
   playList: "Playlist",
   pleaseEnterCorrectBatchList: "Inserisci un elenco batch valido",
   streamMedia: "Stream media (m3u8)",
+  smartDownload: "Download intelligente (rilevamento automatico)",
   bilibiliMedia: "Bilibili",
   mediagoMedia: "MediaGo download",
-  youtubeMedia: "yt-dlp (YouTube / X / TikTok / Douyin)",
-  xiaohongshuMedia: "Xiaohongshu (yt-dlp)",
+  youtubeMedia: "yt-dlp (YouTube / X / TikTok / Douyin / Xiaohongshu)",
   checkUpdate: "Controlla aggiornamenti",
   viewReleases: "Visualizza release",
   allowBetaVersion: "Includi controllo versioni beta",
@@ -507,4 +507,31 @@ Se non puoi modificare direttamente le impostazioni, restituisci il frammento di
   shareIntentInvalid: "Nessun link scaricabile valido trovato",
   shareIntentLegacyAutomaticActionDisabled:
     "Per sicurezza, i parametri di importazione silenziosa o download immediato del link precedente sono stati ignorati. Controlla il modulo per continuare.",
+  streamDiscoveryInProgress: "Ricerca dei contenuti",
+  probingStreamSource: "Verifica dell'URL del flusso…",
+  discoveringStreamSources: "Ricerca dei contenuti scaricabili nella pagina…",
+  selectDiscoveredSources: "Seleziona i contenuti da scaricare",
+  selectDiscoveredSourcesDescription:
+    "Controlla le risorse trovate e conferma i relativi nomi.",
+  streamQuality: "Qualità",
+  discoveryPartialResults:
+    "La ricerca è scaduta, quindi i risultati potrebbero essere incompleti.",
+  downloadAlreadyExists: "Già presente nell'elenco download",
+  creatingDownloadTasks: "Creazione…",
+  confirmDownloadSources: "Conferma e crea",
+  streamDiscoveryNoSources: "Nessun contenuto scaricabile trovato",
+  streamDiscoveryOpenSourceExtractHint:
+    "Apri questo URL in Estrazione contenuti, completa l'accesso o l'interazione richiesta e scegli una risorsa.",
+  streamDiscoveryWebUnavailableHint:
+    "La ricerca nella pagina non è disponibile in questo ambiente. Prova un URL diretto del flusso.",
+  openSourceExtract: "Apri Estrazione contenuti",
+  m3u8ValidationFailed: "Nessun flusso m3u8 rilevato",
+  m3u8ValidationFailedDescription:
+    "Questo URL non contiene una playlist m3u8 valida. Usa Download intelligente per continuare a cercare contenuti scaricabili nella pagina.",
+  useSmartDownload: "Usa Download intelligente",
+  dockerSource: "Docker",
+  dockerOffline: "Docker non in linea",
+  dockerLastSynced: "Ultima sincronizzazione: {{time}}",
+  batchDeleteResult: "Eliminate {{success}} attività; {{failed}} non riuscite",
+  batchDownloadResult: "Avviate {{success}} attività; {{failed}} non riuscite",
 };

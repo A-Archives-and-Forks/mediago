@@ -3,6 +3,8 @@ import { Terminal as XTerminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
 import { type FC, type ReactNode, useEffect, useRef } from "react";
 import useSWR from "swr";
+import type { TaskOrigin } from "@mediago/common";
+import { getDockerDownloadLog } from "@/api/docker-download-task";
 import { getDownloadLog } from "@/api/download-task";
 import { usePlatform } from "@/hooks/use-platform";
 import { cn } from "@/utils";
@@ -10,14 +12,24 @@ import { cn } from "@/utils";
 interface TerminalProps {
   className?: string;
   id: number;
+  origin?: TaskOrigin;
   header?: ReactNode;
 }
 
-const Terminal: FC<TerminalProps> = ({ className, id, header }) => {
+const Terminal: FC<TerminalProps> = ({
+  className,
+  id,
+  origin = "local",
+  header,
+}) => {
   const terminalRef = useRef<HTMLDivElement | null>(null);
   const { on, off } = usePlatform();
-  const { data } = useSWR({ key: "download-log", args: id }, ({ args }) =>
-    getDownloadLog(args),
+  const { data } = useSWR(
+    { key: "download-log", args: { id, origin } },
+    ({ args }) =>
+      args.origin === "docker"
+        ? getDockerDownloadLog(args.id)
+        : getDownloadLog(args.id),
   );
 
   useEffect(() => {
@@ -86,15 +98,15 @@ const Terminal: FC<TerminalProps> = ({ className, id, header }) => {
     };
     const resizeObserver = new ResizeObserver(fit);
     resizeObserver.observe(element);
-    on("download-message", onDownloadMessage);
+    if (origin === "local") on("download-message", onDownloadMessage);
 
     return () => {
       cancelAnimationFrame(frame);
       resizeObserver.disconnect();
-      off("download-message", onDownloadMessage);
+      if (origin === "local") off("download-message", onDownloadMessage);
       terminal.dispose();
     };
-  }, [data, id, off, on]);
+  }, [data, id, off, on, origin]);
 
   return (
     <div className={cn("flex min-h-0 flex-col", className)}>

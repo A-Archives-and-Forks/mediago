@@ -9,7 +9,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const maxInspectSources = 20
+const (
+	maxInspectSources          = 20
+	maxInspectRequestBodyBytes = 256 << 10
+)
 
 // SourceHandler handles ephemeral metadata inspection for sniffed sources.
 type SourceHandler struct {
@@ -23,6 +26,7 @@ func NewSourceHandler(inspector *service.M3U8Inspector) *SourceHandler {
 
 // Inspect returns HLS metadata without creating or persisting download tasks.
 func (h *SourceHandler) Inspect(c *gin.Context) {
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxInspectRequestBodyBytes)
 	var req dto.InspectSourcesReq
 	if err := c.ShouldBindJSON(&req); err != nil {
 		writeInvalidRequest(c)

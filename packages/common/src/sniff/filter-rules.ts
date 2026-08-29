@@ -1,5 +1,17 @@
 import { DownloadType } from "../types";
 
+const HLS_CONTENT_TYPES = new Set([
+  "application/vnd.apple.mpegurl",
+  "application/x-mpegurl",
+  "audio/mpegurl",
+  "audio/x-mpegurl",
+]);
+
+export function isHLSContentType(contentType: string): boolean {
+  const [essence = ""] = contentType.split(";", 1);
+  return HLS_CONTENT_TYPES.has(essence.trim().toLowerCase());
+}
+
 /**
  * A single sniff rule.
  *

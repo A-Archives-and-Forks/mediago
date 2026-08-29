@@ -119,6 +119,37 @@ describe("media fixture protocol", () => {
     expect(unknown.status).toBe(404);
   });
 
+  test("serves smart stream discovery fixtures", async () => {
+    const suffixless = await fetch(
+      `${mediaServer.baseURL}/streams/signed?token=test`,
+    );
+    expect(suffixless.status).toBe(200);
+    expect(suffixless.headers.get("content-type")).toBe(
+      "application/vnd.apple.mpegurl",
+    );
+    await expect(suffixless.text()).resolves.toContain("RESOLUTION=1920x1080");
+
+    const embedded = await fetch(`${mediaServer.baseURL}/pages/embedded-hls`);
+    await expect(embedded.text()).resolves.toContain(
+      "/v1/streams/signed?fixture=embedded",
+    );
+
+    const redirected = await fetch(
+      `${mediaServer.baseURL}/pages/redirect-no-resource`,
+      { redirect: "manual" },
+    );
+    expect(redirected.status).toBe(302);
+    expect(redirected.headers.get("location")).toBe("/v1/pages/no-resource");
+
+    const noResource = await fetch(`${mediaServer.baseURL}/pages/no-resource`);
+    await expect(noResource.text()).resolves.toContain("No downloadable media");
+
+    const startedAt = Date.now();
+    const slow = await fetch(`${mediaServer.baseURL}/pages/slow`);
+    expect(Date.now() - startedAt).toBeGreaterThanOrEqual(200);
+    expect(slow.status).toBe(200);
+  });
+
   test("serves committed files with exact metadata and bytes", async () => {
     await Promise.all(
       [...CONTENT_TYPES].map(async ([relativePath, contentType]) => {

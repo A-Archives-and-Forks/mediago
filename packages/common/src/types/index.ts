@@ -142,6 +142,24 @@ export interface DownloadTaskWithFile extends DownloadTask {
   files?: string[];
 }
 
+export type TaskOrigin = "local" | "docker";
+
+export interface TaskRef {
+  id: number;
+  origin: TaskOrigin;
+}
+
+/**
+ * A view model used when local and Docker-owned tasks share one list. The
+ * origin is deliberately separate from the numeric Core id so two tasks with
+ * the same id cannot be mistaken for each other.
+ */
+export interface UnifiedDownloadTask extends DownloadTaskWithFile {
+  origin: TaskOrigin;
+  remoteOffline?: boolean;
+  remoteLastSyncedAt?: string;
+}
+
 export interface ListPagination {
   total: number;
   list: DownloadTaskWithFile[];

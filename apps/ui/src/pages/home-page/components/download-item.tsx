@@ -1,7 +1,6 @@
 import {
   DownloadProgress,
   DownloadStatus,
-  type DownloadTask,
   type DownloadTaskWithFile,
 } from "@mediago/common";
 import { useMemoizedFn } from "ahooks";
@@ -10,6 +9,7 @@ import {
   CirclePause,
   CirclePlay,
   CircleX,
+  Container,
   Download,
   Pause,
   Pencil,
@@ -54,16 +54,16 @@ import { useEnvPath } from "@/hooks/use-config";
 
 interface Props {
   task: DownloadTaskDetails;
-  onSelectChange: (id: number) => void;
-  onSelect: (id: number) => void;
+  onSelectChange: (task: DownloadTaskDetails) => void;
+  onSelect: (task: DownloadTaskDetails) => void;
   selected: boolean;
-  onStartDownload: (id: number) => void;
-  onStopDownload: (taskId: number) => Promise<void> | void;
-  onContextMenu: (taskId: number) => void;
-  onDelete: (taskId: number) => void;
+  onStartDownload: (task: DownloadTaskDetails) => void;
+  onStopDownload: (task: DownloadTaskDetails) => Promise<void> | void;
+  onContextMenu: (task: DownloadTaskDetails) => void;
+  onDelete: (task: DownloadTaskDetails) => void;
   onRefresh: () => void;
   progress?: DownloadProgress;
-  onShowEditForm?: (value: DownloadTask) => void;
+  onShowEditForm?: (value: DownloadTaskDetails) => void;
   downloadStatus?: DownloadStatus;
 }
 
@@ -101,13 +101,15 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
   });
 
   const startWithEvent = useMemoizedFn((eventName: string) => {
-    onStartDownload(task.id);
+    if (task.remoteOffline) return;
+    onStartDownload(task);
     tdApp.onEvent(eventName);
   });
 
   const stopTask = useMemoizedFn(async () => {
     try {
-      await onStopDownload(task.id);
+      if (task.remoteOffline) return;
+      await onStopDownload(task);
       tdApp.onEvent(STOP_DOWNLOAD);
     } catch {
       setIsStoppingRecording(false);
@@ -135,26 +137,28 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
   const actionButtons = useMemo<ReactNode[]>(() => {
     const buttons: ReactNode[] = [];
 
-    const terminalBtn = appStore.showTerminal ? (
-      <TerminalDialog
-        key="terminal"
-        asChild
-        trigger={
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="text-muted-foreground hover:text-foreground"
-            title={t("terminal")}
-            aria-label={t("terminal")}
-          >
-            <SquareTerminal className="size-[19px]" />
-          </Button>
-        }
-        title={task.name}
-        id={task.id}
-      />
-    ) : null;
+    const terminalBtn =
+      appStore.showTerminal && !task.remoteOffline ? (
+        <TerminalDialog
+          key="terminal"
+          asChild
+          trigger={
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="text-muted-foreground hover:text-foreground"
+              title={t("terminal")}
+              aria-label={t("terminal")}
+            >
+              <SquareTerminal className="size-[19px]" />
+            </Button>
+          }
+          title={task.name}
+          id={task.id}
+          origin={task.origin}
+        />
+      ) : null;
 
     const editBtn = (
       <Button
@@ -166,6 +170,7 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
         title={t("edit")}
         aria-label={t("edit")}
         onClick={() => onShowEditForm?.(task)}
+        disabled={task.remoteOffline}
       >
         <Pencil className="size-[17px]" />
       </Button>
@@ -185,6 +190,7 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
             title={t("download")}
             aria-label={t("download")}
             onClick={() => startWithEvent(DOWNLOAD_NOW)}
+            disabled={task.remoteOffline}
           >
             <CircleArrowDown className="size-4" />
           </Button>,
@@ -213,7 +219,9 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
                   : t("endRecording")
                 : t("pause")
             }
-            disabled={task.isLive && isStoppingRecording}
+            disabled={
+              task.remoteOffline || (task.isLive && isStoppingRecording)
+            }
             onClick={requestStop}
           >
             {task.isLive ? (
@@ -237,6 +245,7 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
             title={t("redownload")}
             aria-label={t("redownload")}
             onClick={() => startWithEvent(RESTART_DOWNLOAD)}
+            disabled={task.remoteOffline}
           >
             <CircleArrowDown className="size-4" />
           </Button>,
@@ -260,6 +269,7 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
             onClick={() =>
               startWithEvent(task.isLive ? RESTART_DOWNLOAD : CONTINUE_DOWNLOAD)
             }
+            disabled={task.remoteOffline}
           >
             <CircleArrowDown className="size-4" />
           </Button>,
@@ -276,7 +286,7 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
             className="text-muted-foreground hover:text-foreground"
             title={t("playVideo")}
             aria-label={t("playVideo")}
-            disabled={!task.exists}
+            disabled={task.origin === "docker" || !task.exists}
             onClick={handlePlay}
           >
             <CirclePlay className="size-4" />
@@ -316,6 +326,15 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
     if (task.isLive)
       list.push(
         <DownloadTag key="live" text={t("liveResource")} variant="info" />,
+      );
+    if (task.origin === "docker")
+      list.push(
+        <DownloadTag
+          key="docker"
+          icon={<Container />}
+          text={task.remoteOffline ? t("dockerOffline") : t("dockerSource")}
+          variant={task.remoteOffline ? "muted" : "info"}
+        />,
       );
 
     switch (task.status) {
@@ -364,19 +383,29 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
         break;
       case DownloadStatus.Failed:
         list.push(
-          <TerminalDialog
-            key="failed"
-            trigger={
-              <DownloadTag
-                icon={<CircleX />}
-                text={t("downloadFailed")}
-                variant="destructive"
-                className="cursor-pointer"
-              />
-            }
-            title={task.name}
-            id={task.id}
-          />,
+          task.remoteOffline ? (
+            <DownloadTag
+              key="failed"
+              icon={<CircleX />}
+              text={t("downloadFailed")}
+              variant="destructive"
+            />
+          ) : (
+            <TerminalDialog
+              key="failed"
+              trigger={
+                <DownloadTag
+                  icon={<CircleX />}
+                  text={t("downloadFailed")}
+                  variant="destructive"
+                  className="cursor-pointer"
+                />
+              }
+              title={task.name}
+              id={task.id}
+              origin={task.origin}
+            />
+          ),
         );
         break;
       case DownloadStatus.Stopped:
@@ -456,6 +485,18 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
           <div className="min-w-0 shrink truncate" title={item.url}>
             {item.url}
           </div>
+          {item.remoteOffline && item.remoteLastSyncedAt ? (
+            <>
+              <span className="shrink-0 text-border-strong" aria-hidden="true">
+                ·
+              </span>
+              <span className="shrink-0 whitespace-nowrap">
+                {t("dockerLastSynced", {
+                  time: fromatDateTime(item.remoteLastSyncedAt),
+                })}
+              </span>
+            </>
+          ) : null}
           {displayedCreatedTime ? (
             <>
               <span className="shrink-0 text-border-strong" aria-hidden="true">
@@ -470,7 +511,7 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
               </time>
             </>
           ) : null}
-          {item.status === DownloadStatus.Failed ? (
+          {item.status === DownloadStatus.Failed && !item.remoteOffline ? (
             <>
               <span className="shrink-0 text-border-strong" aria-hidden="true">
                 ·
@@ -487,6 +528,7 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
                 }
                 title={item.name}
                 id={item.id}
+                origin={item.origin}
               />
             </>
           ) : null}
@@ -506,21 +548,26 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
             "bg-surface-selected hover:bg-surface-selected": selected,
             "opacity-70":
               task.status === DownloadStatus.Success && !task.exists,
+            "border-l-2 border-l-sky-500/50 bg-sky-500/[0.03]":
+              task.origin === "docker" && !task.remoteOffline,
+            "cursor-not-allowed border-l-2 border-l-muted-foreground/30 bg-muted/30 opacity-60 hover:bg-muted/30":
+              task.origin === "docker" && task.remoteOffline,
           },
         )}
         onContextMenu={
-          isWeb
+          isWeb || task.remoteOffline
             ? undefined
             : (event) => {
                 event.preventDefault();
-                void onContextMenu(task.id);
+                void onContextMenu(task);
               }
         }
       >
         <Checkbox
           className="mt-2"
           checked={selected}
-          onCheckedChange={() => onSelectChange(task.id)}
+          disabled={task.remoteOffline}
+          onCheckedChange={() => onSelectChange(task)}
         />
         <div className={cn("flex flex-1 flex-col gap-1 overflow-hidden")}>
           <div className="relative flex flex-row items-center gap-2">
@@ -537,7 +584,9 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
             {isWeb ? (
               <TaskActionsMenu
                 task={task}
-                onSelect={() => onSelect(task.id)}
+                disabled={task.remoteOffline}
+                disablePlay={task.origin === "docker"}
+                onSelect={() => onSelect(task)}
                 onStart={() =>
                   startWithEvent(
                     task.status === DownloadStatus.Failed
@@ -554,7 +603,7 @@ export const DownloadTaskItem = memo(function DownloadTaskItem({
                 onPlay={handlePlay}
                 onEdit={() => onShowEditForm?.(task)}
                 onRefresh={onRefresh}
-                onDelete={() => onDelete(task.id)}
+                onDelete={() => onDelete(task)}
               />
             ) : null}
           </div>

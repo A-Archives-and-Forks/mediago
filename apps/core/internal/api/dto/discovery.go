@@ -14,9 +14,11 @@ type CreateDiscoveryReq struct {
 }
 
 type CreateDiscoveryDownloadsReq struct {
-	SourceIDs     []string `json:"sourceIds" binding:"required"`
-	Folder        string   `json:"folder"`
-	StartDownload *bool    `json:"startDownload"`
+	SourceIDs     []string          `json:"sourceIds" binding:"required"`
+	Folder        string            `json:"folder"`
+	Names         map[string]string `json:"names,omitempty"`
+	VariantURLs   map[string]string `json:"variantUrls,omitempty"`
+	StartDownload *bool             `json:"startDownload"`
 }
 
 type BridgeDiscoverySourceReq struct {

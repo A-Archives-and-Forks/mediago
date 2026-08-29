@@ -90,6 +90,7 @@ const WEB_CONTENTS_DESTROYED_ERROR_CODE = -1001;
 const UNSUPPORTED_PROTOCOL_ERROR_CODE = -1002;
 const ELECTRON_USER_AGENT_TOKEN = /\sElectron\/[^\s]+/gi;
 const MOBILE_VIEWPORT_WIDTH = 412;
+const DISCOVERY_COMPLETION_MARGIN_MS = 250;
 
 export function chromeCompatibleDesktopUserAgent(userAgent: string): string {
   return userAgent.replace(ELECTRON_USER_AGENT_TOKEN, "").trim();
@@ -585,7 +586,13 @@ export default class BrowserTabManagerService implements DiscoveryBrowserExecuto
     this.agentTabs.set(request.discoveryId, tabId);
     const collection = this.sniffingHelper.collectAgent(tabId, {
       signal,
-      timeoutMs: request.input.timeoutMs,
+      // Finish just before Core's authoritative deadline so partial sources
+      // have enough time to cross the bridge instead of losing the race to
+      // Core's timeout transition.
+      timeoutMs: Math.max(
+        1,
+        request.input.timeoutMs - DISCOVERY_COMPLETION_MARGIN_MS,
+      ),
     });
     try {
       const navigation = runtime.view.webContents.loadURL(request.input.url);

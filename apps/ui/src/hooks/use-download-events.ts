@@ -104,7 +104,7 @@ function isDownloadTasksCacheKey(key: unknown): boolean {
     typeof key === "object" &&
     key !== null &&
     "key" in key &&
-    key.key === "api/tasks"
+    key.key === "api/tasks/local"
   );
 }
 

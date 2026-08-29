@@ -1,5 +1,6 @@
 export {
   SNIFF_FILTERS,
+  isHLSContentType,
   matchPageUrl,
   matchRequestUrl,
   shouldSuppressRequestSource,

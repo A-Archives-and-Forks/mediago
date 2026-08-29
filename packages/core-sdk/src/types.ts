@@ -107,6 +107,7 @@ export interface SourceInspection {
   playlistType: "master" | "media" | "unknown";
   maxQuality?: string;
   variants: HLSVariantInspection[];
+  errorCode?: "invalid_url" | "not_hls" | "fetch_failed" | "response_too_large";
   error?: string;
 }
 
@@ -188,6 +189,9 @@ export interface DiscoveryRequestOptions {
 export interface CreateDiscoveryDownloadsParams {
   sourceIds: string[];
   folder?: string;
+  names?: Record<string, string>;
+  /** Optional master-playlist variant URL selected for each source id. */
+  variantUrls?: Record<string, string>;
   startDownload?: boolean;
 }
 
